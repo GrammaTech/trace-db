@@ -4,15 +4,13 @@
 
 #include "trace.h"
 
-struct trace_read_state
-{
-    FILE *file;
-    const char** dictionary;
-};
-
 trace_read_state *start_reading(const char *filename)
 {
     trace_read_state *state = (trace_read_state *)malloc(sizeof(trace_read_state));
+    state->size_buffer = NULL;
+    state->n_sizes = 0;
+    state->var_buffer = NULL;
+    state->n_vars = 0;
     state->file = fopen(filename, "rb");
 
     /* Scan through the string dictionary, counting characters and strings */
@@ -34,7 +32,7 @@ trace_read_state *start_reading(const char *filename)
 
     /* Now read the whole dictionary and split it up */
     rewind(state->file);
-    state->dictionary = (const char**)malloc(sizeof(char*) * n_strings);
+    state->dictionary = (const char**)malloc(sizeof(char*) * (n_strings + 1));
     char *buf = (char*)malloc(n_chars);;
     fread(buf, 1, n_chars, state->file);
 
@@ -44,6 +42,7 @@ trace_read_state *start_reading(const char *filename)
             buf++;
         buf++;
     }
+    state->dictionary[n_strings] = NULL;
     /* Read final NULL which terminates dictionary */
     assert(fgetc(state->file) == 0);
 
@@ -101,4 +100,58 @@ void end_reading(trace_read_state *state)
     free((void *)state->dictionary[0]);
     free(state->dictionary);
     free(state);
+}
+
+static void ensure_buffer_size(void **buffer, size_t element_size,
+                               uint32_t *allocated, uint32_t needed)
+{
+    if (*allocated >= needed)
+        return;
+
+    if (*allocated == 0)
+        *allocated = 1024;
+    else
+        *allocated *= 2;
+
+    *buffer = realloc(*buffer, *allocated * element_size);
+}
+
+int read_trace_point(trace_read_state *state, trace_point *result_ptr)
+{
+    trace_point result = { 0, 0, 0, 0 };
+    int valid_point = 0;
+
+    while (1) {
+        trace_entry entry = read_entry(state);
+
+        switch (entry.kind) {
+        case END_ENTRY:
+          goto end;
+        case STATEMENT:
+          result.statement = entry.data;
+          break;
+        case SCOPES:
+          result.n_vars = entry.data;
+          ensure_buffer_size((void **)&(state->var_buffer), sizeof(trace_var_info),
+                             &state->n_vars, result.n_vars);
+          for (size_t i = 0; i < result.n_vars; i++) {
+              state->var_buffer[i] = read_var_info(state);
+          }
+          result.vars = state->var_buffer;
+          break;
+        case SIZES:
+          result.n_sizes = entry.data;
+          ensure_buffer_size((void **)&(state->size_buffer), sizeof(trace_buffer_size),
+                         &state->n_sizes, result.n_sizes);
+          for (size_t i = 0; i < result.n_sizes; i++) {
+              state->size_buffer[i] = read_buffer_size(state);
+          }
+          result.sizes = state->size_buffer;
+        }
+        valid_point = 1 ;
+    }
+
+ end:
+    *result_ptr = result;
+    return valid_point ? 0 : 1;
 }
