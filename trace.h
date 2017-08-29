@@ -60,7 +60,16 @@ typedef struct trace_var_info
     uint64_t value;
 } trace_var_info;
 
-typedef struct trace_read_state trace_read_state;
+typedef struct trace_read_state
+{
+    FILE *file;
+    const char** dictionary;
+
+    trace_buffer_size *size_buffer;
+    uint32_t n_sizes;
+    trace_var_info *var_buffer;
+    uint32_t n_vars;
+} trace_read_state;
 
 typedef struct trace_entry
 {
@@ -77,5 +86,20 @@ trace_buffer_size read_buffer_size(trace_read_state *state);
 const char* string_lookup(trace_read_state *state, uint8_t index);
 
 void end_reading(trace_read_state *state);
+
+typedef struct trace_point
+{
+    uint64_t statement;
+    trace_buffer_size *sizes;
+    uint32_t n_sizes;
+    trace_var_info *vars;
+    uint32_t n_vars;
+} trace_point;
+
+/* Read an entire trace point.
+
+   Return 0 if successful.
+*/
+int read_trace_point(trace_read_state *state, trace_point *result_ptr);
 
 #endif // __TRACE_H
