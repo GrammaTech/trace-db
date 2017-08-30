@@ -1,3 +1,100 @@
+# Current Plan
+
+-   [ ] Design a simple binary format
+-   [ ] Implement a trivial trace collector which performs minimal
+    pre-processing of traces before storing them
+-   [ ] Implement a simple query API
+-   [ ] Connect to SEL/Bug-injector
+
+# Use Cases
+
+Ideas from past and future GrammaTech projects.
+
+## CodeSonar X
+
+Add-on to identify overflows, etc.
+-   Use rewriting to make program vulnerable
+-   Run, looking for overflows
+-   Dump traces after each overflow
+
+Traces are currently list of effective addresses. Long-term may have
+variable or register values, allocation sizes.
+
+Overflows are detected by scanning the traces linearly.
+
+## CodeSonar regression test tracing
+
+Run an entire test suite, collecting traces, then query for various
+properties:
+-   Which tests executed a given line of code?
+-   Which values were assigned to a variable in a particular test or
+    set of tests?
+
+We might want to support strings, C++ standard containers, and other
+non-primitive types.
+
+## AER
+
+Similar to CodeSonar X. Binary focused &#x2013; storing addresses, registers
+and flags.
+
+## Heterogeneous Computing
+
+Use tracing to build call graphs from obfuscated code. Very simple,
+just basic block IDs.
+
+## Value-set analysis
+
+Use an initial trace to initialize static VSA. Again, collecting
+values of variables at each execution point.
+
+## Bug Injector
+
+Collect values of variables and sizes of memory regions.
+
+Queries can be fairly complicated, looking for trace points which
+satisfy arbitrary preconditions.
+
+# Requirements
+
+-   Support various primitive types (signed and unsigned, different sizes)
+-   Support binary blobs of arbitrary size (for tracing strings and
+    data structures)
+-   Query API
+    -   Minimal for now, only meeting current needs
+    -   Keep orthogonal to storage as much as possible
+
+# Architecture
+
+1.  Programs are instrumented to write trace data to a pipe.
+
+2.  Trace data is read by a trace collector, which preprocesses the
+    traces for compaction and writes them to a database.
+
+3.  Client programs query the trace database to perform trace
+    processing and analysis.
+
+# Format Ideas
+
+-   Dictionary of variable names
+-   Dictionary of types
+    -   Names
+    -   Size
+    -   Signedness
+    -   Any other necessary properties
+-   Type indices are variable size, defined in the trace header
+-   Other details are generally similar to the current prototype
+
+# Concurrency
+
+Can we handle multiple writers?
+-   Trace collector can poll multiple pipes and keep traces separate
+-   Can compaction handle multiple traces arriving in parallel?
+    -   May cause sub-optimal results from hash consing
+    -   If necessary could re-compact the database later
+
+Probably no need for read/write concurrency at this time.
+
 # Trace Collection, Storage, and analysis Process
 
 Combine the insights of hash-consing and compression.
@@ -19,8 +116,12 @@ Combine the insights of hash-consing and compression.
 
 ## Instrumentation
 
-Could be done with clang-instrument (or in other contexts with binary
-rewriting).
+Could be done with clang-instrument, but that won't be suitable for
+all uses (e.g. when source is not available). The binary format should
+be kept simple so we can easily inject code to write it whatever
+context is necessary. We will also want to support other languages so
+ideally it won't be too much work to reimplement the trace writing
+functions.
 
 ## Execution
 
@@ -116,7 +217,7 @@ See [Whole program paths](http://stonecat.grammatech.com/repos/reading/larus1999
 Introduces "hash-consing"
 
 -   p.29 III-5 &#x2013; p.31 &#x2013;
-    
+
     > The basic problem is to take a key (a variable or an expression), a
     > data base name (property name), and a context, and logically search
     > backwards toward the root looking for the first context in which
