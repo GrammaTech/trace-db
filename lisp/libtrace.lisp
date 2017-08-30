@@ -156,7 +156,7 @@
                      (for i upfrom 0)
                      (for str = (mem-aref ptr :string i))
                      (while str)
-                     (collect str result-type 'array))))
+                     (collect str result-type 'vector))))
     (unwind-protect
          (with-foreign-object (point-struct '(:struct trace-point))
            (iter (while (eq 0 (read-trace-point state point-struct)))
@@ -176,7 +176,7 @@
                      (for i upfrom 0)
                      (for str = (mem-aref ptr :string i))
                      (while str)
-                     (collect str result-type 'array))))
+                     (collect str result-type 'vector))))
     (unwind-protect
          (with-foreign-object (results '(:struct trace-point) limit)
            (iter (for count = (read-many-points state results limit))
