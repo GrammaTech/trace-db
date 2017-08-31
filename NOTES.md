@@ -1,106 +1,72 @@
-# Current Plan
+% Trace DB Notes
 
--   [ ] Design a simple binary format
--   [ ] Implement a trivial trace collector which performs minimal
+Top level contents
+- [Architecture](#architecture)
+- [Trace Collection, Storage, and analysis Process](#trace-collection-storage-and-analysis-process)
+- [Anticipated benefits](#anticipated-benefits)
+- [Use Cases](#use-cases)
+- [Requirements](#requirements)
+- [Format Ideas](#format-ideas)
+- [Miscellaneous](#miscellaneous)
+
+Current Implementation Plan
+1.  Design a simple binary format
+2.  Implement a trivial trace collector which performs minimal
     pre-processing of traces before storing them
--   [ ] Implement a simple query API
--   [ ] Connect to SEL/Bug-injector
-
-# Use Cases
-
-Ideas from past and future GrammaTech projects.
-
-## CodeSonar X
-
-Add-on to identify overflows, etc.
--   Use rewriting to make program vulnerable
--   Run, looking for overflows
--   Dump traces after each overflow
-
-Traces are currently list of effective addresses. Long-term may have
-variable or register values, allocation sizes.
-
-Overflows are detected by scanning the traces linearly.
-
-## CodeSonar regression test tracing
-
-Run an entire test suite, collecting traces, then query for various
-properties:
--   Which tests executed a given line of code?
--   Which values were assigned to a variable in a particular test or
-    set of tests?
-
-We might want to support strings, C++ standard containers, and other
-non-primitive types.
-
-## AER
-
-Similar to CodeSonar X. Binary focused &#x2013; storing addresses, registers
-and flags.
-
-## Heterogeneous Computing
-
-Use tracing to build call graphs from obfuscated code. Very simple,
-just basic block IDs.
-
-## Value-set analysis
-
-Use an initial trace to initialize static VSA. Again, collecting
-values of variables at each execution point.
-
-## Bug Injector
-
-Collect values of variables and sizes of memory regions.
-
-Queries can be fairly complicated, looking for trace points which
-satisfy arbitrary preconditions.
-
-# Requirements
-
--   Support various primitive types (signed and unsigned, different sizes)
--   Support binary blobs of arbitrary size (for tracing strings and
-    data structures)
--   Query API
-    -   Minimal for now, only meeting current needs
-    -   Keep orthogonal to storage as much as possible
+3.  Implement a simple query API
+4.  Connect to SEL/Bug-injector
 
 # Architecture
 
-1.  Programs are instrumented to write trace data to a pipe.
+     +--------------+                  Search in      +----------+
+     | Instrumented |                  query lang     |  Client  |
+     |   Program    |              +------------------|          |
+    1| ------------ |              v        5         |          |
+     |  write to    |       +--------------+  results |          |
+     |    pipe      |       |   TRACE-DB   |--------->|          |
+     +--------------+       | -----------  |          +----------+
+       2 | Binary           |              |
+    pipe V Format           |  Hash        |
+    +--------------+        |  Consing     |
+    |  3 Trace     |        |              |
+    |  Collector   | Writes |  Searchable  |
+    | -----------  |------->|  Compression |
+    | pre-process  |   4    |              |
+    +--------------+        +--------------+
 
-2.  Trace data is read by a trace collector, which preprocesses the
-    traces for compaction and writes them to a database.
+1.  Programs are instrumented (source or binary) to write trace data
+    to a pipe.  Trace-db provides instrumentation as C which may be
+    injected literally into program source, or compiled to a shared
+    object and linked into a program.
 
-3.  Client programs query the trace database to perform trace
+2.  Program is run and trace data written to a pipe.
+
+3.  Trace data is read and parsed by a trace collector.  Trace
+    collector may also pre-process data before writing to the database
+    (e.g., convert memory values to sizes of the pointed to regions).
+
+4.  Trace data is written into the trace database.  This will perform
+    hash consing and compression to reduce the resources required for
+    trace storage and search.
+
+5.  Client programs query the trace database to perform trace
     processing and analysis.
 
-# Format Ideas
+## API, points of contact/use for clients
 
--   Dictionary of variable names
--   Dictionary of types
-    -   Names
-    -   Size
-    -   Signedness
-    -   Any other necessary properties
--   Type indices are variable size, defined in the trace header
--   Other details are generally similar to the current prototype
+-   Instrumentation to produce binary format.
 
-# Concurrency
+-   Optional pre-processing.
 
-Can we handle multiple writers?
--   Trace collector can poll multiple pipes and keep traces separate
--   Can compaction handle multiple traces arriving in parallel?
-    -   May cause sub-optimal results from hash consing
-    -   If necessary could re-compact the database later
-
-Probably no need for read/write concurrency at this time.
+-   Search of trace-db and results processing.
 
 # Trace Collection, Storage, and analysis Process
 
 Combine the insights of hash-consing and compression.
 
-1.  **Instrumentation**.
-2.  **Execution**.
+1.  [Instrumentation](#instrumentation).
+2.  [Execution](#execution).
+
 3.  **Preprocessing** for Compaction.
     -   *difference traces* (see [Blocking: Exploiting spatial locality
         for trace compaction](http://stonecat/repos/reading/agarwal1990blocking.html) and [Mache: No-loss trace compaction](http://stonecat/repos/reading/samples1989mache.html))
@@ -161,7 +127,6 @@ Requirements
 -   <https://github.com/moyix/panda/blob/master/qemu/panda/pandalog.c>
 
 # Anticipated benefits
-
 ## Compact storage
 
 Both via hash-consing and then subsequent compression.
@@ -177,20 +142,100 @@ For two reasons.
     (In effect we run analysis on the compressed data not on the full
     data.)
 
-# Enclosing wrappers to automate trace collection
+# Use Cases
 
--   [X] trace path into instrumented program on ENV
--   [X] `traceable` software-object class
--   [X] Serialization and parsing using either
-    -   cl-conspack, or
-    -   [series](https://www.cs.cmu.edu/Groups/AI/html/cltl/clm/node347.html)
-    -   [X] simple `read`
+Ideas from past and future GrammaTech projects.
 
-# TODO Read "whole program paths"
+## CodeSonarX
+
+Tails of traces leading up to crash points.  Mainly interested in a
+series of EAs or LoCs building up to the crash location.
+
+Add-on to identify overflows, etc.
+-   Use rewriting to make program vulnerable
+-   Run, looking for overflows
+-   Dump traces after each overflow
+
+Traces are currently list of effective addresses. Long-term may have
+variable or register values, allocation sizes.
+
+Overflows are detected by scanning the traces linearly.
+
+## CodeSonar regression test tracing
+
+Run an entire test suite, collecting traces, then query for various
+properties:
+-   Which tests executed a given line of code?
+-   Which values were assigned to a variable in a particular test or
+    set of tests?
+
+We might want to support strings, C++ standard containers, and other
+non-primitive types.
+
+Will access traces by loc and variable from the source code.  Might
+need to care about scopes, but this can be reverse engineered from var
+and loc.
+
+## AER
+
+Similar to CodeSonar X. Binary focused &#x2013; storing addresses,
+registers and flags.
+
+Will access traces to dump linear sequences by successive EA/LOC.
+
+## Heterogeneous Computing
+
+Use tracing to build call graphs from obfuscated code. Very simple,
+just basic block IDs.
+
+Will access traces to dump full linear sequence of basic block
+transitions.
+
+## Value-set analysis
+
+Use an initial trace to initialize static VSA. Again, collecting
+values of variables at each execution point.
+
+## Bug Injector
+
+Collect values of variables and sizes of memory regions.
+
+Queries can be fairly complicated, looking for trace points which
+satisfy arbitrary preconditions.
+
+# Requirements
+
+-   (maybe) Support various primitive types (signed and unsigned, different sizes)
+-   Support binary blobs of arbitrary size (for tracing strings and data structures)
+-   Query API
+    -   Minimal for now, only meeting current needs
+    -   Keep orthogonal to storage as much as possible
+
+# Format Ideas
+
+-   Dictionary of variable names
+-   Dictionary of types
+    -   Names
+    -   Size
+    -   Signedness (Eric thinks we skip this?)
+    -   Any other necessary properties (Eric thinks we skip this?)
+-   Type indices are variable size, defined in the trace header
+-   Other details are generally similar to the current prototype
+
+Maybe the keys into this database should be variable size determined
+at instrumentation time based on the size of the dictionaries.
+
+> Eric thinks we may not want to include signedness in the type
+> database, rather this is a property *of* the type and is maybe
+> something that the client should care about but we can let trace-db
+> continue to treat everything as sequences of bytes.
+
+# Miscellaneous
+## "whole program paths"
 
 See [Whole program paths](http://stonecat.grammatech.com/repos/reading/larus1999whole.html).
 
-# TODO diff storage
+## diff storage
 
 -   All functional data structures (maximize re-use)
 -   Look into [hash-consing](https://en.wikipedia.org/wiki/Hash_consing)
@@ -204,13 +249,13 @@ See [Whole program paths](http://stonecat.grammatech.com/repos/reading/larus1999
         generically point back to?
 -   Breaking on function boundaries
 
-## Memoizing expensive trace calculation on ingestion
+### Memoizing expensive trace calculation on ingestion
 
 > We should keep in mind the desire to not repeat trace-based
 > calculation (e.g., memory region maintenance) when we re-process a
 > repeated trace region (assuming our diff representation).
 
-## Incremental incorporation
+### Incremental incorporation
 
 [An interactive program verifier](file:///home/eschulte/reading/reading.md)
 
@@ -240,7 +285,17 @@ Introduces "hash-consing"
     > program gave an average of 3.98 entries examined per successful
     > lookup, and 2.44 per unsuccessful lookup.
 
-## See also
+## Concurrency
+
+Can we handle multiple writers?
+-   Trace collector can poll multiple pipes and keep traces separate
+-   Can compaction handle multiple traces arriving in parallel?
+    -   May cause sub-optimal results from hash consing
+    -   If necessary could re-compact the database later
+
+Probably no need for read/write concurrency at this time.
+
+### See also
 
 -   [Efficient program tracing](http://stonecat/repos/reading/larus1993efficient.html)
 -   [Trace-driven memory simulation: A survey](http://stonecat/repos/reading/uhlig1997trace.html)
