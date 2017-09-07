@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "trace.h"
+#include "read-trace.h"
 
 trace_read_state *start_reading(const char *filename)
 {
@@ -13,70 +13,84 @@ trace_read_state *start_reading(const char *filename)
     state->n_vars = 0;
     state->file = fopen(filename, "rb");
 
-    /* Scan through the string dictionary, counting characters and strings */
-    /* XXX: a size or count field would simplify this */
-    size_t n_chars, n_strings = 0;
-    int non_empty = 0;
-    for (n_chars = 0;; n_chars++) {
-        if (fgetc(state->file) == 0) {
-            if (non_empty) {     /* end of string */
-                non_empty = 0;
-                n_strings++;
-            }
-            else                /* empty string terminates dictionary */
-                break;
-        } else {
-            non_empty = 1;
-        }
-    }
+    /* Read dictionary of names */
+    size_t n_chars;
+    fread(&n_chars, sizeof(n_chars), 1, state->file);
 
-    /* Now read the whole dictionary and split it up */
-    rewind(state->file);
-    state->dictionary = (const char**)malloc(sizeof(char*) * (n_strings + 1));
-    char *buf = (char*)malloc(n_chars);;
+    char *buf = (char*)malloc(n_chars);
     fread(buf, 1, n_chars, state->file);
 
+    /* Scan once to count strings */
+    size_t n_strings = 0;
+    for (int i = 0; i < n_chars; i++) {
+        if (buf[i] == 0)
+            n_strings++;
+    }
+    state->names = (const char**)malloc(sizeof(char*) * n_strings);
+
+    /* Scan again to find starts of each string */
     for (int i = 0; i < n_strings; i++) {
-        state->dictionary[i] = buf; /* dictionary[0] points to original buf */
+        state->names[i] = buf; /* names[0] points to original buf */
         while (*buf != 0)
             buf++;
         buf++;
     }
-    state->dictionary[n_strings] = NULL;
-    /* Read final NULL which terminates dictionary */
-    assert(fgetc(state->file) == 0);
+    state->n_names = n_strings;
+
+    /* Read dictionary of types */
+    size_t n_types;
+    fread(&n_types, sizeof(n_types), 1, state->file);
+    type_description *types = malloc(sizeof(type_description) * n_types);
+    fread(types, sizeof(type_description), n_types, state->file);
+    state->types = types;
+    state->n_types = n_types;
 
     return state;
 }
 
-trace_entry read_entry(trace_read_state *state)
+enum trace_entry_tag read_tag(trace_read_state *state)
 {
-    trace_entry result;
-    result.kind = fgetc(state->file);
-    if (result.kind == EOF)
-        result.kind = END_ENTRY;
+    char c = fgetc(state->file);
+    if (c == EOF)
+        return END_OF_TRACE;
+    assert(c < UNKNOWN);
 
-    /* No data */
-    if (result.kind == END_ENTRY)
-        return result;
+    return (enum trace_entry_tag)c;
+}
 
-    /* FIXME: handle EOF here (in case of truncated trace) */
-    if (result.kind == STATEMENT)
-        fread(&result.data, sizeof(result.data), 1, state->file);
-    else {
-        /* Just a single byte var/size counts */
-        result.data = fgetc(state->file);
-    }
+uint64_t read_id(trace_read_state *state)
+{
+    uint64_t id;
+    fread(&id, sizeof(id), 1, state->file);
 
-    return result;
+    return id;
 }
 
 trace_var_info read_var_info(trace_read_state *state)
 {
     trace_var_info result;
-    result.name_index = fgetc(state->file);
-    result.type_index = fgetc(state->file);
-    fread(&result.value, 1, sizeof(result.value), state->file);
+    fread(&result.name_index, sizeof(result.name_index), 1, state->file);
+    fread(&result.type_index, sizeof(result.type_index), 1, state->file);
+
+    type_description type = state->types[result.type_index];
+    if (type.format == BLOB) {
+        /* Blob type: store value on the heap */
+        uint16_t size = type.size;
+        if (type.size == 0) {
+            /* Variable-sized type: read size from trace */
+            fread(&size, sizeof(size), 1, state->file);
+        }
+        result.size = size;
+
+        result.value.ptr = malloc(size);
+        fread(result.value.ptr, size, 1, state->file);
+    }
+    else {
+        /* Primitive type: read directly into result */
+        result.size = type.size;
+        result.value.u = 0;
+        fread(&result.value.u, result.size, 1, state->file);
+    }
 
     return result;
 }
@@ -89,19 +103,15 @@ trace_buffer_size read_buffer_size(trace_read_state *state)
     return result;
 }
 
-const char* string_lookup(trace_read_state *state, uint8_t index)
-{
-    return state->dictionary[index];
-}
-
 void end_reading(trace_read_state *state)
 {
     fclose(state->file);
-    free((void *)state->dictionary[0]);
-    free(state->dictionary);
+    free((void *)state->names[0]);
+    free(state->names);
     free(state);
 }
 
+#if 0
 static void ensure_buffer_size(void **buffer, size_t element_size,
                                uint32_t *allocated, uint32_t needed)
 {
@@ -127,10 +137,10 @@ int read_trace_point(trace_read_state *state, trace_point *result_ptr)
         switch (entry.kind) {
         case END_ENTRY:
           goto end;
-        case STATEMENT:
+        case STATEMENT_ID:
           result.statement = entry.data;
           break;
-        case SCOPES:
+        case VARIABLE:
           result.n_vars = entry.data;
           ensure_buffer_size((void **)&(state->var_buffer), sizeof(trace_var_info),
                              &state->n_vars, result.n_vars);
@@ -173,10 +183,10 @@ int read_many_points(trace_read_state *state, trace_point *results, uint32_t lim
             switch (entry.kind) {
             case END_ENTRY:
               goto end_point;
-            case STATEMENT:
+            case STATEMENT_ID:
               result.statement = entry.data;
               break;
-            case SCOPES:
+            case VARIABLE:
               result.n_vars = entry.data;
               var_start[n_read] = var_index;
 
@@ -221,3 +231,4 @@ int read_many_points(trace_read_state *state, trace_point *results, uint32_t lim
 
     return n_read;
 }
+#endif
