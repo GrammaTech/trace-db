@@ -14,14 +14,14 @@ trace_read_state *start_reading(const char *filename)
     state->file = fopen(filename, "rb");
 
     /* Read dictionary of names */
-    size_t n_chars;
+    uint16_t n_chars;
     fread(&n_chars, sizeof(n_chars), 1, state->file);
 
     char *buf = (char*)malloc(n_chars);
     fread(buf, 1, n_chars, state->file);
 
     /* Scan once to count strings */
-    size_t n_strings = 0;
+    uint16_t n_strings = 0;
     for (int i = 0; i < n_chars; i++) {
         if (buf[i] == 0)
             n_strings++;
@@ -38,7 +38,7 @@ trace_read_state *start_reading(const char *filename)
     state->n_names = n_strings;
 
     /* Read dictionary of types */
-    size_t n_types;
+    uint16_t n_types;
     fread(&n_types, sizeof(n_types), 1, state->file);
     type_description *types = malloc(sizeof(type_description) * n_types);
     fread(types, sizeof(type_description), n_types, state->file);
@@ -58,9 +58,9 @@ enum trace_entry_tag read_tag(trace_read_state *state)
     return (enum trace_entry_tag)c;
 }
 
-uint64_t read_id(trace_read_state *state)
+uint32_t read_id(trace_read_state *state)
 {
-    uint64_t id;
+    uint32_t id;
     fread(&id, sizeof(id), 1, state->file);
 
     return id;
