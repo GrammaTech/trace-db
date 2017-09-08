@@ -1,4 +1,18 @@
-/* Sample code for reading and writing binary traces. */
+/*
+Sample code for reading and writing binary traces.
+
+Usage:
+trace-test [--write] <filename>
+
+With --write, writes a trace to <filename> while printing "ground truth" to
+stdout. Otherwise, read a trace from <filename> and print the results.
+
+This can be used as a self-test with:
+trace-test --write trace.out > expected && diff expected <(trace-test trace.out)
+
+If reading and writing are working correctly, both invocations of trace-test
+will produce the same output.
+*/
 
 #include <assert.h>
 #include <stdio.h>
@@ -28,8 +42,20 @@ void write_test_trace(const char *filename)
         { 6, BLOB, 0 }, /* unsigned int */
     };
 
-    write_trace_header(out, names, sizeof(names) / sizeof(*names),
-                       types, sizeof(types) / sizeof(*types));
+    size_t n_names = sizeof(names) / sizeof(*names);
+    size_t n_types = sizeof(types) / sizeof(*types);
+    write_trace_header(out, names, n_names, types, n_types);
+
+    printf("names:\n");
+    for (int i = 0; i < n_names; i++) {
+        printf("  %s\n", names[i]);
+    }
+    printf("\ntypes:\n");
+    for (int i = 0; i < n_types; i++) {
+        type_description type = types[i];
+        printf("  %s: %u, %u bytes\n",
+               names[type.name_index], type.format, type.size);
+    }
 
     char *chars = "hello, world";
     for (int i = 0; i < 10; i++) {
@@ -46,11 +72,22 @@ void write_test_trace(const char *filename)
         WRITE_TRACE_VARIABLE(out, 10, 3, f);
         WRITE_TRACE_VARIABLE(out, 11, 4, d);
         WRITE_TRACE_VARIABLE(out, 12, 5, u);
-        WRITE_TRACE_BLOB(out, 12, 6, strlen(ptr), ptr);
+        WRITE_TRACE_BLOB(out, 8, 6, strlen(ptr), ptr);
         /* Fake buffer size */
         write_buffer_size(out, (void *)(size_t)(0xff + i), 10 * i);
         write_end_entry(out);
+
+        printf("ID: %d\n", 100 + i);
+        printf("i: int, %lu bytes = %d\n", sizeof(i), i);
+        printf("ptr: *char, %lu bytes = %lx\n", sizeof(ptr), (size_t)ptr);
+        printf("c: char, %lu bytes = %u '%c'\n", sizeof(c), c, c);
+        printf("f: float, %lu bytes = %g\n", sizeof(f), f);
+        printf("d: double, %lu bytes = %g\n", sizeof(d), d);
+        printf("u: unsigned int, %lu bytes = %u\n", sizeof(u), u);
+        printf("ptr: string, %lu bytes = blob: '%s'\n", strlen(ptr), ptr);
+        printf("buffer size: %x . %u\n\n", (0xff + i), 10 * i);
     }
+    printf("read 10 trace points\n");
 
     fclose(out);
 }
@@ -78,6 +115,7 @@ void read_trace(const char *filename)
 
         switch (tag) {
         case END_ENTRY:
+          printf("\n");
           count++;
           break;
         case STATEMENT_ID:
@@ -110,7 +148,7 @@ void read_trace(const char *filename)
                       printf("%g", info.value.d);
                   break;
                 case BLOB:
-                  printf("blob: '%.*s'\n", info.size, (const char *)info.value.ptr);
+                  printf("blob: '%.*s'", info.size, (const char *)info.value.ptr);
                   free(info.value.ptr);
                   break;
                 default:
