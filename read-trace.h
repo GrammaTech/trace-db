@@ -4,6 +4,7 @@
 #define __READ_TRACE_H
 
 #include <stdint.h>
+#include <stdio.h>
 #include "types.h"
 
 typedef struct trace_var_info
@@ -34,11 +35,40 @@ typedef struct trace_read_state
     uint32_t n_vars;
 } trace_read_state;
 
+/*
+Read header and initialize state.
+
+The returned state should be cleaned up with end_reading().
+
+Returns NULL if the header can't be read.
+ */
 trace_read_state *start_reading(const char *filename);
 
+/*
+   Read trace tag.
+
+   Returns END_OF_TRACE at end of file, TRACE_TAG_ERROR for an unrecognized
+   tag or any other error.
+ */
 enum trace_entry_tag read_tag(trace_read_state *state);
+
+/*
+   Read statement ID. Returns 0 on error.
+ */
 uint32_t read_id(trace_read_state *state);
+
+/*
+   Read a variable.
+
+   Result will have size 0 on error.
+ */
 trace_var_info read_var_info(trace_read_state *state);
+
+/*
+   Read an address and corresponding buffer size.
+
+   Result will have address 0 on error.
+ */
 trace_buffer_size read_buffer_size(trace_read_state *state);
 
 void end_reading(trace_read_state *state);
