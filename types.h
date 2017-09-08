@@ -10,7 +10,8 @@ enum type_format {
     SIGNED,                     /* signed integer */
     FLOAT,                      /* floating point */
     POINTER,                    /* unsigned, interpret as address */
-    BLOB                        /* arbitrary bytes, do not interpret */
+    BLOB,                       /* arbitrary bytes, do not interpret */
+    INVALID_FORMAT
 };
 
 typedef struct {
@@ -27,7 +28,7 @@ enum trace_entry_tag {
     STATEMENT_ID,
     VARIABLE,
     BUFFER_SIZE,
-    UNKNOWN,
+    TRACE_TAG_ERROR,
     /* Returned at EOF, should not appear in trace */
     END_OF_TRACE
 };

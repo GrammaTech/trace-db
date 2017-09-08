@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -25,6 +26,7 @@ void write_trace_header(FILE *out, const char **names, uint16_t n_names,
 
 void write_trace_id(FILE *out, uint32_t statement_id)
 {
+    assert(statement_id != 0);
     fputc(STATEMENT_ID, out);
     fwrite(&statement_id, sizeof(statement_id), 1, out);
 }

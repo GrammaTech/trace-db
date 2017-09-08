@@ -95,6 +95,7 @@ void write_test_trace(const char *filename)
 void read_trace(const char *filename)
 {
     trace_read_state *state = start_reading(filename);
+    assert(state);
 
     printf("names:\n");
     for (int i = 0; i < state->n_names; i++) {
@@ -110,6 +111,7 @@ void read_trace(const char *filename)
     int count = 0;
     while (1) {
         enum trace_entry_tag tag = read_tag(state);
+        assert(tag != TRACE_TAG_ERROR);
         if (tag == END_OF_TRACE)
             break;
 
@@ -119,11 +121,17 @@ void read_trace(const char *filename)
           count++;
           break;
         case STATEMENT_ID:
-          printf("ID: %u\n", read_id(state));
-          break;
+            {
+                uint32_t id = read_id(state);
+                assert(id != 0);
+                printf("ID: %u\n", id);
+                break;
+            }
         case VARIABLE:
             {
                 trace_var_info info = read_var_info(state);
+                assert(info.size != 0);
+
                 type_description type = state->types[info.type_index];
                 printf("%s: %s, %u bytes = ", state->names[info.name_index],
                        state->names[type.name_index], info.size);
@@ -161,6 +169,8 @@ void read_trace(const char *filename)
         case BUFFER_SIZE:
             {
                 trace_buffer_size info = read_buffer_size(state);
+                assert(info.address != 0);
+
                 printf("buffer size: %lx . %lu\n", info.address, info.size);
                 break;
             }

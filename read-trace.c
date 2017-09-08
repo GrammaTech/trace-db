@@ -4,21 +4,23 @@
 
 #include "read-trace.h"
 
+#define FREAD_CHECK(ptr, size, nmemb, stream) \
+    if (fread((ptr), (size), (nmemb), (stream)) != (nmemb)) goto error
+
 trace_read_state *start_reading(const char *filename)
 {
-    trace_read_state *state = (trace_read_state *)malloc(sizeof(trace_read_state));
-    state->size_buffer = NULL;
-    state->n_sizes = 0;
-    state->var_buffer = NULL;
-    state->n_vars = 0;
+    trace_read_state *state = (trace_read_state *)calloc(1, sizeof(trace_read_state));
     state->file = fopen(filename, "rb");
 
     /* Read dictionary of names */
     uint16_t n_chars;
-    fread(&n_chars, sizeof(n_chars), 1, state->file);
+    FREAD_CHECK(&n_chars, sizeof(n_chars), 1, state->file);
 
     char *buf = (char*)malloc(n_chars);
-    fread(buf, 1, n_chars, state->file);
+    if (fread(buf, 1, n_chars, state->file) != n_chars) {
+        free(buf);
+        goto error;
+    }
 
     /* Scan once to count strings */
     uint16_t n_strings = 0;
@@ -39,13 +41,24 @@ trace_read_state *start_reading(const char *filename)
 
     /* Read dictionary of types */
     uint16_t n_types;
-    fread(&n_types, sizeof(n_types), 1, state->file);
+    FREAD_CHECK(&n_types, sizeof(n_types), 1, state->file);
     type_description *types = malloc(sizeof(type_description) * n_types);
-    fread(types, sizeof(type_description), n_types, state->file);
+    FREAD_CHECK(types, sizeof(type_description), n_types, state->file);
     state->types = types;
     state->n_types = n_types;
 
+    for (int i = 0; i < n_types; i++) {
+        if (types[i].format >= INVALID_FORMAT || types[i].name_index >= state->n_names)
+            goto error;
+    }
+
     return state;
+
+ error:
+    if (state)
+        end_reading(state);
+
+    return NULL;
 }
 
 enum trace_entry_tag read_tag(trace_read_state *state)
@@ -53,7 +66,8 @@ enum trace_entry_tag read_tag(trace_read_state *state)
     char c = fgetc(state->file);
     if (c == EOF)
         return END_OF_TRACE;
-    assert(c < UNKNOWN);
+    else if (c >= TRACE_TAG_ERROR)
+        return TRACE_TAG_ERROR;
 
     return (enum trace_entry_tag)c;
 }
@@ -61,16 +75,22 @@ enum trace_entry_tag read_tag(trace_read_state *state)
 uint32_t read_id(trace_read_state *state)
 {
     uint32_t id;
-    fread(&id, sizeof(id), 1, state->file);
+    FREAD_CHECK(&id, sizeof(id), 1, state->file);
 
     return id;
+
+ error:
+    return 0;
 }
 
 trace_var_info read_var_info(trace_read_state *state)
 {
     trace_var_info result;
-    fread(&result.name_index, sizeof(result.name_index), 1, state->file);
-    fread(&result.type_index, sizeof(result.type_index), 1, state->file);
+    FREAD_CHECK(&result.name_index, sizeof(result.name_index), 1, state->file);
+    FREAD_CHECK(&result.type_index, sizeof(result.type_index), 1, state->file);
+
+    if (result.name_index >= state->n_names || result.type_index > state->n_types)
+        goto error;
 
     type_description type = state->types[result.type_index];
     if (type.format == BLOB) {
@@ -78,36 +98,49 @@ trace_var_info read_var_info(trace_read_state *state)
         uint16_t size = type.size;
         if (type.size == 0) {
             /* Variable-sized type: read size from trace */
-            fread(&size, sizeof(size), 1, state->file);
+            FREAD_CHECK(&size, sizeof(size), 1, state->file);
         }
         result.size = size;
 
         result.value.ptr = malloc(size);
-        fread(result.value.ptr, size, 1, state->file);
+        FREAD_CHECK(result.value.ptr, size, 1, state->file);
     }
     else {
         /* Primitive type: read directly into result */
         result.size = type.size;
         result.value.u = 0;
-        fread(&result.value.u, result.size, 1, state->file);
+        FREAD_CHECK(&result.value.u, result.size, 1, state->file);
     }
 
+    return result;
+
+ error:
+    result.size = 0;
     return result;
 }
 
 trace_buffer_size read_buffer_size(trace_read_state *state)
 {
     trace_buffer_size result;
-    fread(&result, sizeof(result), 1, state->file);
+    FREAD_CHECK(&result, sizeof(result), 1, state->file);
 
+    return result;
+
+ error:
+    result.address = 0;
+    result.size = 0;
     return result;
 }
 
 void end_reading(trace_read_state *state)
 {
-    fclose(state->file);
-    free((void *)state->names[0]);
-    free(state->names);
+    if (state->file)
+        fclose(state->file);
+    if (state->names) {
+        if (state->names[0])
+            free((void *)state->names[0]);
+        free(state->names);
+    }
     free(state);
 }
 
