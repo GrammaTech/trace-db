@@ -2,15 +2,15 @@
 Sample code for reading and writing binary traces.
 
 Usage:
-trace-test [--write] <filename>
+sample [--write] <filename>
 
 With --write, writes a trace to <filename> while printing "ground truth" to
 stdout. Otherwise, read a trace from <filename> and print the results.
 
 This can be used as a self-test with:
-trace-test --write trace.out > expected && diff expected <(trace-test trace.out)
+sample --write trace.out > expected && diff expected <(sample trace.out)
 
-If reading and writing are working correctly, both invocations of trace-test
+If reading and writing are working correctly, both invocations of sample
 will produce the same output.
 */
 
