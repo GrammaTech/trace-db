@@ -119,7 +119,7 @@ void read_trace(const char *filename)
           count++;
           break;
         case STATEMENT_ID:
-          printf("ID: %lu\n", read_id(state));
+          printf("ID: %u\n", read_id(state));
           break;
         case VARIABLE:
             {

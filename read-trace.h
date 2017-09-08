@@ -6,12 +6,6 @@
 #include <stdint.h>
 #include "types.h"
 
-typedef struct trace_buffer_size
-{
-    uint64_t address;
-    uint64_t size;
-} trace_buffer_size;
-
 typedef struct trace_var_info
 {
     union {
@@ -43,7 +37,7 @@ typedef struct trace_read_state
 trace_read_state *start_reading(const char *filename);
 
 enum trace_entry_tag read_tag(trace_read_state *state);
-uint64_t read_id(trace_read_state *state);
+uint32_t read_id(trace_read_state *state);
 trace_var_info read_var_info(trace_read_state *state);
 trace_buffer_size read_buffer_size(trace_read_state *state);
 

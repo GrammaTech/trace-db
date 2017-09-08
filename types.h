@@ -1,3 +1,5 @@
+/* Types used for reading and writing */
+
 #ifndef __TYPES_H
 #define __TYPES_H
 
@@ -29,5 +31,12 @@ enum trace_entry_tag {
     /* Returned at EOF, should not appear in trace */
     END_OF_TRACE
 };
+
+typedef struct trace_buffer_size
+{
+    uint64_t address;
+    uint64_t size;
+} trace_buffer_size;
+
 
 #endif // __TYPES_H
