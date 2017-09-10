@@ -42,22 +42,3 @@ void write_buffer_size(FILE *out, void *address, size_t size)
     trace_buffer_size val = { (uint64_t)address, (uint64_t)size };
     fwrite(&val, sizeof(val), 1, out);
 }
-
-#define WRITE_TRACE_VARIABLE(out, name_index, type_index, var)        \
-    do {                                                              \
-        uint16_t val;                                                 \
-        fputc(VARIABLE, out);                                         \
-        val = name_index; fwrite(&val, sizeof(val), 1, out);          \
-        val = type_index; fwrite(&val, sizeof(val), 1, out);          \
-        fwrite(&var, sizeof(var), 1, out);                            \
-    } while(0)
-
-#define WRITE_TRACE_BLOB(out, name_index, type_index, size, ptr)        \
-    do {                                                                \
-        uint16_t val;                                                   \
-        fputc(VARIABLE, out);                                           \
-        val = name_index; fwrite(&val, sizeof(val), 1, out);            \
-        val = type_index; fwrite(&val, sizeof(val), 1, out);            \
-        val = size; fwrite(&val, sizeof(val), 1, out);                  \
-        fwrite(ptr, size, 1, out);                                      \
-    } while (0)
