@@ -25,9 +25,9 @@ typedef struct trace_read_state
 {
     FILE *file;
     const char **names;
-    size_t n_names;
+    uint16_t n_names;
     const type_description *types;
-    size_t n_types;
+    uint16_t n_types;
 
     trace_buffer_size *size_buffer;
     uint32_t n_sizes;
@@ -60,6 +60,9 @@ uint32_t read_id(trace_read_state *state);
 /*
    Read a variable.
 
+   If the variable format is BLOB, the result will contain a heap pointer to
+   the value, which should be freed by the caller.
+
    Result will have size 0 on error.
  */
 trace_var_info read_var_info(trace_read_state *state);
@@ -84,10 +87,10 @@ typedef struct trace_point
 
 /* Read an entire trace point.
 
-   The resulting trace_point have pointers into caches in the state, and
-   is only valid until the next call to read_trace_point.
+   The resulting trace_point has pointers into caches in the state, and is
+   only valid until the next call to read_trace_point.
 
-   Return 0 if successful.
+   Return 0 if successful, 1 for EOF, -1 for error.
 */
 int read_trace_point(trace_read_state *state, trace_point *result_ptr);
 

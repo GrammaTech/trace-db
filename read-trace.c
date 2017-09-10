@@ -144,7 +144,6 @@ void end_reading(trace_read_state *state)
     free(state);
 }
 
-#if 0
 static void ensure_buffer_size(void **buffer, size_t element_size,
                                uint32_t *allocated, uint32_t needed)
 {
@@ -159,109 +158,62 @@ static void ensure_buffer_size(void **buffer, size_t element_size,
     *buffer = realloc(*buffer, *allocated * element_size);
 }
 
-int read_trace_point(trace_read_state *state, trace_point *result_ptr)
-{
+int read_trace_point(trace_read_state *state, trace_point *result_ptr){
     trace_point result = { 0, 0, 0, 0 };
-    int valid_point = 0;
 
     while (1) {
-        trace_entry entry = read_entry(state);
+        enum trace_entry_tag tag = read_tag(state);
+        if (tag == TRACE_TAG_ERROR || tag == END_OF_TRACE)
+            goto error;
+        if (tag == END_OF_TRACE)
+            break;
 
-        switch (entry.kind) {
+        switch (tag) {
         case END_ENTRY:
           goto end;
         case STATEMENT_ID:
-          result.statement = entry.data;
+          result.statement = read_id(state);
+          if (result.statement == 0)
+              goto error;
           break;
         case VARIABLE:
-          result.n_vars = entry.data;
-          ensure_buffer_size((void **)&(state->var_buffer), sizeof(trace_var_info),
-                             &state->n_vars, result.n_vars);
-          for (size_t i = 0; i < result.n_vars; i++) {
-              state->var_buffer[i] = read_var_info(state);
-          }
-          result.vars = state->var_buffer;
-          break;
-        case SIZES:
-          result.n_sizes = entry.data;
-          ensure_buffer_size((void **)&(state->size_buffer), sizeof(trace_buffer_size),
-                         &state->n_sizes, result.n_sizes);
-          for (size_t i = 0; i < result.n_sizes; i++) {
-              state->size_buffer[i] = read_buffer_size(state);
-          }
-          result.sizes = state->size_buffer;
+            {
+                trace_var_info info = read_var_info(state);
+                if (info.size == 0)
+                    goto error;
+
+                result.n_vars++;
+                ensure_buffer_size((void **)&(state->var_buffer), sizeof(trace_var_info),
+                                   &state->n_vars, result.n_vars);
+                state->var_buffer[result.n_vars - 1] = info;
+
+                break;
+            }
+
+        case BUFFER_SIZE:
+            {
+                trace_buffer_size info = read_buffer_size(state);
+                if (info.address == 0)
+                    goto error;
+
+
+                result.n_sizes++;
+                ensure_buffer_size((void **)&(state->size_buffer), sizeof(trace_buffer_size),
+                                   &state->n_sizes, result.n_sizes);
+                state->size_buffer[result.n_sizes - 1] = info;
+                break;
+            }
+        default:
+          goto error;
         }
-        valid_point = 1 ;
     }
 
  end:
+    result.vars = state->var_buffer;
+    result.sizes = state->size_buffer;
     *result_ptr = result;
-    return valid_point ? 0 : 1;
+    return (result.statement > 0) ? 0 : 1;
+
+ error:
+    return -1;
 }
-
-int read_many_points(trace_read_state *state, trace_point *results, uint32_t limit)
-{
-    uint32_t var_index = 0, size_index = 0;
-    uint32_t *var_start = malloc(limit * sizeof(uint32_t));
-    uint32_t *size_start = malloc(limit * sizeof(uint32_t));
-
-    uint32_t n_read;
-    for (n_read = 0; n_read < limit; n_read++) {
-        trace_point result = { 0, 0, 0, 0 };
-        int valid_point = 0;
-
-        while (1) {
-            trace_entry entry = read_entry(state);
-
-            switch (entry.kind) {
-            case END_ENTRY:
-              goto end_point;
-            case STATEMENT_ID:
-              result.statement = entry.data;
-              break;
-            case VARIABLE:
-              result.n_vars = entry.data;
-              var_start[n_read] = var_index;
-
-              ensure_buffer_size((void **)&(state->var_buffer), sizeof(trace_var_info),
-                                 &state->n_vars, var_index + result.n_vars);
-              for (size_t i = 0; i < result.n_vars; i++) {
-                  state->var_buffer[var_index++] = read_var_info(state);
-              }
-              break;
-            case SIZES:
-              result.n_sizes = entry.data;
-              size_start[n_read] = size_index;
-
-              ensure_buffer_size((void **)&(state->size_buffer), sizeof(trace_buffer_size),
-                                 &state->n_sizes, size_index + result.n_sizes);
-              for (size_t i = 0; i < result.n_sizes; i++) {
-                  state->size_buffer[size_index++] = read_buffer_size(state);
-              }
-              break;
-            }
-            valid_point = 1 ;
-        }
-
-    end_point:
-        if (valid_point)
-            results[n_read] = result;
-        else
-            break;              /* end of trace */
-    }
-
-    /* var and size buffers may have been realloced while reading. Convert
-       buffer indices into pointers for all points. */
-    for (uint32_t i = 0; i < n_read; i++) {
-        if (results[i].n_vars > 0)
-            results[i].vars = state->var_buffer + var_start[i];
-        if (results[i].n_sizes > 0)
-            results[i].sizes = state->size_buffer + size_start[i];
-    }
-
-    free(var_start);
-    free(size_start);
-
-    return n_read;
-}
-#endif
