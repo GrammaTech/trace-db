@@ -15,4 +15,4 @@ check: unit-test
 	LD_LIBRARY_PATH=. ./unit-test
 
 clean:
-	rm libtrace.so unit-test sample
+	rm -f libtrace.so unit-test sample
