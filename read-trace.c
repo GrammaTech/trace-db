@@ -137,10 +137,12 @@ void end_reading(trace_read_state *state)
     if (state->file)
         fclose(state->file);
     if (state->names) {
-        if (state->names[0])
+        if (state->n_names > 0)
             free((void *)state->names[0]);
         free(state->names);
     }
+    if (state->types)
+        free((void *)state->types);
     free(state);
 }
 
