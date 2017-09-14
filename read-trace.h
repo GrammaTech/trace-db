@@ -40,9 +40,9 @@ Read header and initialize state.
 
 The returned state should be cleaned up with end_reading().
 
-Returns NULL if the header can't be read.
+Returns NULL if the header can't be read or reading times out.
  */
-trace_read_state *start_reading(const char *filename);
+trace_read_state *start_reading(const char *filename, int timeout_seconds);
 
 /*
    Read trace tag.
