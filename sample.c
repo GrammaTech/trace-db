@@ -185,13 +185,86 @@ void read_trace(const char *filename)
     printf("read %d trace points\n", count);
 }
 
+void read_trace_2(const char *filename)
+{
+    trace_read_state *state = start_reading(filename);
+    assert(state);
+
+    printf("names:\n");
+    for (int i = 0; i < state->n_names; i++) {
+        printf("  %s\n", state->names[i]);
+    }
+    printf("\ntypes:\n");
+    for (int i = 0; i < state->n_types; i++) {
+        type_description type = state->types[i];
+        printf("  %s: %u, %u bytes\n",
+               state->names[type.name_index], type.format, type.size);
+    }
+
+    int count = 0;
+    trace_point point;
+
+    while (read_trace_point(state, &point) == 0) {
+        count++;
+        printf("ID: %u\n", point.statement);
+        for (uint32_t i = 0; i < point.n_vars; i++) {
+            trace_var_info info = point.vars[i];
+            assert(info.size != 0);
+
+            type_description type = state->types[info.type_index];
+            printf("%s: %s, %u bytes = ", state->names[info.name_index],
+                   state->names[type.name_index], info.size);
+            switch (type.format) {
+            case UNSIGNED:
+              printf("%lu", info.value.u);
+              if (type.size == 1)
+                  printf(" '%c'", (unsigned char)info.value.u);
+              break;
+            case SIGNED:
+              printf("%ld", info.value.s);
+              if (type.size == 1)
+                  printf(" '%c'", (char)info.value.u);
+              break;
+            case POINTER:
+              printf("%lx", info.value.u);
+              break;
+            case FLOAT:
+              if (type.size == 4)
+                  printf("%g", info.value.f);
+              else
+                  printf("%g", info.value.d);
+              break;
+            case BLOB:
+              printf("blob: '%.*s'", info.size, (const char *)info.value.ptr);
+              free(info.value.ptr);
+              break;
+            default:
+              printf("<unrecognized format %u>", type.format);
+            }
+            printf("\n");
+        }
+        for (uint32_t i = 0; i < point.n_sizes; i++) {
+            trace_buffer_size info = point.sizes[i];
+            assert(info.address != 0);
+
+            printf("buffer size: %lx . %lu\n", info.address, info.size);
+            break;
+        }
+        printf("\n");
+    }
+
+    end_reading(state);
+
+    printf("read %d trace points\n", count);
+}
+
 int main(int argc, char **argv)
 {
     if (!strcmp(argv[1], "--write")) {
         write_test_trace(argv[2]);
     }
     else {
-        read_trace(argv[1]);
+        read_trace_2(argv[1]);
     }
 
     return 0;

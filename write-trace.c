@@ -33,7 +33,8 @@ void write_trace_id(FILE *out, uint32_t statement_id)
 
 void write_end_entry(FILE *out)
 {
-    fputc(0, out);
+    fputc(END_ENTRY, out);
+    fflush(out);
 }
 
 void write_buffer_size(FILE *out, void *address, size_t size)

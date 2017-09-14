@@ -78,7 +78,7 @@ void end_reading(trace_read_state *state);
 
 typedef struct trace_point
 {
-    uint64_t statement;
+    uint32_t statement;
     trace_buffer_size *sizes;
     uint32_t n_sizes;
     trace_var_info *vars;
