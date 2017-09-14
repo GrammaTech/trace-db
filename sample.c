@@ -94,7 +94,7 @@ void write_test_trace(const char *filename)
 
 void read_trace(const char *filename)
 {
-    trace_read_state *state = start_reading(filename);
+    trace_read_state *state = start_reading(filename, 10);
     assert(state);
 
     printf("names:\n");
@@ -187,7 +187,7 @@ void read_trace(const char *filename)
 
 void read_trace_2(const char *filename)
 {
-    trace_read_state *state = start_reading(filename);
+    trace_read_state *state = start_reading(filename, 10);
     assert(state);
 
     printf("names:\n");

@@ -1,7 +1,11 @@
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "read-trace.h"
 #include "write-trace.h"
@@ -39,7 +43,7 @@ void test_eof_in_header()
     {
         FILE *out = fopen(TRACE_FILE, "w");
         fclose(out);
-        assert(start_reading(TRACE_FILE) == NULL);
+        assert(start_reading(TRACE_FILE, 10) == NULL);
     }
 
     /* Truncated name dictionary */
@@ -49,7 +53,7 @@ void test_eof_in_header()
         fwrite(val, sizeof(val), 1, out);
         fclose(out);
 
-        assert(start_reading(TRACE_FILE) == NULL);
+        assert(start_reading(TRACE_FILE, 10) == NULL);
     }
 
     /* Missing type dictionary */
@@ -62,7 +66,7 @@ void test_eof_in_header()
         fputc(0, out);
         fclose(out);
 
-        assert(start_reading(TRACE_FILE) == NULL);
+        assert(start_reading(TRACE_FILE, 10) == NULL);
     }
 
     /* Truncated type dictionary */
@@ -77,7 +81,7 @@ void test_eof_in_header()
         fwrite(&vals, sizeof(vals), 1, out);
         fclose(out);
 
-        assert(start_reading(TRACE_FILE) == NULL);
+        assert(start_reading(TRACE_FILE, 10) == NULL);
     }
 }
 
@@ -87,7 +91,7 @@ void test_good_header()
     fputc(END_ENTRY, out);
     fclose(out);
 
-    trace_read_state *state = start_reading(TRACE_FILE);
+    trace_read_state *state = start_reading(TRACE_FILE, 10);
     assert(state);
     assert(state->n_names == 4);
     assert(state->n_types == 3);
@@ -102,7 +106,7 @@ void test_bad_tag()
     fputc(END_OF_TRACE + 2, out);
     fclose(out);
 
-    trace_read_state *state = start_reading(TRACE_FILE);
+    trace_read_state *state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == TRACE_TAG_ERROR);
 
     end_reading(state);
@@ -113,7 +117,7 @@ void test_eof_in_tag()
     FILE *out = write_test_header();
     fclose(out);
 
-    trace_read_state *state = start_reading(TRACE_FILE);
+    trace_read_state *state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == END_OF_TRACE);
 
     end_reading(state);
@@ -126,7 +130,7 @@ void test_eof_in_id()
     fputc(0xab, out);           /* arbitrary byte */
     fclose(out);
 
-    trace_read_state *state = start_reading(TRACE_FILE);
+    trace_read_state *state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == STATEMENT_ID);
     assert(read_id(state) == 0);
 }
@@ -139,7 +143,7 @@ void test_eof_in_variable()
     fputc(0xab, out);            /* arbitrary byte */
     fclose(out);
 
-    trace_read_state *state = start_reading(TRACE_FILE);
+    trace_read_state *state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == VARIABLE);
     assert(read_var_info(state).size == 0);
 
@@ -151,7 +155,7 @@ void test_eof_in_variable()
     fputc(0xab, out);            /* arbitrary byte */
     fclose(out);
 
-    state = start_reading(TRACE_FILE);
+    state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == VARIABLE);
     assert(read_var_info(state).size == 0);
 
@@ -160,7 +164,7 @@ void test_eof_in_variable()
     fputc(0xab, out);            /* arbitrary byte */
     fclose(out);
 
-    state = start_reading(TRACE_FILE);
+    state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == VARIABLE);
     assert(read_var_info(state).size == 0);
 }
@@ -175,7 +179,7 @@ void test_eof_in_blob_variable()
     fputc(0xab, out);            /* arbitrary byte */
     fclose(out);
 
-    state = start_reading(TRACE_FILE);
+    state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == VARIABLE);
     assert(read_var_info(state).size == 0);
 
@@ -184,7 +188,7 @@ void test_eof_in_blob_variable()
     fputc(0xab, out);            /* arbitrary byte */
     fclose(out);
 
-    state = start_reading(TRACE_FILE);
+    state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == VARIABLE);
     assert(read_var_info(state).size == 0);
 
@@ -196,7 +200,7 @@ void test_eof_in_blob_variable()
     fputc(0xab, out);            /* arbitrary byte */
     fclose(out);
 
-    state = start_reading(TRACE_FILE);
+    state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == VARIABLE);
     assert(read_var_info(state).size == 0);
 }
@@ -213,7 +217,7 @@ void test_bad_index_in_variable()
     fwrite(&value, sizeof(value), 1, out);
     fclose(out);
 
-    state = start_reading(TRACE_FILE);
+    state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == VARIABLE);
     assert(read_var_info(state).size == 0);
 
@@ -222,7 +226,7 @@ void test_bad_index_in_variable()
     fwrite(&value, sizeof(value), 1, out);
     fclose(out);
 
-    state = start_reading(TRACE_FILE);
+    state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == VARIABLE);
     assert(read_var_info(state).size == 0);
 
@@ -238,7 +242,7 @@ void test_bad_type()
                            types, N_ELTS(types));
         fclose(out);
 
-        assert(start_reading(TRACE_FILE) == NULL);
+        assert(start_reading(TRACE_FILE, 10) == NULL);
     }
 
     /* Bad name index */
@@ -249,7 +253,7 @@ void test_bad_type()
                            types, N_ELTS(types));
         fclose(out);
 
-        assert(start_reading(TRACE_FILE) == NULL);
+        assert(start_reading(TRACE_FILE, 10) == NULL);
     }
 }
 
@@ -260,9 +264,36 @@ void test_eof_in_buffer_size()
     fputc(0xab, out);           /* arbitrary byte */
     fclose(out);
 
-    trace_read_state *state = start_reading(TRACE_FILE);
+    trace_read_state *state = start_reading(TRACE_FILE, 10);
     assert(read_tag(state) == BUFFER_SIZE);
     assert(read_buffer_size(state).address == 0);
+}
+
+void test_read_from_fifo()
+{
+    FILE *out = write_test_header();
+    fclose(out);
+
+    mkfifo("test/fifo", 0700);
+    system("cat test/tmp.trace > test/fifo &");
+
+    trace_read_state *state = start_reading("test/fifo", 10);
+    unlink("test/fifo");
+
+    assert(state);
+    assert(read_tag(state) == END_OF_TRACE);
+    end_reading(state);
+
+}
+
+void test_timeout_from_fifo()
+{
+    mkfifo("test/fifo", 0700);
+
+    trace_read_state *state = start_reading("test/fifo", 1);
+    unlink("test/fifo");
+
+    assert(state == NULL);
 }
 
 int main(int argc, char **argv)
@@ -277,6 +308,8 @@ int main(int argc, char **argv)
     test_bad_index_in_variable();
     test_bad_type();
     test_eof_in_buffer_size();
+    test_read_from_fifo();
+    test_timeout_from_fifo();
 
     unlink(TRACE_FILE);
 
