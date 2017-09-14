@@ -53,7 +53,7 @@
   (n-types :uint16))
 
 (defcstruct (trace-point :class c-trace-point)
-  (statement :uint64)
+  (statement :uint32)
   (sizes (:pointer (:struct buffer-size)))
   (n-sizes :uint32)
   (vars (:pointer (:struct var-info)))

@@ -4,6 +4,4 @@
         :alexandria
         :iterate
         :cffi)
-  (:export :test-read
-           :test-read-2
-           :test-read-3))
+  (:export :read-trace))
