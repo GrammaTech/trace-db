@@ -242,6 +242,17 @@ int read_trace_point(trace_read_state *state, trace_point *result_ptr){
                 state->size_buffer[result.n_sizes - 1] = info;
                 break;
             }
+        case AUXILIARY:
+          {
+              uint64_t value;
+              FREAD_CHECK(&value, sizeof(value), 1, state->file);
+
+              result.n_aux++;
+              ensure_buffer_size((void **)&(state->aux_buffer), sizeof(uint64_t),
+                                 &state->n_aux, result.n_aux);
+              state->aux_buffer[result.n_aux - 1] = value;
+              break;
+          }
         default:
           goto error;
         }
@@ -250,6 +261,7 @@ int read_trace_point(trace_read_state *state, trace_point *result_ptr){
  end:
     result.vars = state->var_buffer;
     result.sizes = state->size_buffer;
+    result.aux = state->aux_buffer;
     *result_ptr = result;
     return (result.statement > 0) ? 0 : 1;
 

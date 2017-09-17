@@ -75,6 +75,8 @@ void write_test_trace(const char *filename)
         WRITE_TRACE_BLOB(out, 8, 6, strlen(ptr), ptr);
         /* Fake buffer size */
         write_buffer_size(out, (void *)(size_t)(0xff + i), 10 * i);
+        uint64_t uint = 100 * i;
+        write_trace_aux(out, uint);
         write_end_entry(out);
 
         printf("ID: %d\n", 100 + i);
@@ -85,7 +87,9 @@ void write_test_trace(const char *filename)
         printf("d: double, %lu bytes = %g\n", sizeof(d), d);
         printf("u: unsigned int, %lu bytes = %u\n", sizeof(u), u);
         printf("ptr: string, %lu bytes = blob: '%s'\n", strlen(ptr), ptr);
-        printf("buffer size: %x . %u\n\n", (0xff + i), 10 * i);
+        printf("buffer size: %x . %u\n", (0xff + i), 10 * i);
+        printf("uint: %lu bytes = %lu\n", sizeof(uint), uint);
+        printf("\n");
     }
     printf("read 10 trace points\n");
 
@@ -174,6 +178,14 @@ void read_trace(const char *filename)
                 printf("buffer size: %lx . %lu\n", info.address, info.size);
                 break;
             }
+        case AUXILIARY:
+            {
+                uint64_t value;
+                assert(fread(&value, sizeof(value), 1, state->file) == 1);
+
+                printf("uint: %lu bytes = %lu\n", sizeof(value), value);
+                break;
+            }
         default:
           fprintf(stderr, "ERROR: unknown trace tag %u\n", tag);
           exit(1);
@@ -248,6 +260,12 @@ void read_trace_2(const char *filename)
             assert(info.address != 0);
 
             printf("buffer size: %lx . %lu\n", info.address, info.size);
+            break;
+        }
+        for (uint32_t i = 0; i < point.n_aux; i++) {
+            uint64_t val = point.aux[i];
+
+            printf("uint: %lu bytes = %lu\n", sizeof(val), val);
             break;
         }
         printf("\n");

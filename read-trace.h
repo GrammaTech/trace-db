@@ -33,6 +33,8 @@ typedef struct trace_read_state
     uint32_t n_sizes;
     trace_var_info *var_buffer;
     uint32_t n_vars;
+    uint64_t *aux_buffer;
+    uint32_t n_aux;
 } trace_read_state;
 
 /*
@@ -83,6 +85,8 @@ typedef struct trace_point
     uint32_t n_sizes;
     trace_var_info *vars;
     uint32_t n_vars;
+    uint64_t *aux;
+    uint32_t n_aux;
 } trace_point;
 
 /* Read an entire trace point.
