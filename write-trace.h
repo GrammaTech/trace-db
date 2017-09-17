@@ -28,6 +28,7 @@
 void write_trace_header(FILE *out, const char **names, uint16_t n_names,
                         const type_description *types, uint16_t n_types);
 void write_trace_id(FILE *out, uint32_t statement_id);
+void write_trace_aux(FILE *out, uint64_t value);
 void write_end_entry(FILE *out);
 void write_buffer_size(FILE *out, void *address, size_t size);
 

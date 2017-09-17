@@ -31,6 +31,12 @@ void write_trace_id(FILE *out, uint32_t statement_id)
     fwrite(&statement_id, sizeof(statement_id), 1, out);
 }
 
+void write_trace_aux(FILE *out, uint64_t value)
+{
+    fputc(AUXILIARY, out);
+    fwrite(&value, sizeof(value), 1, out);
+}
+
 void write_end_entry(FILE *out)
 {
     fputc(END_ENTRY, out);

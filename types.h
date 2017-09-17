@@ -28,6 +28,8 @@ enum trace_entry_tag {
     STATEMENT_ID,
     VARIABLE,
     BUFFER_SIZE,
+    /* A 64-bit value, meaning defined by the user */
+    AUXILIARY,
     TRACE_TAG_ERROR,
     /* Returned at EOF, should not appear in trace */
     END_OF_TRACE
