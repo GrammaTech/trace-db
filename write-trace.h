@@ -6,13 +6,27 @@
 #include <stdint.h>
 #include "types.h"
 
-#define WRITE_TRACE_VARIABLE(out, name_index, type_index, var)        \
-    do {                                                              \
-        uint16_t val;                                                 \
-        fputc(VARIABLE, out);                                         \
-        val = name_index; fwrite(&val, sizeof(val), 1, out);          \
-        val = type_index; fwrite(&val, sizeof(val), 1, out);          \
-        fwrite(&var, sizeof(var), 1, out);                            \
+#ifdef __cplusplus
+# define AUTO auto
+#else
+# define AUTO __auto_type
+#endif
+
+#define WRITE_TRACE_VARIABLE(out, name_index, type_index, var) \
+    do {                                                       \
+        uint16_t val;                                          \
+        fputc(VARIABLE, out);                                  \
+        val = name_index; fwrite(&val, sizeof(val), 1, out);   \
+        val = type_index; fwrite(&val, sizeof(val), 1, out);   \
+        /* Assigning to tmp here solves two problems:
+           1. If var has the "register" storage class, we can't take its address,
+              but tmp will discard the storage class.
+           2. If var is a static array, sizeof() will give the size of its
+              contents when we want to write its address. But tmp will be
+              a pointer.
+        */
+        AUTO tmp = var;                                        \
+        fwrite(&tmp, sizeof(tmp), 1, out);                     \
     } while(0)
 
 #define WRITE_TRACE_BLOB(out, name_index, type_index, size, ptr)        \
