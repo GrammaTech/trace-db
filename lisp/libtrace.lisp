@@ -142,7 +142,15 @@
                     (foreign-array-to-lisp aux `(:array :uint64 ,n-aux)))
               result))
       (when (> statement 0)
-        (push (cons :c statement) result))))
+        ;; SEL clang-project instrumentation uses 16 bits for
+        ;; statement ID, 15 for file ID, and the top bit as a flag
+        ;; indicating file ID is present.
+        ;; Since SEL is likely to be the only Lisp client, it's
+        ;; convenient to handle this here.
+        (if (> (logand statement (ash 1 31)) 0)
+            (progn (push (cons :c (logand #xFFFF statement)) result)
+                   (push (cons :f (logand #x7FFF (ash statement -16))) result))
+         (push (cons :c statement) result)))))
   result)
 
 (defun read-trace (file timeout &key (predicate #'identity) max
