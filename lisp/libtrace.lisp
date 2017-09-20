@@ -105,11 +105,15 @@
                                  (:blob :pointer))
                                offset)))
            (if (eq :blob (type-format type))
-               ;; Blob: collect into byte array
+               ;; Blob: convert to string, or collect into byte array.
                (prog1
-                   (iter (for i below size)
+                   (restart-case
+                       (foreign-string-to-lisp data :count size)
+                     (store-as-byte-array ()
+                       :report "Store as a byte array"
+                       (iter (for i below size)
                          (collecting (mem-ref data :char i)
-                           result-type 'vector))
+                           result-type 'vector))))
                  (foreign-free data))
 
              ;; Primitive type
