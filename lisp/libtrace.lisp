@@ -33,7 +33,7 @@
 
 (defstruct (type-description (:conc-name type-))
   (name-index nil :type fixnum)
-  (format nil :type (unsigned-byte 8))
+  (format nil :type symbol)
   (size nil :type (unsigned-byte 8)))
 
 (defcstruct (var-info :class c-var-info)
