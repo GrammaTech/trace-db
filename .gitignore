@@ -1,3 +1,5 @@
 /libtrace.so
 /unit-test
 /sample
+
+*.fasl
