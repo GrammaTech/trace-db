@@ -203,6 +203,13 @@ Collect values of variables and sizes of memory regions.
 Queries can be fairly complicated, looking for trace points which
 satisfy arbitrary preconditions.
 
+## Trace comparison
+
+We have previously implemented tools to compare traces, see
+[trace-cmp](https://git.grammatech.com/research/trace-cmp).
+Supporting walking multiple traces in parallel and showing the
+differences would be useful.
+
 # Requirements
 
 -   (maybe) Support various primitive types (signed and unsigned, different sizes)
