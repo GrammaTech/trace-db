@@ -33,8 +33,8 @@
 
 (defstruct (type-description (:conc-name type-))
   (name-index nil :type fixnum)
-  (format nil :type byte)
-  (size nil :type byte))
+  (format nil :type (unsigned-byte 8))
+  (size nil :type (unsigned-byte 8)))
 
 (defcstruct (var-info :class c-var-info)
   ;; CFFI's handling of the union here seems to be broken.
@@ -80,7 +80,7 @@
                               :format format
                               :size size))))
 
-(defcfun start-reading (:pointer trace-read-state)
+(defcfun start-reading (:pointer (:struct trace-read-state))
   (filename :string)
   (timeout :int))
 
