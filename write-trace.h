@@ -24,7 +24,7 @@
            2. If var is a static array, sizeof() will give the size of its
               contents when we want to write its address. But tmp will be
               a pointer.
-        */
+        */                                                     \
         AUTO tmp = var;                                        \
         fwrite(&tmp, sizeof(tmp), 1, out);                     \
     } while(0)
