@@ -1,14 +1,5 @@
 (in-package :libtrace)
 
-(define-constant +lib-dir+
-    (make-pathname :directory (butlast (pathname-directory
-                                        #.(or *compile-file-truename*
-                                              *load-truename*
-                                              *default-pathname-defaults*))))
-  :test #'equalp
-  :documentation "Path to directory holding shared library.")
-
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (format t "Loading libtrace.so from lib-dir ~a~%" +lib-dir+)
   (pushnew +lib-dir+ *foreign-library-directories*
