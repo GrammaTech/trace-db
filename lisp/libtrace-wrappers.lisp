@@ -1,8 +1,8 @@
 (in-package :libtrace)
 
-(flag "-I/home/rswords/Projects/synthesis/sel/quicklisp/local-projects/trace-db/")
-;(include "types.h")
-;(include "read-trace.h")
+;; (cc-flags #.(format nil "-I~a" (namestring +lib-dir+)))
+;; (include "types.h")
+;; (include "read-trace.h")
 
 (c "#include \"types.h\"")
 (c "#include \"read-trace.h\"")
