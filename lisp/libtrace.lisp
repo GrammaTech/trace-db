@@ -70,7 +70,7 @@
     `(with-foreign-slots ((statement sizes n-sizes vars n-vars aux n-aux)
                           ,point (:struct trace-point))
        (list statement sizes n-sizes vars n-vars aux n-aux)))
-  (defmethod expand-from-foreign (type-struct (type c-type-description))
+  (defmethod expand-from-foreign (type-struct (type type-description))
     `(with-foreign-slots ((name-index format size)
                           ,type-struct (:struct type-description))
        (make-type-description :name-index name-index
