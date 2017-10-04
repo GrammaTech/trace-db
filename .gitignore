@@ -1,5 +1,9 @@
+src/
+pkg/
+
 /libtrace.so
 /unit-test
 /sample
 
 *.fasl
+*.pkg.tar.xz
