@@ -4,7 +4,7 @@
         :alexandria
         :iterate
         :cffi)
-  (:export :read-trace :libtrace))
+  (:export :read-trace))
 (in-package :libtrace)
 
 (define-constant +lib-dir+

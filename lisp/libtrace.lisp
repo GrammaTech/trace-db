@@ -12,26 +12,26 @@
 
   (format t "Done loading libtrace.so"))
 
-;; (defcenum type-format
-;;   :unsigned
-;;   :signed
-;;   :float
-;;   :pointer
-;;   :blob)
+(defcenum type-format
+  :unsigned
+  :signed
+  :float
+  :pointer
+  :blob)
 
 (defcstruct (buffer-size :class c-buffer-size)
   (address :uint64)
   (size :uint64))
 
-;; (defcstruct (type-description :class c-type-description)
-;;   (name-index :uint16)
-;;   (format type-format)
-;;   (size :uint8))
+(defcstruct (type-description :class c-type-description)
+  (name-index :uint16)
+  (format type-format)
+  (size :uint8))
 
-;; (defstruct (type-description (:conc-name type-))
-;;   (name-index nil :type fixnum)
-;;   (format nil :type symbol)
-;;   (size nil :type (unsigned-byte 8)))
+(defstruct (type-description (:conc-name type-))
+  (name-index nil :type fixnum)
+  (format nil :type symbol)
+  (size nil :type (unsigned-byte 8)))
 
 (defcstruct (var-info :class c-var-info)
   ;; CFFI's handling of the union here seems to be broken.
@@ -42,12 +42,12 @@
   (type-index :uint16)
   (size :uint16))
 
-;; (defcstruct trace-read-state
-;;   (file :pointer)
-;;   (names (:pointer :string))
-;;   (n-names :uint16)
-;;   (types (:pointer (:struct type-description)))
-;;   (n-types :uint16))
+(defcstruct trace-read-state
+  (file :pointer)
+  (names (:pointer :string))
+  (n-names :uint16)
+  (types (:pointer (:struct type-description)))
+  (n-types :uint16))
 
 (defcstruct (trace-point :class c-trace-point)
   (statement :uint32)
@@ -70,22 +70,22 @@
     `(with-foreign-slots ((statement sizes n-sizes vars n-vars aux n-aux)
                           ,point (:struct trace-point))
        (list statement sizes n-sizes vars n-vars aux n-aux)))
-  (defmethod expand-from-foreign (type-struct (type type-description))
+  (defmethod expand-from-foreign (type-struct (type c-type-description))
     `(with-foreign-slots ((name-index format size)
                           ,type-struct (:struct type-description))
        (make-type-description :name-index name-index
                               :format format
                               :size size))))
 
-;; (defcfun start-reading (:pointer (:struct trace-read-state))
-;;   (filename :string)
-;;   (timeout :int))
+(defcfun start-reading (:pointer (:struct trace-read-state))
+  (filename :string)
+  (timeout :int))
 
-;; (defcfun end-reading :void
-;;   (state :pointer))
+(defcfun end-reading :void
+  (state :pointer))
 
-;; (defcfun read-trace-point :int
-;;   (state :pointer) (results :pointer))
+(defcfun read-trace-point :int
+  (state :pointer) (results :pointer))
 
 (defun convert-trace-point (names types point &optional (index 0) &aux result)
   "Convert a trace point to an alist."
