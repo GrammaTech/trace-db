@@ -19,7 +19,7 @@
             :components
             ((:file "package")
              (:grovel-file "libtrace-grovel")
-             (:wrapper-file "libtrace-wrappers" :soname "libtrace")
+             ;; (:wrapper-file "libtrace-wrappers" :soname "libtrace-wrappers")
              (:file "libtrace"))))
   ;:output-files (prepare-op (o c) (list "libtrace.so"))
   ;; :perform (prepare-op :before (o c)
