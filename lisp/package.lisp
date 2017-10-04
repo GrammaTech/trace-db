@@ -4,4 +4,4 @@
         :alexandria
         :iterate
         :cffi)
-  (:export :read-trace))
+  (:export :read-trace :libtrace))
