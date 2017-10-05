@@ -1,4 +1,4 @@
-CFLAGS = -O0 -Wall -g
+CFLAGS = -O0 -Wall -g -std=gnu11
 
 SRCS = read-trace.c write-trace.c
 
