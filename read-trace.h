@@ -98,13 +98,4 @@ typedef struct trace_point
 */
 int read_trace_point(trace_read_state *state, trace_point *result_ptr);
 
-/* Read multiple trace points at once.
-
-   The resulting trace_points have pointers into caches in the state, and are
-   only valid until the next call to read_many_points.
-
-   Return 0.
- */
-int read_many_points(trace_read_state *state, trace_point *results, uint32_t limit);
-
 #endif // __READ_TRACE_H
