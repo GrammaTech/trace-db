@@ -8,8 +8,13 @@
 
 #include "read-trace.h"
 
-#define FREAD_CHECK(ptr, size, nmemb, stream) \
-    if (fread((ptr), (size), (nmemb), (stream)) != (nmemb)) goto error
+#define FREAD_CHECK(ptr, size, nmemb, state   )                                  \
+    do {                                                                         \
+        if (fread((ptr), (size), (nmemb), (state)->file) != (nmemb)) {           \
+            (state)->error_code = feof((state)->file) ? TRACE_EOF : TRACE_ERROR; \
+            goto error;                                                          \
+        }                                                                        \
+       } while (0)
 
 static FILE *open_with_timeout(const char *filename, int timeout_seconds)
 {
@@ -51,7 +56,7 @@ trace_read_state *start_reading(const char *filename, int timeout_seconds)
 
     /* Read dictionary of names */
     uint16_t n_chars;
-    FREAD_CHECK(&n_chars, sizeof(n_chars), 1, state->file);
+    FREAD_CHECK(&n_chars, sizeof(n_chars), 1, state);
 
     char *buf = (char*)malloc(n_chars);
     if (fread(buf, 1, n_chars, state->file) != n_chars) {
@@ -78,9 +83,9 @@ trace_read_state *start_reading(const char *filename, int timeout_seconds)
 
     /* Read dictionary of types */
     uint16_t n_types;
-    FREAD_CHECK(&n_types, sizeof(n_types), 1, state->file);
+    FREAD_CHECK(&n_types, sizeof(n_types), 1, state);
     type_description *types = malloc(sizeof(type_description) * n_types);
-    FREAD_CHECK(types, sizeof(type_description), n_types, state->file);
+    FREAD_CHECK(types, sizeof(type_description), n_types, state);
     state->types = types;
     state->n_types = n_types;
 
@@ -89,6 +94,7 @@ trace_read_state *start_reading(const char *filename, int timeout_seconds)
             goto error;
     }
 
+    state->error_code = TRACE_OK;
     return state;
 
  error:
@@ -101,10 +107,12 @@ trace_read_state *start_reading(const char *filename, int timeout_seconds)
 enum trace_entry_tag read_tag(trace_read_state *state)
 {
     char c = fgetc(state->file);
-    if (c == EOF)
-        return END_OF_TRACE;
-    else if (c >= TRACE_TAG_ERROR)
-        return TRACE_TAG_ERROR;
+    if (c == EOF) {
+        state->error_code = TRACE_EOF;
+    }
+    else if (c >= INVALID_TAG) {
+        state->error_code = TRACE_ERROR;
+    }
 
     return (enum trace_entry_tag)c;
 }
@@ -112,7 +120,7 @@ enum trace_entry_tag read_tag(trace_read_state *state)
 uint32_t read_id(trace_read_state *state)
 {
     uint32_t id;
-    FREAD_CHECK(&id, sizeof(id), 1, state->file);
+    FREAD_CHECK(&id, sizeof(id), 1, state);
 
     return id;
 
@@ -123,11 +131,14 @@ uint32_t read_id(trace_read_state *state)
 trace_var_info read_var_info(trace_read_state *state)
 {
     trace_var_info result;
-    FREAD_CHECK(&result.name_index, sizeof(result.name_index), 1, state->file);
-    FREAD_CHECK(&result.type_index, sizeof(result.type_index), 1, state->file);
+    FREAD_CHECK(&result.name_index, sizeof(result.name_index), 1, state);
+    FREAD_CHECK(&result.type_index, sizeof(result.type_index), 1, state);
 
-    if (result.name_index >= state->n_names || result.type_index > state->n_types)
+    if (result.name_index >= state->n_names
+        || result.type_index >= state->n_types) {
+        state->error_code = TRACE_ERROR;
         goto error;
+    }
 
     type_description type = state->types[result.type_index];
     if (type.format == BLOB) {
@@ -135,37 +146,30 @@ trace_var_info read_var_info(trace_read_state *state)
         uint16_t size = type.size;
         if (type.size == 0) {
             /* Variable-sized type: read size from trace */
-            FREAD_CHECK(&size, sizeof(size), 1, state->file);
+            FREAD_CHECK(&size, sizeof(size), 1, state);
         }
         result.size = size;
 
         result.value.ptr = malloc(size);
-        FREAD_CHECK(result.value.ptr, size, 1, state->file);
+        FREAD_CHECK(result.value.ptr, size, 1, state);
     }
     else {
         /* Primitive type: read directly into result */
         result.size = type.size;
         result.value.u = 0;
-        FREAD_CHECK(&result.value.u, result.size, 1, state->file);
+        FREAD_CHECK(&result.value.u, result.size, 1, state);
     }
 
-    return result;
-
  error:
-    result.size = 0;
     return result;
 }
 
 trace_buffer_size read_buffer_size(trace_read_state *state)
 {
     trace_buffer_size result;
-    FREAD_CHECK(&result, sizeof(result), 1, state->file);
-
-    return result;
+    FREAD_CHECK(&result, sizeof(result), 1, state);
 
  error:
-    result.address = 0;
-    result.size = 0;
     return result;
 }
 
@@ -197,28 +201,27 @@ static void ensure_buffer_size(void **buffer, size_t element_size,
     *buffer = realloc(*buffer, *allocated * element_size);
 }
 
-int read_trace_point(trace_read_state *state, trace_point *result_ptr){
+enum trace_error read_trace_point(trace_read_state *state, trace_point *result_ptr)
+{
     trace_point result = { 0, 0, 0, 0 };
 
     while (1) {
         enum trace_entry_tag tag = read_tag(state);
-        if (tag == TRACE_TAG_ERROR || tag == END_OF_TRACE)
+        if (state->error_code != TRACE_OK)
             goto error;
-        if (tag == END_OF_TRACE)
-            break;
 
         switch (tag) {
         case END_ENTRY:
           goto end;
         case STATEMENT_ID:
           result.statement = read_id(state);
-          if (result.statement == 0)
+          if (state->error_code != TRACE_OK)
               goto error;
           break;
         case VARIABLE:
             {
                 trace_var_info info = read_var_info(state);
-                if (info.size == 0)
+                if (state->error_code != TRACE_OK)
                     goto error;
 
                 result.n_vars++;
@@ -232,7 +235,7 @@ int read_trace_point(trace_read_state *state, trace_point *result_ptr){
         case BUFFER_SIZE:
             {
                 trace_buffer_size info = read_buffer_size(state);
-                if (info.address == 0)
+                if (state->error_code != TRACE_OK)
                     goto error;
 
 
@@ -245,7 +248,7 @@ int read_trace_point(trace_read_state *state, trace_point *result_ptr){
         case AUXILIARY:
           {
               uint64_t value;
-              FREAD_CHECK(&value, sizeof(value), 1, state->file);
+              FREAD_CHECK(&value, sizeof(value), 1, state);
 
               result.n_aux++;
               ensure_buffer_size((void **)&(state->aux_buffer), sizeof(uint64_t),
@@ -263,8 +266,6 @@ int read_trace_point(trace_read_state *state, trace_point *result_ptr){
     result.sizes = state->size_buffer;
     result.aux = state->aux_buffer;
     *result_ptr = result;
-    return (result.statement > 0) ? 0 : 1;
-
  error:
-    return -1;
+    return state->error_code;
 }
