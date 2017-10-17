@@ -30,9 +30,7 @@ enum trace_entry_tag {
     BUFFER_SIZE,
     /* A 64-bit value, meaning defined by the user */
     AUXILIARY,
-    TRACE_TAG_ERROR,
-    /* Returned at EOF, should not appear in trace */
-    END_OF_TRACE
+    INVALID_TAG,
 };
 
 typedef struct trace_buffer_size

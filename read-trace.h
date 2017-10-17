@@ -21,6 +21,12 @@ typedef struct trace_var_info
     uint16_t size;
 } trace_var_info;
 
+enum trace_error {
+    TRACE_OK=0,
+    TRACE_EOF,
+    TRACE_ERROR
+};
+
 typedef struct trace_read_state
 {
     FILE *file;
@@ -35,6 +41,8 @@ typedef struct trace_read_state
     uint32_t n_vars;
     uint64_t *aux_buffer;
     uint32_t n_aux;
+
+    enum trace_error error_code;
 } trace_read_state;
 
 /*
@@ -48,14 +56,11 @@ trace_read_state *start_reading(const char *filename, int timeout_seconds);
 
 /*
    Read trace tag.
-
-   Returns END_OF_TRACE at end of file, TRACE_TAG_ERROR for an unrecognized
-   tag or any other error.
  */
 enum trace_entry_tag read_tag(trace_read_state *state);
 
 /*
-   Read statement ID. Returns 0 on error.
+   Read statement ID.
  */
 uint32_t read_id(trace_read_state *state);
 
@@ -64,15 +69,11 @@ uint32_t read_id(trace_read_state *state);
 
    If the variable format is BLOB, the result will contain a heap pointer to
    the value, which should be freed by the caller.
-
-   Result will have size 0 on error.
  */
 trace_var_info read_var_info(trace_read_state *state);
 
 /*
    Read an address and corresponding buffer size.
-
-   Result will have address 0 on error.
  */
 trace_buffer_size read_buffer_size(trace_read_state *state);
 
@@ -93,9 +94,7 @@ typedef struct trace_point
 
    The resulting trace_point has pointers into caches in the state, and is
    only valid until the next call to read_trace_point.
-
-   Return 0 if successful, 1 for EOF, -1 for error.
 */
-int read_trace_point(trace_read_state *state, trace_point *result_ptr);
+enum trace_error read_trace_point(trace_read_state *state, trace_point *result_ptr);
 
 #endif // __READ_TRACE_H

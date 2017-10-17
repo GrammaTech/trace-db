@@ -115,8 +115,8 @@ void read_trace(const char *filename)
     int count = 0;
     while (1) {
         enum trace_entry_tag tag = read_tag(state);
-        assert(tag != TRACE_TAG_ERROR);
-        if (tag == END_OF_TRACE)
+        assert(state->error_code != TRACE_ERROR);
+        if (state->error_code == TRACE_EOF)
             break;
 
         switch (tag) {
@@ -127,14 +127,14 @@ void read_trace(const char *filename)
         case STATEMENT_ID:
             {
                 uint32_t id = read_id(state);
-                assert(id != 0);
+                assert(state->error_code != TRACE_ERROR);
                 printf("ID: %u\n", id);
                 break;
             }
         case VARIABLE:
             {
                 trace_var_info info = read_var_info(state);
-                assert(info.size != 0);
+                assert(state->error_code != TRACE_ERROR);
 
                 type_description type = state->types[info.type_index];
                 printf("%s: %s, %u bytes = ", state->names[info.name_index],
@@ -173,7 +173,7 @@ void read_trace(const char *filename)
         case BUFFER_SIZE:
             {
                 trace_buffer_size info = read_buffer_size(state);
-                assert(info.address != 0);
+                assert(state->error_code != TRACE_ERROR);
 
                 printf("buffer size: %lx . %lu\n", info.address, info.size);
                 break;
@@ -221,7 +221,7 @@ void read_trace_2(const char *filename)
         printf("ID: %u\n", point.statement);
         for (uint32_t i = 0; i < point.n_vars; i++) {
             trace_var_info info = point.vars[i];
-            assert(info.size != 0);
+            assert(state->error_code != TRACE_ERROR);
 
             type_description type = state->types[info.type_index];
             printf("%s: %s, %u bytes = ", state->names[info.name_index],
@@ -257,7 +257,7 @@ void read_trace_2(const char *filename)
         }
         for (uint32_t i = 0; i < point.n_sizes; i++) {
             trace_buffer_size info = point.sizes[i];
-            assert(info.address != 0);
+            assert(state->error_code != TRACE_ERROR);
 
             printf("buffer size: %lx . %lu\n", info.address, info.size);
             break;
