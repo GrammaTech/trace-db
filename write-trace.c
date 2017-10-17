@@ -49,3 +49,22 @@ void write_buffer_size(FILE *out, void *address, size_t size)
     trace_buffer_size val = { (uint64_t)address, (uint64_t)size };
     fwrite(&val, sizeof(val), 1, out);
 }
+
+void write_trace_variable(FILE *out, uint16_t name_index, uint16_t type_index,
+                                 uint16_t size, void *var)
+{
+    fputc(VARIABLE, out);
+    fwrite(&name_index, sizeof(name_index), 1, out);
+    fwrite(&type_index, sizeof(type_index), 1, out);
+    fwrite(var, size, 1, out);
+}
+
+void write_trace_blob(FILE *out, uint16_t name_index, uint16_t type_index,
+                      uint16_t size, void *var)
+{
+    fputc(VARIABLE, out);
+    fwrite(&name_index, sizeof(name_index), 1, out);
+    fwrite(&type_index, sizeof(type_index), 1, out);
+    fwrite(&size, sizeof(size), 1, out);
+    fwrite(var, size, 1, out);
+}

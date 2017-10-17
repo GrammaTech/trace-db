@@ -72,7 +72,7 @@ void write_test_trace(const char *filename)
         WRITE_TRACE_VARIABLE(out, 10, 3, f);
         WRITE_TRACE_VARIABLE(out, 11, 4, d);
         WRITE_TRACE_VARIABLE(out, 12, 5, u);
-        WRITE_TRACE_BLOB(out, 8, 6, strlen(ptr), ptr);
+        write_trace_blob(out, 8, 6, strlen(ptr), ptr);
         /* Fake buffer size */
         write_buffer_size(out, (void *)(size_t)(0xff + i), 10 * i);
         uint64_t uint = 100 * i;
