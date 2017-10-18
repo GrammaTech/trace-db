@@ -4,5 +4,4 @@
         :alexandria
         :iterate
         :cffi)
-  (:export :read-trace))
-
+  (:export :read-trace :+trace-id-file-bits+ :+trace-id-statement-bits+))

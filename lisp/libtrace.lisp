@@ -96,6 +96,11 @@
 (defcfun read-trace-point :int
   (state :pointer) (results :pointer))
 
+(defconstant +trace-id-file-bits+ 11
+  "Number of bits in trace ID used to identify the file.")
+(defconstant +trace-id-statement-bits+ 20
+  "Number of bits in trace ID used to identify the statement within a file.")
+
 (defun convert-trace-point (names types point &optional (index 0) &aux result)
   "Convert a trace point to an alist."
   (labels
@@ -148,14 +153,20 @@
                     (foreign-array-to-lisp aux `(:array :uint64 ,n-aux)))
               result))
       (when (> statement 0)
-        ;; SEL clang-project instrumentation uses 16 bits for
-        ;; statement ID, 15 for file ID, and the top bit as a flag
-        ;; indicating file ID is present.
+        ;; SEL clang-project instrumentation packs file and AST
+        ;; indices into the trace ID, with the top bits used as a flag
+        ;; to indicate the presence of the file ID.
         ;; Since SEL is likely to be the only Lisp client, it's
         ;; convenient to handle this here.
         (if (> (logand statement (ash 1 31)) 0)
-            (progn (push (cons :c (logand #xFFFF statement)) result)
-                   (push (cons :f (logand #x7FFF (ash statement -16))) result))
+            (progn (push (cons :c (logand (1- (ash 1 +trace-id-statement-bits+))
+                                          statement))
+                         result)
+                   (push (cons :f
+                               (logand (1- (ash 1 +trace-id-file-bits+))
+                                       (ash statement
+                                            (* -1 +trace-id-statement-bits+))))
+                         result))
          (push (cons :c statement) result)))))
   result)
 
