@@ -177,25 +177,28 @@
   (let ((state-ptr (start-reading file timeout)))
     (unless (null-pointer-p state-ptr)
       (let* ((state (mem-aref state-ptr '(:struct trace-read-state)))
-             (names (iter (with ptr = (getf state 'names))
-                          (for i below (getf state 'n-names))
-                          (for str = (mem-aref ptr :string i))
-                          (while str)
-                          (collect str result-type 'vector)))
-             (types (iter (with ptr = (getf state 'types))
-                          (for i below (getf state 'n-types))
-                          (for str =
-                               (mem-aref ptr '(:struct type-description) i))
-                          (while str)
-                          (collect str result-type 'vector))))
+             (names (ignore-errors
+                      (iter (with ptr = (getf state 'names))
+                            (for i below (getf state 'n-names))
+                            (for str = (mem-aref ptr :string i))
+                            (while str)
+                            (collect str result-type 'vector))))
+             (types (ignore-errors
+                      (iter (with ptr = (getf state 'types))
+                            (for i below (getf state 'n-types))
+                            (for str =
+                                 (mem-aref ptr '(:struct type-description) i))
+                            (while str)
+                            (collect str result-type 'vector)))))
         (unwind-protect
-             (with-foreign-object (point-struct '(:struct trace-point))
-               (iter (while
-                         (and (eq 0 (read-trace-point state-ptr point-struct))
-                              (or (null max) (< collected max))))
-                     (for trace-point =
-                          (convert-trace-point names types point-struct))
-                     (when (funcall predicate trace-point)
-                       (incf collected)
-                       (collect trace-point))))
+             (when (and types names)
+               (with-foreign-object (point-struct '(:struct trace-point))
+                 (iter (while
+                           (and (eq 0 (read-trace-point state-ptr point-struct))
+                                (or (null max) (< collected max))))
+                       (for trace-point =
+                            (convert-trace-point names types point-struct))
+                       (when (funcall predicate trace-point)
+                         (incf collected)
+                         (collect trace-point)))))
           (end-reading state-ptr))))))
