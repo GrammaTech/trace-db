@@ -174,6 +174,7 @@
                    &aux (collected 0))
   "Read a trace and convert to a list."
   (load-libtrace)
+  (format t "reading trace~%")
   (let ((state-ptr (start-reading file timeout)))
     (unless (null-pointer-p state-ptr)
       (let* ((state (mem-aref state-ptr '(:struct trace-read-state)))
@@ -190,8 +191,11 @@
                           (collect str result-type 'vector))))
         (unwind-protect
              (with-foreign-object (point-struct '(:struct trace-point))
-               (iter (while
-                         (and (eq 0 (read-trace-point state-ptr point-struct))
+               (iter (for status = (read-trace-point state-ptr point-struct))
+                     (when (not (zerop status))
+                       (format t "trace read failed: ~d~%" status))
+                     (while
+                         (and (zerop status)
                               (or (null max) (< collected max))))
                      (for trace-point =
                           (convert-trace-point names types point-struct))
