@@ -33,33 +33,33 @@
   (size :uint64))
 
 (defcstruct (type-description :class c-type-description)
-  (name-index :uint16)
+  (name-index :uint32)
   (format type-format)
-  (size :uint8))
+  (size :uint32))
 
 (defstruct (type-description (:conc-name type-))
   (name-index nil :type fixnum)
   (format nil :type symbol)
-  (size nil :type (unsigned-byte 8)))
+  (size nil :type (unsigned-byte 32)))
 
 (defcstruct (var-info :class c-var-info)
   ;; CFFI's handling of the union here seems to be broken.
   ;; Use an integer here to get the correct layout, and figure out the
   ;; real type when we dereference.
   (value :int64)
-  (name-index :uint16)
-  (type-index :uint16)
-  (size :uint16))
+  (name-index :uint32)
+  (type-index :uint32)
+  (size :uint32))
 
 (defcstruct trace-read-state
   (file :pointer)
   (names (:pointer :string))
-  (n-names :uint16)
+  (n-names :uint32)
   (types (:pointer (:struct type-description)))
-  (n-types :uint16))
+  (n-types :uint32))
 
 (defcstruct (trace-point :class c-trace-point)
-  (statement :uint32)
+  (statement :uint64)
   (sizes (:pointer (:struct buffer-size)))
   (n-sizes :uint32)
   (vars (:pointer (:struct var-info)))
@@ -96,9 +96,9 @@
 (defcfun read-trace-point :int
   (state :pointer) (results :pointer))
 
-(defconstant +trace-id-file-bits+ 11
+(defconstant +trace-id-file-bits+ 23
   "Number of bits in trace ID used to identify the file.")
-(defconstant +trace-id-statement-bits+ 20
+(defconstant +trace-id-statement-bits+ 40
   "Number of bits in trace ID used to identify the statement within a file.")
 
 (defun convert-trace-point (names types point &optional (index 0) &aux result)
@@ -158,7 +158,7 @@
         ;; to indicate the presence of the file ID.
         ;; Since SEL is likely to be the only Lisp client, it's
         ;; convenient to handle this here.
-        (if (> (logand statement (ash 1 31)) 0)
+        (if (> (logand statement (ash 1 63)) 0)
             (progn (push (cons :c (logand (1- (ash 1 +trace-id-statement-bits+))
                                           statement))
                          result)

@@ -55,7 +55,7 @@ trace_read_state *start_reading(const char *filename, int timeout_seconds)
         goto error;
 
     /* Read dictionary of names */
-    uint16_t n_chars;
+    uint64_t n_chars;
     FREAD_CHECK(&n_chars, sizeof(n_chars), 1, state);
 
     char *buf = (char*)malloc(n_chars);
@@ -65,15 +65,15 @@ trace_read_state *start_reading(const char *filename, int timeout_seconds)
     }
 
     /* Scan once to count strings */
-    uint16_t n_strings = 0;
-    for (int i = 0; i < n_chars; i++) {
+    uint32_t n_strings = 0;
+    for (uint32_t i = 0; i < n_chars; i++) {
         if (buf[i] == 0)
             n_strings++;
     }
     state->names = (const char**)malloc(sizeof(char*) * n_strings);
 
     /* Scan again to find starts of each string */
-    for (int i = 0; i < n_strings; i++) {
+    for (uint32_t i = 0; i < n_strings; i++) {
         state->names[i] = buf; /* names[0] points to original buf */
         while (*buf != 0)
             buf++;
@@ -82,14 +82,14 @@ trace_read_state *start_reading(const char *filename, int timeout_seconds)
     state->n_names = n_strings;
 
     /* Read dictionary of types */
-    uint16_t n_types;
+    uint32_t n_types;
     FREAD_CHECK(&n_types, sizeof(n_types), 1, state);
     type_description *types = malloc(sizeof(type_description) * n_types);
     FREAD_CHECK(types, sizeof(type_description), n_types, state);
     state->types = types;
     state->n_types = n_types;
 
-    for (int i = 0; i < n_types; i++) {
+    for (uint32_t i = 0; i < n_types; i++) {
         if (types[i].format >= INVALID_FORMAT || types[i].name_index >= state->n_names)
             goto error;
     }
@@ -117,9 +117,9 @@ enum trace_entry_tag read_tag(trace_read_state *state)
     return (enum trace_entry_tag)c;
 }
 
-uint32_t read_id(trace_read_state *state)
+uint64_t read_id(trace_read_state *state)
 {
-    uint32_t id;
+    uint64_t id;
     FREAD_CHECK(&id, sizeof(id), 1, state);
 
     return id;
@@ -143,7 +143,7 @@ trace_var_info read_var_info(trace_read_state *state)
     type_description type = state->types[result.type_index];
     if (type.format == BLOB) {
         /* Blob type: store value on the heap */
-        uint16_t size = type.size;
+        uint32_t size = type.size;
         if (type.size == 0) {
             /* Variable-sized type: read size from trace */
             FREAD_CHECK(&size, sizeof(size), 1, state);

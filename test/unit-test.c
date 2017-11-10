@@ -27,7 +27,7 @@ FILE *write_test_header()
     return out;
 }
 
-FILE *write_trace_with_variable(uint16_t name_index, uint16_t type_index)
+FILE *write_trace_with_variable(uint32_t name_index, uint32_t type_index)
 {
     FILE *out = write_test_header();
     fputc(VARIABLE, out);
@@ -60,7 +60,7 @@ void test_eof_in_header()
     {
         FILE *out = fopen(TRACE_FILE, "w");
         const char *name = "foo";
-        uint16_t val = strlen(name) + 1;
+        uint64_t val = strlen(name) + 1;
         fwrite(&val, sizeof(val), 1, out);
         fwrite(name, 1, strlen(name), out);
         fputc(0, out);
@@ -73,7 +73,7 @@ void test_eof_in_header()
     {
         FILE *out = fopen(TRACE_FILE, "w");
         const char *name = "foo";
-        uint16_t val = strlen(name) + 1;
+        uint64_t val = strlen(name) + 1;
         fwrite(&val, sizeof(val), 1, out);
         fwrite(name, 1, strlen(name), out);
         fputc(0, out);

@@ -4,17 +4,17 @@
 
 #include "write-trace.h"
 
-void write_trace_header(FILE *out, const char **names, uint16_t n_names,
-                        const type_description *types, uint16_t n_types)
+void write_trace_header(FILE *out, const char **names, uint32_t n_names,
+                        const type_description *types, uint32_t n_types)
 {
     /* Dictionary of names, as a sequence of NULL-terminated strings */
-    uint16_t total_size = 0;
-    for (uint16_t i = 0; i < n_names; i++) {
+    uint64_t total_size = 0;
+    for (uint64_t i = 0; i < n_names; i++) {
         total_size += strlen(names[i]) + 1;
     }
     fwrite(&total_size, sizeof(total_size), 1, out);
 
-    for (uint16_t i = 0; i < n_names; i++) {
+    for (uint32_t i = 0; i < n_names; i++) {
         fputs(names[i], out);
         fputc(0, out);
     }
@@ -24,7 +24,7 @@ void write_trace_header(FILE *out, const char **names, uint16_t n_names,
     fwrite(types, sizeof(*types), n_types, out);
 }
 
-void write_trace_id(FILE *out, uint32_t statement_id)
+void write_trace_id(FILE *out, uint64_t statement_id)
 {
     assert(statement_id != 0);
     fputc(STATEMENT_ID, out);
@@ -50,8 +50,8 @@ void write_buffer_size(FILE *out, void *address, size_t size)
     fwrite(&val, sizeof(val), 1, out);
 }
 
-void write_trace_variable(FILE *out, uint16_t name_index, uint16_t type_index,
-                                 uint16_t size, void *var)
+void write_trace_variable(FILE *out, uint32_t name_index, uint32_t type_index,
+                          uint32_t size, void *var)
 {
     fputc(VARIABLE, out);
     fwrite(&name_index, sizeof(name_index), 1, out);
@@ -59,8 +59,8 @@ void write_trace_variable(FILE *out, uint16_t name_index, uint16_t type_index,
     fwrite(var, size, 1, out);
 }
 
-void write_trace_blob(FILE *out, uint16_t name_index, uint16_t type_index,
-                      uint16_t size, void *var)
+void write_trace_blob(FILE *out, uint32_t name_index, uint32_t type_index,
+                      uint32_t size, void *var)
 {
     fputc(VARIABLE, out);
     fwrite(&name_index, sizeof(name_index), 1, out);

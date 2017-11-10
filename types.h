@@ -16,11 +16,11 @@ enum type_format {
 
 typedef struct {
     /* Index into the string dictionary which gives the name of the type. */
-    uint16_t name_index;
+    uint32_t name_index;
     /* Data format */
     enum type_format format;
     /* Size in bytes. 0 indicates a variable-sized object. */
-    uint8_t size;
+    uint32_t size;
 } type_description;
 
 enum trace_entry_tag {

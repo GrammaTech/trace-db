@@ -16,9 +16,9 @@ typedef struct trace_var_info
         double d;
         void *ptr;
     } value;
-    uint16_t name_index;
-    uint16_t type_index;
-    uint16_t size;
+    uint32_t name_index;
+    uint32_t type_index;
+    uint32_t size;
 } trace_var_info;
 
 enum trace_error {
@@ -31,9 +31,9 @@ typedef struct trace_read_state
 {
     FILE *file;
     const char **names;
-    uint16_t n_names;
+    uint32_t n_names;
     const type_description *types;
-    uint16_t n_types;
+    uint32_t n_types;
 
     trace_buffer_size *size_buffer;
     uint32_t n_sizes;
@@ -62,7 +62,7 @@ enum trace_entry_tag read_tag(trace_read_state *state);
 /*
    Read statement ID.
  */
-uint32_t read_id(trace_read_state *state);
+uint64_t read_id(trace_read_state *state);
 
 /*
    Read a variable.
@@ -81,7 +81,7 @@ void end_reading(trace_read_state *state);
 
 typedef struct trace_point
 {
-    uint32_t statement;
+    uint64_t statement;
     trace_buffer_size *sizes;
     uint32_t n_sizes;
     trace_var_info *vars;
