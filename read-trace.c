@@ -14,7 +14,7 @@
             (state)->error_code = feof((state)->file) ? TRACE_EOF : TRACE_ERROR; \
             goto error;                                                          \
         }                                                                        \
-       } while (0)
+    } while (0)
 
 static FILE *open_with_timeout(const char *filename, int timeout_seconds)
 {
@@ -212,12 +212,12 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
 
         switch (tag) {
         case END_ENTRY:
-          goto end;
+            goto end;
         case STATEMENT_ID:
-          result.statement = read_id(state);
-          if (state->error_code != TRACE_OK)
-              goto error;
-          break;
+            result.statement = read_id(state);
+            if (state->error_code != TRACE_OK)
+                goto error;
+            break;
         case VARIABLE:
             {
                 trace_var_info info = read_var_info(state);
@@ -238,7 +238,6 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
                 if (state->error_code != TRACE_OK)
                     goto error;
 
-
                 result.n_sizes++;
                 ensure_buffer_size((void **)&(state->size_buffer), sizeof(trace_buffer_size),
                                    &state->n_sizes, result.n_sizes);
@@ -246,18 +245,18 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
                 break;
             }
         case AUXILIARY:
-          {
-              uint64_t value;
-              FREAD_CHECK(&value, sizeof(value), 1, state);
+            {
+                uint64_t value;
+                FREAD_CHECK(&value, sizeof(value), 1, state);
 
-              result.n_aux++;
-              ensure_buffer_size((void **)&(state->aux_buffer), sizeof(uint64_t),
-                                 &state->n_aux, result.n_aux);
-              state->aux_buffer[result.n_aux - 1] = value;
-              break;
-          }
+                result.n_aux++;
+                ensure_buffer_size((void **)&(state->aux_buffer), sizeof(uint64_t),
+                                   &state->n_aux, result.n_aux);
+                state->aux_buffer[result.n_aux - 1] = value;
+                break;
+            }
         default:
-          goto error;
+            goto error;
         }
     }
 
