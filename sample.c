@@ -121,9 +121,9 @@ void read_trace(const char *filename)
 
         switch (tag) {
         case END_ENTRY:
-          printf("\n");
-          count++;
-          break;
+            printf("\n");
+            count++;
+            break;
         case STATEMENT_ID:
             {
                 uint64_t id = read_id(state);
@@ -141,30 +141,30 @@ void read_trace(const char *filename)
                        state->names[type.name_index], info.size);
                 switch (type.format) {
                 case UNSIGNED:
-                  printf("%lu", info.value.u);
-                  if (type.size == 1)
-                      printf(" '%c'", (unsigned char)info.value.u);
-                  break;
+                    printf("%lu", info.value.u);
+                    if (type.size == 1)
+                        printf(" '%c'", (unsigned char)info.value.u);
+                    break;
                 case SIGNED:
-                  printf("%ld", info.value.s);
-                  if (type.size == 1)
-                      printf(" '%c'", (char)info.value.u);
-                  break;
+                    printf("%ld", info.value.s);
+                    if (type.size == 1)
+                        printf(" '%c'", (char)info.value.u);
+                    break;
                 case POINTER:
-                  printf("%lx", info.value.u);
-                  break;
+                    printf("%lx", info.value.u);
+                    break;
                 case FLOAT:
-                  if (type.size == 4)
-                      printf("%g", info.value.f);
-                  else
-                      printf("%g", info.value.d);
-                  break;
+                    if (type.size == 4)
+                        printf("%g", info.value.f);
+                    else
+                        printf("%g", info.value.d);
+                    break;
                 case BLOB:
-                  printf("blob: '%.*s'", info.size, (const char *)info.value.ptr);
-                  free(info.value.ptr);
-                  break;
+                    printf("blob: '%.*s'", info.size, (const char *)info.value.ptr);
+                    free(info.value.ptr);
+                    break;
                 default:
-                  printf("<unrecognized format %u>", type.format);
+                    printf("<unrecognized format %u>", type.format);
                 }
                 printf("\n");
             }
@@ -187,8 +187,8 @@ void read_trace(const char *filename)
                 break;
             }
         default:
-          fprintf(stderr, "ERROR: unknown trace tag %u\n", tag);
-          exit(1);
+            fprintf(stderr, "ERROR: unknown trace tag %u\n", tag);
+            exit(1);
         }
     }
 
@@ -228,30 +228,30 @@ void read_trace_2(const char *filename)
                    state->names[type.name_index], info.size);
             switch (type.format) {
             case UNSIGNED:
-              printf("%lu", info.value.u);
-              if (type.size == 1)
-                  printf(" '%c'", (unsigned char)info.value.u);
-              break;
+                printf("%lu", info.value.u);
+                if (type.size == 1)
+                    printf(" '%c'", (unsigned char)info.value.u);
+                break;
             case SIGNED:
-              printf("%ld", info.value.s);
-              if (type.size == 1)
-                  printf(" '%c'", (char)info.value.u);
-              break;
+                printf("%ld", info.value.s);
+                if (type.size == 1)
+                    printf(" '%c'", (char)info.value.u);
+                break;
             case POINTER:
-              printf("%lx", info.value.u);
-              break;
+                printf("%lx", info.value.u);
+                break;
             case FLOAT:
-              if (type.size == 4)
-                  printf("%g", info.value.f);
-              else
-                  printf("%g", info.value.d);
-              break;
+                if (type.size == 4)
+                    printf("%g", info.value.f);
+                else
+                    printf("%g", info.value.d);
+                break;
             case BLOB:
-              printf("blob: '%.*s'", info.size, (const char *)info.value.ptr);
-              free(info.value.ptr);
-              break;
+                printf("blob: '%.*s'", info.size, (const char *)info.value.ptr);
+                free(info.value.ptr);
+                break;
             default:
-              printf("<unrecognized format %u>", type.format);
+                printf("<unrecognized format %u>", type.format);
             }
             printf("\n");
         }
