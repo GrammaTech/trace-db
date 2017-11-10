@@ -26,15 +26,15 @@
                              sizeof(tmp), &tmp);               \
     } while(0)
 
-void write_trace_header(FILE *out, const char **names, uint16_t n_names,
-                        const type_description *types, uint16_t n_types);
-void write_trace_id(FILE *out, uint32_t statement_id);
+void write_trace_header(FILE *out, const char **names, uint32_t n_names,
+                        const type_description *types, uint32_t n_types);
+void write_trace_id(FILE *out, uint64_t statement_id);
 void write_trace_aux(FILE *out, uint64_t value);
 void write_end_entry(FILE *out);
 void write_buffer_size(FILE *out, void *address, size_t size);
-void write_trace_variable(FILE *out, uint16_t name_index, uint16_t type_index,
-                          uint16_t size, void *var);
-void write_trace_blob(FILE *out, uint16_t name_index, uint16_t type_index,
-                      uint16_t size, void *var);
+void write_trace_variable(FILE *out, uint32_t name_index, uint32_t type_index,
+                          uint32_t size, void *var);
+void write_trace_blob(FILE *out, uint32_t name_index, uint32_t type_index,
+                      uint32_t size, void *var);
 
 #endif // __WRITE_TRACE_H

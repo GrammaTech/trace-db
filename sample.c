@@ -47,11 +47,11 @@ void write_test_trace(const char *filename)
     write_trace_header(out, names, n_names, types, n_types);
 
     printf("names:\n");
-    for (int i = 0; i < n_names; i++) {
+    for (uint32_t i = 0; i < n_names; i++) {
         printf("  %s\n", names[i]);
     }
     printf("\ntypes:\n");
-    for (int i = 0; i < n_types; i++) {
+    for (uint32_t i = 0; i < n_types; i++) {
         type_description type = types[i];
         printf("  %s: %u, %u bytes\n",
                names[type.name_index], type.format, type.size);
@@ -102,11 +102,11 @@ void read_trace(const char *filename)
     assert(state);
 
     printf("names:\n");
-    for (int i = 0; i < state->n_names; i++) {
+    for (uint32_t i = 0; i < state->n_names; i++) {
         printf("  %s\n", state->names[i]);
     }
     printf("\ntypes:\n");
-    for (int i = 0; i < state->n_types; i++) {
+    for (uint32_t i = 0; i < state->n_types; i++) {
         type_description type = state->types[i];
         printf("  %s: %u, %u bytes\n",
                state->names[type.name_index], type.format, type.size);
@@ -126,9 +126,9 @@ void read_trace(const char *filename)
           break;
         case STATEMENT_ID:
             {
-                uint32_t id = read_id(state);
+                uint64_t id = read_id(state);
                 assert(state->error_code != TRACE_ERROR);
-                printf("ID: %u\n", id);
+                printf("ID: %lu\n", id);
                 break;
             }
         case VARIABLE:
@@ -203,11 +203,11 @@ void read_trace_2(const char *filename)
     assert(state);
 
     printf("names:\n");
-    for (int i = 0; i < state->n_names; i++) {
+    for (uint32_t i = 0; i < state->n_names; i++) {
         printf("  %s\n", state->names[i]);
     }
     printf("\ntypes:\n");
-    for (int i = 0; i < state->n_types; i++) {
+    for (uint32_t i = 0; i < state->n_types; i++) {
         type_description type = state->types[i];
         printf("  %s: %u, %u bytes\n",
                state->names[type.name_index], type.format, type.size);
@@ -218,7 +218,7 @@ void read_trace_2(const char *filename)
 
     while (read_trace_point(state, &point) == 0) {
         count++;
-        printf("ID: %u\n", point.statement);
+        printf("ID: %lu\n", point.statement);
         for (uint32_t i = 0; i < point.n_vars; i++) {
             trace_var_info info = point.vars[i];
             assert(state->error_code != TRACE_ERROR);
