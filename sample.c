@@ -66,13 +66,14 @@ void write_test_trace(const char *filename)
         unsigned int u = 2 * i;
 
         write_trace_id(out, 100 + i);
-        WRITE_TRACE_VARIABLE(out, 7, 0, i);
-        WRITE_TRACE_VARIABLE(out, 8, 1, ptr);
-        WRITE_TRACE_VARIABLE(out, 9, 2, c);
-        WRITE_TRACE_VARIABLE(out, 10, 3, f);
-        WRITE_TRACE_VARIABLE(out, 11, 4, d);
-        WRITE_TRACE_VARIABLE(out, 12, 5, u);
-        write_trace_blob(out, 8, 6, strlen(ptr), ptr);
+        write_trace_variables(out, 6,
+                              7, 0, sizeof(i), SIGNED, i,
+                              8, 1, sizeof(ptr), POINTER, ptr,
+                              9, 2, sizeof(c), UNSIGNED, c,
+                              10, 3, sizeof(f), FLOAT, f,
+                              11, 4, sizeof(d), FLOAT, d,
+                              12, 5, sizeof(u), UNSIGNED, u);
+        write_trace_blobs(out, 1, 8, 6, strlen(ptr), ptr);
         /* Fake buffer size */
         write_buffer_size(out, (void *)(size_t)(0xff + i), 10 * i);
         uint64_t uint = 100 * i;
