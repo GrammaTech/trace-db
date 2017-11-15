@@ -212,6 +212,10 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
 
         switch (tag) {
         case END_ENTRY:
+            if (result.statement == 0) {
+                state->error_code = TRACE_ERROR;
+                goto error;
+            }
             goto end;
         case STATEMENT_ID:
             result.statement = read_id(state);
