@@ -7,7 +7,7 @@ Top level contents
 - [Use Cases](#use-cases)
 - [Requirements](#requirements)
 - [Format Ideas](#format-ideas)
-- [Miscellaneous](#miscellaneous)
+- [Miscellaneous/References](#miscellaneous-references)
 
 Current Implementation Plan
 1.  Design a simple binary format
@@ -237,7 +237,40 @@ at instrumentation time based on the size of the dictionaries.
 > something that the client should care about but we can let trace-db
 > continue to treat everything as sequences of bytes.
 
-# Miscellaneous
+# Miscellaneous / References
+
+## Common Trace Format
+
+This is a standard.  See [CTF in a nutshell](http://diamon.org/ctf/#ctf-in-a-nutshell).
+
+A trace consists of multiple streams (including one required meta-data
+stream which defines all other streams).  Each stream is a
+concatenation of trace packets.  Designed to be read from files or
+network.
+
+Notes:
+
+- This includes a nice description of the types (scalar and sized)
+  available to traces.
+
+- Includes things like checksums, compression, and encryption of trace
+  packets (which don't make sense here).
+
+- Seems primarily concerned with capturing timed *events* from a
+  process, rather than recording the evolving state of the process.
+
+At some point (e.g., if we ever want to communicate over a network) we
+should probably consider if it makes sense to communicate our traces
+using this format.  This would look something like:
+- Every trace point is packaged into CTF even packet.
+- Our trace header is sent as the CTF meta-data stream.
+- We fit our current types into CTF types.
+
+
+## "Whole execution traces"
+
+See [Whole execution traces and their applications](http://stonecat/repos/reading/zhang2005whole.html)
+
 ## "whole program paths"
 
 See [Whole program paths](http://stonecat.grammatech.com/repos/reading/larus1999whole.html).
