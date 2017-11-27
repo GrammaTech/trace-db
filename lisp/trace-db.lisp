@@ -202,3 +202,55 @@
                          (incf collected)
                          (collect trace-point)))))
           (end-reading state-ptr))))))
+
+
+;;; Trace DB interface
+(defcfun create-db :pointer)
+(defcfun collect-trace :void (db :pointer) (state :pointer))
+(defcfun free-db :void (db :pointer))
+
+(defcstruct c-trace
+  (points (:pointer (:struct trace-point)))
+  (n-points :uint64)
+  (n-points-allocated :uint64)
+
+  (names (:pointer :string))
+  (n-names :uint32)
+  (types (:pointer (:struct type-description)))
+  (n-types :uint32))
+
+(defcstruct trace-db
+  (traces (:pointer (:struct c-trace)))
+  (n-traces :uint64)
+  (n-traces-allocated :uint64))
+
+(defun get-trace (db index &key (predicate #'identity) max
+                  &aux (collected 0))
+  "Get a trace from DB and convert to a list."
+  (load-libtrace)
+  (let* ((trace (mem-aref (getf (mem-aref db '(:struct trace-db)) 'traces)
+                          '(:struct c-trace) index))
+         (names (ignore-errors
+                  (iter (with ptr = (getf trace 'names))
+                        (for i below (getf trace 'n-names))
+                        (for str = (mem-aref ptr :string i))
+                        (while str)
+                        (collect str result-type 'vector))))
+         (types (ignore-errors
+                  (iter (with ptr = (getf trace 'types))
+                        (for i below (getf trace 'n-types))
+                        (for str =
+                             (mem-aref ptr '(:struct type-description) i))
+                        (while str)
+                        (collect str result-type 'vector)))))
+    (unwind-protect
+         (when (and types names)
+           (iter (for i below (getf trace 'n-points))
+                 (while (or (null max) (< collected max)))
+                 (for trace-point =
+                      (convert-trace-point names types
+                                           (getf trace 'points)
+                                           i))
+                 (when (funcall predicate trace-point)
+                   (incf collected)
+                   (collect trace-point)))))))
