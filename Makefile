@@ -1,6 +1,6 @@
 CFLAGS = -O0 -Wall -g -std=gnu11
 
-SRCS = read-trace.c write-trace.c
+SRCS = read-trace.c write-trace.c utils.c trace-db.c
 
 libtrace-db.so: $(SRCS) read-trace.h write-trace.h
 	$(CC) $(CFLAGS) -o libtrace-db.so -fPIC -shared $(SRCS)  -Wl,-soname,libtrace-db.so

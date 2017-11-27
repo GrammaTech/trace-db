@@ -2,9 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include "utils.h"
 
 #include "read-trace.h"
 
@@ -15,37 +13,6 @@
             goto error;                                                          \
         }                                                                        \
     } while (0)
-
-static FILE *open_with_timeout(const char *filename, int timeout_seconds)
-{
-    /* Open in non-blocking mode. Returns immediately even if file is a FIFO
-       with no writer yet. */
-    int fd = open(filename, O_RDONLY | O_NONBLOCK);
-
-    /* Now use select() to wait until there is data to read. For a regular
-       file, this should return immediately. For a FIFO, it will block until
-       some data is written. */
-    fd_set set;
-    FD_ZERO(&set);
-    FD_SET(fd, &set);
-
-    struct timeval timeout;
-    timeout.tv_sec = timeout_seconds;
-    timeout.tv_usec = 0;
-
-    int result = select(fd + 1, &set, NULL, NULL, &timeout);
-
-    if (result == 1) {
-        /* Switch back to block mode */
-        int flags = fcntl(fd, F_GETFL, 0);
-        fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-
-        return fdopen(fd, "rb");
-    }
-    else {
-        return NULL;
-    }
-}
 
 trace_read_state *start_reading(const char *filename, int timeout_seconds)
 {
@@ -187,20 +154,6 @@ void end_reading(trace_read_state *state)
     free(state);
 }
 
-static void ensure_buffer_size(void **buffer, size_t element_size,
-                               uint32_t *allocated, uint32_t needed)
-{
-    if (*allocated >= needed)
-        return;
-
-    if (*allocated == 0)
-        *allocated = 1024;
-    else
-        *allocated *= 2;
-
-    *buffer = realloc(*buffer, *allocated * element_size);
-}
-
 enum trace_error read_trace_point(trace_read_state *state, trace_point *result_ptr)
 {
     trace_point result = { 0, 0, 0, 0 };
@@ -225,8 +178,8 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
                     goto error;
 
                 result.n_vars++;
-                ensure_buffer_size((void **)&(state->var_buffer), sizeof(trace_var_info),
-                                   &state->n_vars, result.n_vars);
+                ENSURE_BUFFER_SIZE(state->var_buffer, sizeof(trace_var_info),
+                                   state->n_vars, result.n_vars);
                 state->var_buffer[result.n_vars - 1] = info;
 
                 break;
@@ -239,8 +192,8 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
                     goto error;
 
                 result.n_sizes++;
-                ensure_buffer_size((void **)&(state->size_buffer), sizeof(trace_buffer_size),
-                                   &state->n_sizes, result.n_sizes);
+                ENSURE_BUFFER_SIZE(state->size_buffer, sizeof(trace_buffer_size),
+                                   state->n_sizes, result.n_sizes);
                 state->size_buffer[result.n_sizes - 1] = info;
                 break;
             }
@@ -250,8 +203,8 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
                 FREAD_CHECK(&value, sizeof(value), 1, state);
 
                 result.n_aux++;
-                ensure_buffer_size((void **)&(state->aux_buffer), sizeof(uint64_t),
-                                   &state->n_aux, result.n_aux);
+                ENSURE_BUFFER_SIZE(state->aux_buffer, sizeof(uint64_t),
+                                   state->n_aux, result.n_aux);
                 state->aux_buffer[result.n_aux - 1] = value;
                 break;
             }
