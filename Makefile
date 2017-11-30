@@ -1,9 +1,14 @@
-CFLAGS = -O0 -Wall -g -std=gnu11
+CFLAGS = -O0 -Wall -g -std=gnu11 -I. -fPIC
 
 SRCS = read-trace.c write-trace.c utils.c trace-db.c
+OBJS := $(SRCS:%.c=%.o)
+DEPS := $(SRCS:%.c=%.d)
+TARGETS := libtrace-db.so sample
 
-libtrace-db.so: $(SRCS) read-trace.h write-trace.h
-	$(CC) $(CFLAGS) -o libtrace-db.so -fPIC -shared $(SRCS)  -Wl,-soname,libtrace-db.so
+libtrace-db.so: $(OBJS)
+    $(CC) $(CFLAGS) -o libtrace-db.so -fPIC -shared $(OBJS)  -Wl,-soname,libtrace-db.so
+
+-include $(DEPS)
 
 README.html: README.md
 	pandoc $< -o $@
@@ -23,14 +28,14 @@ local-makepkg: src/trace-db_pkg
 	make -C src/trace-db_pkg clean
 	makepkg -ef
 
-sample: libtrace-db.so sample.c
+sample: libtrace-db.so sample.o
 	$(CC) $(CFLAGS) -o sample sample.c -ltrace-db -L.
 
-unit-test: libtrace-db.so test/unit-test.c
-	$(CC) $(CFLAGS) -o unit-test test/unit-test.c -ltrace-db -L. -I.
+unit-test: libtrace-db.so test/unit-test.o
+    $(CC) $(CFLAGS) -o unit-test test/unit-test.c -ltrace -L.
 
 check: unit-test
 	LD_LIBRARY_PATH=. ./unit-test
 
 clean:
-	rm -f libtrace-db.so README.html unit-test sample *.tar.xz
+    rm -f *.o *.d libtrace-db.so README.html unit-test sample *.tar.xz
