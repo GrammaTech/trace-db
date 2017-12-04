@@ -49,7 +49,9 @@
   (value :int64)
   (name-index :uint32)
   (type-index :uint32)
-  (size :uint32))
+  (size :uint32)
+  (buffer-size :uint64)
+  (has-buffer-size :uint8))
 
 (defcstruct trace-read-state
   (file :pointer)
@@ -72,9 +74,12 @@
     `(with-foreign-slots ((address size) ,info (:struct buffer-size))
        (cons address size)))
   (defmethod expand-from-foreign (info (type c-var-info))
-    `(with-foreign-slots ((name-index type-index size) ,info
+    `(with-foreign-slots ((name-index type-index size
+                           has-buffer-size buffer-size)
+                          ,info
                           (:struct var-info))
-       `(,name-index ,type-index ,size)))
+       `(,name-index ,type-index ,size ,(unless (zerop has-buffer-size)
+                                                buffer-size))))
   (defmethod expand-from-foreign (point (type c-trace-point))
     `(with-foreign-slots ((statement sizes n-sizes vars n-vars aux n-aux)
                           ,point (:struct trace-point))
@@ -131,20 +136,16 @@
              data)))
        (read-vars (vars count)
          (iter (for i below count)
-               (destructuring-bind (name-index type-index size)
+               (destructuring-bind (name-index type-index size buffer-size)
                    (mem-aref vars '(:struct var-info) i)
                  (let ((type (aref types type-index)))
                    (collect `#(,(aref names name-index)
                                ,(aref names (type-name-index type))
-                               ,(get-value vars type size i)))))))
-       (read-sizes (sizes count)
-         (iter (for i below count)
-               (collect (mem-aref sizes '(:struct buffer-size) i)))))
+                               ,(get-value vars type size i)
+                               ,buffer-size)))))))
     (destructuring-bind (statement sizes n-sizes vars n-vars aux n-aux)
         (mem-aref point '(:struct trace-point) index)
-      (when (> n-sizes 0)
-        (push (cons :sizes (read-sizes sizes n-sizes))
-              result))
+      (declare (ignorable sizes n-sizes))
       (when (> n-vars 0)
         (push (cons :scopes (read-vars vars n-vars))
               result))
@@ -227,7 +228,7 @@
 (defun get-trace (db index &key (predicate #'identity) max
                   &aux (collected 0))
   "Get a trace from DB and convert to a list."
-  (load-libtrace)
+  (load-trace-db)
   (let* ((trace (mem-aref (getf (mem-aref db '(:struct trace-db)) 'traces)
                           '(:struct c-trace) index))
          (names (ignore-errors

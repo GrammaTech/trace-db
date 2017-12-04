@@ -277,6 +277,20 @@ void read_trace_2(const char *filename)
     printf("read %d trace points\n", count);
 }
 
+#include "trace-db.h"
+
+void skip_list_remove(skip_list *list, uint64_t key);
+void skip_list_update(skip_list *list, uint64_t key, uint64_t value);
+typedef struct snode
+{
+    uint64_t key;
+    uint64_t value;
+    struct snode **next;
+} snode;
+
+snode *skip_list_find(const skip_list *list, uint64_t key);
+extern int sl_verbose;
+
 int main(int argc, char **argv)
 {
     if (!strcmp(argv[1], "--write")) {
