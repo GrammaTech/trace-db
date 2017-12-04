@@ -19,6 +19,8 @@ typedef struct trace_var_info
     uint32_t name_index;
     uint32_t type_index;
     uint32_t size;
+    uint64_t buffer_size;
+    uint8_t has_buffer_size;
 } trace_var_info;
 
 enum trace_error {

@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 
 #include "read-trace.h"
+#include "trace-db.h"
 #include "write-trace.h"
 
 #define TRACE_FILE "test/tmp.trace"
@@ -321,6 +322,68 @@ void test_timeout_from_fifo()
     assert(state == NULL);
 }
 
+void test_memory_map()
+{
+    type_description type = {0, POINTER, 8};
+    trace_read_state state = { .n_types = 1,
+                               .types = &type };
+    skip_list *memory_map = create_memory_map();
+    trace_buffer_size sizes[] = {{ 3, 10 }, { 100, 2}};
+    trace_point point = { .n_sizes = 2, .sizes = sizes };
+    update_memory_map(memory_map, &point);
+
+    /* Basic lookups */
+    trace_var_info var = { .type_index = 0,
+                           .value = { .ptr = (void *)3 }};
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.buffer_size == 10);
+
+    var.value.ptr = (void *)100;
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.buffer_size == 2);
+
+    /* Pointers in the middle of the buffer */
+    var.value.ptr = (void *)8;
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.buffer_size == 5);
+
+    var.value.ptr = (void *)101;
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.buffer_size == 1);
+
+    /* End of buffer */
+    var.value.ptr = (void *)13;
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.has_buffer_size == 0);
+
+    var.value.ptr = (void *)102;
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.has_buffer_size == 0);
+
+    /* Pointers outside known buffers */
+    var.value.ptr = (void *)99;
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.has_buffer_size == 0);
+
+    var.value.ptr = (void *)2;
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.has_buffer_size == 0);
+
+    /* New allocation supersedes old */
+    sizes[0] = (trace_buffer_size) {3, 5};
+    update_memory_map(memory_map, &point);
+    var.value.ptr = (void *)3;
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.buffer_size == 5);
+
+    /* Freed memory is removed from the map */
+    sizes[1] = (trace_buffer_size) {100, 0};
+    update_memory_map(memory_map, &point);
+    var.value.ptr = (void *)100;
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.has_buffer_size == 0);
+}
+
 int main(int argc, char **argv)
 {
     test_eof_in_header();
@@ -335,6 +398,7 @@ int main(int argc, char **argv)
     test_eof_in_buffer_size();
     test_read_from_fifo();
     test_timeout_from_fifo();
+    test_memory_map();
 
     unlink(TRACE_FILE);
 
