@@ -26,4 +26,13 @@ trace_db *create_db();
 void collect_trace(trace_db *db, trace_read_state *state);
 void free_db(trace_db *db);
 
+typedef struct skip_list skip_list;
+
+skip_list *create_memory_map();
+void free_memory_map(skip_list *list);
+void update_memory_map(skip_list *memory_map, const trace_point *point);
+void compute_buffer_size(const skip_list *memory_map,
+                         const trace_read_state *state,
+                         trace_var_info *var);
+
 #endif // __TRACE_DB_H

@@ -98,6 +98,8 @@ uint64_t read_id(trace_read_state *state)
 trace_var_info read_var_info(trace_read_state *state)
 {
     trace_var_info result;
+    result.has_buffer_size = 0;
+
     FREAD_CHECK(&result.name_index, sizeof(result.name_index), 1, state);
     FREAD_CHECK(&result.type_index, sizeof(result.type_index), 1, state);
 
