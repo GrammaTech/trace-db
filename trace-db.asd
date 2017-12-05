@@ -1,6 +1,5 @@
-(defsystem :libtrace
-  :description
-  "Bug Injector: Inject Vulnerabilities for Configurable Cyber Defense"
+(defsystem :trace-db
+  :description "Writing, reading, storing, and searching of program traces"
   :version "0.0.0"
   :depends-on (alexandria
                iterate
@@ -12,11 +11,11 @@
             :serial t
             :components
             ((:file "package")
-             (:file "libtrace"))))
-  :output-files (prepare-op (o c) (list "libtrace.so"))
+             (:file "trace-db"))))
+  :output-files (prepare-op (o c) (list "trace-db.so"))
   :perform (prepare-op :before (o c)
              (uiop::run-program
               (list "make" "-C"
                     (namestring
                      (asdf:component-pathname
-                      (asdf:find-system :libtrace)))))))
+                      (asdf:find-system :trace-db)))))))
