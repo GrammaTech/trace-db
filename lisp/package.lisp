@@ -1,5 +1,5 @@
-(defpackage :libtrace
-  (:documentation "Wrapper for libtrace.")
+(defpackage :trace-db
+  (:documentation "Wrapper for trace-db.")
   (:use :common-lisp
         :alexandria
         :iterate

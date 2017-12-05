@@ -1,4 +1,4 @@
-(in-package :libtrace)
+(in-package :trace-db)
 
 (define-constant +lib-dir+
     (make-pathname :directory (butlast (pathname-directory
@@ -8,18 +8,18 @@
   :test #'equalp
   :documentation "Path to directory holding shared library.")
 
-(defvar *libtrace-loaded* nil)
-(defun load-libtrace ()
-  (unless *libtrace-loaded*
+(defvar *trace-db-loaded* nil)
+(defun load-trace-db ()
+  (unless *trace-db-loaded*
     (pushnew +lib-dir+ *foreign-library-directories*
              :test #'equal)
 
-    (define-foreign-library libtrace
-      (t (:default "libtrace")))
+    (define-foreign-library trace-db
+      (t (:default "trace-db")))
 
-    (use-foreign-library libtrace)
+    (use-foreign-library trace-db)
 
-    (setf *libtrace-loaded* t)))
+    (setf *trace-db-loaded* t)))
 
 (defcenum type-format
   :unsigned
@@ -173,7 +173,7 @@
 (defun read-trace (file timeout &key (predicate #'identity) max
                    &aux (collected 0))
   "Read a trace and convert to a list."
-  (load-libtrace)
+  (load-trace-db)
   (let ((state-ptr (start-reading file timeout)))
     (unless (null-pointer-p state-ptr)
       (let* ((state (mem-aref state-ptr '(:struct trace-read-state)))
