@@ -15,7 +15,7 @@
              :test #'equal)
 
     (define-foreign-library trace-db
-      (t (:default "trace-db")))
+      (t (:default "libtrace-db")))
 
     (use-foreign-library trace-db)
 
