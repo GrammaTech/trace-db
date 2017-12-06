@@ -2,14 +2,14 @@ CFLAGS = -O0 -Wall -g -std=gnu11
 
 SRCS = read-trace.c write-trace.c
 
-trace-db.so: $(SRCS) read-trace.h write-trace.h
-	$(CC) $(CFLAGS) -o trace-db.so -fPIC -shared $(SRCS)  -Wl,-soname,trace-db.so
+libtrace-db.so: $(SRCS) read-trace.h write-trace.h
+	$(CC) $(CFLAGS) -o libtrace-db.so -fPIC -shared $(SRCS)  -Wl,-soname,libtrace-db.so
 
 README.html: README.md
 	pandoc $< -o $@
 
-install: trace-db.so README.html
-	install -Dm755 trace-db.so $(DESTDIR)lib/trace-db.so
+install: libtrace-db.so README.html
+	install -Dm755 libtrace-db.so $(DESTDIR)lib/libtrace-db.so
 	install -Dm644 README.html $(DESTDIR)share/doc/trace-db/README.html
 
 # This target builds an Arch package from the current state of the
@@ -23,14 +23,14 @@ local-makepkg: src/trace-db_pkg
 	make -C src/trace-db_pkg clean
 	makepkg -ef
 
-sample: trace-db.so sample.c
-	$(CC) $(CFLAGS) -o sample sample.c -ltrace -L.
+sample: libtrace-db.so sample.c
+	$(CC) $(CFLAGS) -o sample sample.c -ltrace-db -L.
 
-unit-test: trace-db.so test/unit-test.c
-	$(CC) $(CFLAGS) -o unit-test test/unit-test.c -ltrace -L. -I.
+unit-test: libtrace-db.so test/unit-test.c
+	$(CC) $(CFLAGS) -o unit-test test/unit-test.c -ltrace-db -L. -I.
 
 check: unit-test
 	LD_LIBRARY_PATH=. ./unit-test
 
 clean:
-	rm -f trace-db.so README.html unit-test sample *.tar.xz
+	rm -f libtrace-db.so README.html unit-test sample *.tar.xz

@@ -1,7 +1,7 @@
 src/
 pkg/
 
-/trace-db.so
+/libtrace-db.so
 /unit-test
 /sample
 
