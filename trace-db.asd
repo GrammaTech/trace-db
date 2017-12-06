@@ -12,7 +12,7 @@
             :components
             ((:file "package")
              (:file "trace-db"))))
-  :output-files (prepare-op (o c) (list "trace-db.so"))
+  :output-files (prepare-op (o c) (list "libtrace-db.so"))
   :perform (prepare-op :before (o c)
              (uiop::run-program
               (list "make" "-C"
