@@ -2,7 +2,7 @@
 # Maintainer: Eric Schulte <schulte.eric@gmail.com>
 pkgname=trace-db-git
 _srcdir=trace-db_pkg
-pkgver=r51.81a06d3
+pkgver=r52.0ad255e
 pkgrel=1
 pkgdesc="Writing, reading, storing, and searching of program traces (source and binary)"
 url="https://git.grammatech.com/research/trace-db"
