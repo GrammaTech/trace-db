@@ -4,7 +4,8 @@
   :depends-on (alexandria
                iterate
                cffi
-               cffi-libffi)
+               cffi-libffi
+               trivial-garbage)
   :components
   ((:module lisp
             :pathname "lisp"

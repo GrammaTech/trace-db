@@ -3,11 +3,11 @@
   (:use :common-lisp
         :alexandria
         :iterate
-        :cffi)
+        :cffi
+        :trivial-garbage)
   (:export :read-trace
            :+trace-id-file-bits+
            :+trace-id-statement-bits+
-           :create-db
-           :collect-trace
-           :free-db
-           :get-trace))
+           :trace-db
+           :get-trace
+           :add-trace))

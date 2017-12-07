@@ -25,7 +25,7 @@ typedef struct trace_db
 } trace_db;
 
 trace_db *create_db();
-void collect_trace(trace_db *db, trace_read_state *state);
+void add_trace(trace_db *db, trace_read_state *state);
 void free_db(trace_db *db);
 
 typedef struct skip_list skip_list;
