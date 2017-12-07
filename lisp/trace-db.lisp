@@ -9,7 +9,7 @@
   :documentation "Path to directory holding shared library.")
 
 (defvar *trace-db-loaded* nil)
-(defun load-trace-db ()
+(defun load-libtrace-db ()
   (unless *trace-db-loaded*
     (pushnew +lib-dir+ *foreign-library-directories*
              :test #'equal)
@@ -174,7 +174,7 @@
 (defun read-trace (file timeout &key (predicate #'identity) max
                    &aux (collected 0))
   "Read a trace and convert to a list."
-  (load-trace-db)
+  (load-libtrace-db)
   (let ((state-ptr (start-reading file timeout)))
     (unless (null-pointer-p state-ptr)
       (let* ((state (mem-aref state-ptr '(:struct trace-read-state)))
@@ -207,7 +207,7 @@
 
 ;;; Trace DB interface
 (defcfun create-db :pointer)
-(defcfun collect-trace :void (db :pointer) (state :pointer))
+(defcfun ("add_trace" c-add-trace) :void (db :pointer) (state :pointer))
 (defcfun free-db :void (db :pointer))
 
 (defcstruct c-trace
@@ -225,33 +225,56 @@
   (n-traces :uint64)
   (n-traces-allocated :uint64))
 
-(defun get-trace (db index &key (predicate #'identity) max
-                  &aux (collected 0))
+(defclass trace-db ()
+  ((db-pointer :reader db-pointer)
+   (trace-metadata :initform nil :accessor trace-metadata :type 'list)))
+
+(defmethod initialize-instance :after ((instance trace-db) &key)
+  (load-libtrace-db)
+  (let ((db-pointer (create-db)))
+    (setf (slot-value instance 'db-pointer) db-pointer)
+    (finalize instance (lambda () (free-db db-pointer)))))
+
+(defmethod add-trace ((db trace-db) filename timeout
+                      metadata)
+  (let ((state-pointer (start-reading filename timeout)))
+    (assert (not (null state-pointer)))
+    (c-add-trace (db-pointer db) state-pointer)
+    (push metadata (trace-metadata db)))
+  nil)
+
+(defmethod get-trace ((db trace-db) index &key (predicate #'identity) max
+                      &aux (collected 0))
   "Get a trace from DB and convert to a list."
-  (load-trace-db)
-  (let* ((trace (mem-aref (getf (mem-aref db '(:struct trace-db)) 'traces)
-                          '(:struct c-trace) index))
-         (names (ignore-errors
-                  (iter (with ptr = (getf trace 'names))
-                        (for i below (getf trace 'n-names))
-                        (for str = (mem-aref ptr :string i))
-                        (while str)
-                        (collect str result-type 'vector))))
-         (types (ignore-errors
-                  (iter (with ptr = (getf trace 'types))
-                        (for i below (getf trace 'n-types))
-                        (for str =
-                             (mem-aref ptr '(:struct type-description) i))
-                        (while str)
-                        (collect str result-type 'vector)))))
-    (unwind-protect
-         (when (and types names)
-           (iter (for i below (getf trace 'n-points))
-                 (while (or (null max) (< collected max)))
-                 (for trace-point =
-                      (convert-trace-point names types
-                                           (getf trace 'points)
-                                           i))
-                 (when (funcall predicate trace-point)
-                   (incf collected)
-                   (collect trace-point)))))))
+
+  (let ((db-struct (mem-aref (db-pointer db) '(:struct trace-db))))
+    (assert (< index (getf db-struct 'n-traces)))
+
+    (let* ((trace (mem-aref (getf db-struct 'traces)
+                            '(:struct c-trace) index))
+           (names (ignore-errors
+                    (iter (with ptr = (getf trace 'names))
+                          (for i below (getf trace 'n-names))
+                          (for str = (mem-aref ptr :string i))
+                          (while str)
+                          (collect str result-type 'vector))))
+           (types (ignore-errors
+                    (iter (with ptr = (getf trace 'types))
+                          (for i below (getf trace 'n-types))
+                          (for str =
+                               (mem-aref ptr '(:struct type-description) i))
+                          (while str)
+                          (collect str result-type 'vector)))))
+      (when (and types names)
+        (iter (for i below (getf trace 'n-points))
+              (while (or (null max) (< collected max)))
+              (for trace-point =
+                   (convert-trace-point names types
+                                        (getf trace 'points)
+                                        i))
+              (when (funcall predicate trace-point)
+                (incf collected)
+                (collect trace-point into points))
+              (finally
+               (return (cons (cons :trace points)
+                             (elt (trace-metadata db) index)))))))))

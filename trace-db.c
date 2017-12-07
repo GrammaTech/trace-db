@@ -160,7 +160,7 @@ void compute_buffer_size(const skip_list *memory_map,
 
 #define INITIAL_TRACE_SIZE (1 << 16)
 
-void collect_trace(trace_db *db, trace_read_state *state)
+void add_trace(trace_db *db, trace_read_state *state)
 {
     trace trace = { malloc(INITIAL_TRACE_SIZE * sizeof(trace_point)),
                     0, INITIAL_TRACE_SIZE };
