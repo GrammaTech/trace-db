@@ -6,20 +6,6 @@
 
 #include "utils.h"
 
-void ensure_buffer_size(void **buffer, size_t element_size,
-                        uint32_t *allocated, uint32_t needed)
-{
-    if (*allocated >= needed)
-        return;
-
-    if (*allocated == 0)
-        *allocated = 1024;
-    else
-        *allocated *= 2;
-
-    *buffer = realloc(*buffer, *allocated * element_size);
-}
-
 FILE *open_with_timeout(const char *filename, int timeout_seconds)
 {
     /* Open in non-blocking mode. Returns immediately even if file is a FIFO

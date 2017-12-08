@@ -181,8 +181,8 @@ void add_trace(trace_db *db, trace_read_state *state)
                                  point.n_vars * sizeof(trace_var_info));
         point.aux = malloc_copy(point.aux, point.n_aux * sizeof(*point.aux));
 
-        ensure_buffer_size((void **)&trace.points, sizeof(trace_point),
-                           &trace.n_points_allocated, trace.n_points + 1);
+        ENSURE_BUFFER_SIZE(trace.points, sizeof(trace_point),
+                           trace.n_points_allocated, trace.n_points + 1);
         trace.points[trace.n_points++] = point;
     }
 
@@ -200,8 +200,8 @@ void add_trace(trace_db *db, trace_read_state *state)
     end_reading(state);
 
     /* Store trace */
-    ensure_buffer_size((void **)&db->traces, sizeof(trace),
-                       &db->n_traces_allocated, db->n_traces + 1);
+    ENSURE_BUFFER_SIZE(db->traces, sizeof(trace),
+                       db->n_traces_allocated, db->n_traces + 1);
     db->traces[db->n_traces++] = trace;
 }
 

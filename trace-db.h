@@ -7,9 +7,7 @@ typedef struct trace
 {
     trace_point *points;
     uint64_t n_points;
-    /* XXX: should be 64 bits, causes type problems with
-       ensure_buffer_size */
-    uint32_t n_points_allocated;
+    uint64_t n_points_allocated;
 
     const char **names;
     uint32_t n_names;

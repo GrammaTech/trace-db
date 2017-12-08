@@ -180,8 +180,8 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
                     goto error;
 
                 result.n_vars++;
-                ensure_buffer_size((void **)&(state->var_buffer), sizeof(trace_var_info),
-                                   &state->n_vars, result.n_vars);
+                ENSURE_BUFFER_SIZE(state->var_buffer, sizeof(trace_var_info),
+                                   state->n_vars, result.n_vars);
                 state->var_buffer[result.n_vars - 1] = info;
 
                 break;
@@ -194,8 +194,8 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
                     goto error;
 
                 result.n_sizes++;
-                ensure_buffer_size((void **)&(state->size_buffer), sizeof(trace_buffer_size),
-                                   &state->n_sizes, result.n_sizes);
+                ENSURE_BUFFER_SIZE(state->size_buffer, sizeof(trace_buffer_size),
+                                   state->n_sizes, result.n_sizes);
                 state->size_buffer[result.n_sizes - 1] = info;
                 break;
             }
@@ -205,8 +205,8 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
                 FREAD_CHECK(&value, sizeof(value), 1, state);
 
                 result.n_aux++;
-                ensure_buffer_size((void **)&(state->aux_buffer), sizeof(uint64_t),
-                                   &state->n_aux, result.n_aux);
+                ENSURE_BUFFER_SIZE(state->aux_buffer, sizeof(uint64_t),
+                                   state->n_aux, result.n_aux);
                 state->aux_buffer[result.n_aux - 1] = value;
                 break;
             }

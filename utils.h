@@ -5,8 +5,13 @@
 /* Ensure the buffer will hold at least needed elements.
    Reallocates if necessary.
  */
-void ensure_buffer_size(void **buffer, size_t element_size,
-                        uint32_t *allocated, uint32_t needed);
+#define ENSURE_BUFFER_SIZE(buffer, element_size, allocated, needed) \
+    do {                                                            \
+        if ((allocated) < (needed)) {                               \
+            (allocated) = ((allocated) == 0) ? 1024 : 2 * (allocated);  \
+            (buffer) = realloc((buffer), (allocated) * (element_size)); \
+        }                                                               \
+} while (0)
 
 /* Open a file and wait for it to have data available to read.
 
