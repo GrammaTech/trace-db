@@ -226,7 +226,8 @@
   (n-traces-allocated :uint64))
 
 (defclass trace-db ()
-  ((db-pointer :reader db-pointer)))
+  ((db-pointer :reader db-pointer)
+   (trace-metadata :initform nil :accessor trace-metadata :type 'list)))
 
 (defmethod initialize-instance :after ((instance trace-db) &key)
   (load-libtrace-db)
@@ -234,10 +235,13 @@
     (setf (slot-value instance 'db-pointer) db-pointer)
     (finalize instance (lambda () (free-db db-pointer)))))
 
-(defmethod add-trace ((db trace-db) filename timeout)
+(defmethod add-trace ((db trace-db) filename timeout
+                      metadata)
   (let ((state-pointer (start-reading filename timeout)))
     (assert (not (null state-pointer)))
-    (c-add-trace (db-pointer db) state-pointer)))
+    (c-add-trace (db-pointer db) state-pointer)
+    (push metadata (trace-metadata db)))
+  nil)
 
 (defmethod get-trace ((db trace-db) index &key (predicate #'identity) max
                       &aux (collected 0))
@@ -270,4 +274,7 @@
                                         i))
               (when (funcall predicate trace-point)
                 (incf collected)
-                (collect trace-point)))))))
+                (collect trace-point into points))
+              (finally
+               (return (cons (cons :trace points)
+                             (elt (trace-metadata db) index)))))))))
