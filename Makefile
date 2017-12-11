@@ -1,12 +1,14 @@
-CFLAGS = -O0 -Wall -g -std=gnu11 -I. -fPIC
+CCFLAGS = -O0 -Wall -g -I. -fPIC
+CFLAGS = $(CCFLAGS) -std=gnu11
+CXXFLAGS = $(CCFLAGS) -std=c++11
 
-SRCS = read-trace.c write-trace.c utils.c trace-db.c
-OBJS := $(SRCS:%.c=%.o)
-DEPS := $(SRCS:%.c=%.d)
+SRCS = read-trace.c write-trace.c utils.c trace-db.cpp
+OBJS := $(addsuffix .o,$(basename $(SRCS)))
+DEPS := $(addsuffix .d,$(basename $(SRCS)))
 TARGETS := libtrace-db.so sample
 
 libtrace-db.so: $(OBJS)
-	$(CC) $(CFLAGS) -o libtrace-db.so -fPIC -shared $(OBJS)  -Wl,-soname,libtrace-db.so
+	$(CXX) $(CFLAGS) -o libtrace-db.so -fPIC -shared $(OBJS)  -Wl,-soname,libtrace-db.so
 
 -include $(DEPS)
 
@@ -29,10 +31,10 @@ local-makepkg: src/trace-db_pkg
 	makepkg -ef
 
 sample: libtrace-db.so sample.o
-	$(CC) $(CFLAGS) -o sample sample.c -ltrace-db -L.
+	$(CXX) $(CXXFLAGS) -o sample sample.o -ltrace-db -L.
 
 unit-test: libtrace-db.so test/unit-test.o
-	$(CC) $(CFLAGS) -o unit-test test/unit-test.c -ltrace-db -L.
+	$(CXX) $(CXXFLAGS) -o unit-test test/unit-test.o -ltrace-db -L.
 
 check: unit-test
 	LD_LIBRARY_PATH=. ./unit-test

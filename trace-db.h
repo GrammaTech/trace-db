@@ -1,6 +1,9 @@
 #ifndef __TRACE_DB_H
 #define __TRACE_DB_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include "read-trace.h"
 
 typedef struct trace
@@ -34,5 +37,9 @@ void update_memory_map(skip_list *memory_map, const trace_point *point);
 void compute_buffer_size(const skip_list *memory_map,
                          const trace_read_state *state,
                          trace_var_info *var);
+
+#ifdef __cplusplus
+} // end extern "C"
+#endif
 
 #endif // __TRACE_DB_H
