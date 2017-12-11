@@ -1,13 +1,16 @@
-#include <stdlib.h>
+#include <cstdlib>
+#include <vector>
 
+extern "C" {
 #include "read-trace.h"
 #include "utils.h"
+}
 
 #include "trace-db.h"
 
 trace_db *create_db()
 {
-    return calloc(1, sizeof(trace_db));
+    return (trace_db*)calloc(1, sizeof(trace_db));
 }
 
 #define SKIP_LIST_MAX_HEIGHT 32
@@ -46,7 +49,7 @@ static void skip_list_remove(skip_list *list, uint64_t key)
 
     current = current->next[1];
     if (current->key == key) {
-        for (int i = 1; i <= list->height; i++) {
+        for (unsigned int i = 1; i <= list->height; i++) {
             if (update[i]->next[i] != current)
                 break;
             update[i]->next[1] = current->next[i];
@@ -131,7 +134,7 @@ void free_memory_map(skip_list *list)
 
 void update_memory_map(skip_list *memory_map, const trace_point *point)
 {
-    for (int i = 0; i < point->n_sizes; i++) {
+    for (uint32_t i = 0; i < point->n_sizes; i++) {
         trace_buffer_size bsize = point->sizes[i];
         if (bsize.size == 0)
             skip_list_remove(memory_map, bsize.address);
@@ -162,52 +165,58 @@ void compute_buffer_size(const skip_list *memory_map,
 
 void add_trace(trace_db *db, trace_read_state *state)
 {
-    trace trace = { malloc(INITIAL_TRACE_SIZE * sizeof(trace_point)),
-                    0, INITIAL_TRACE_SIZE };
+    trace_point *points =
+        (trace_point*)malloc(INITIAL_TRACE_SIZE * sizeof(trace_point));
+    trace new_trace = { points, 0, INITIAL_TRACE_SIZE };
     skip_list *memory_map = create_memory_map();
 
     /* Read trace points */
     trace_point point;
     while (read_trace_point(state, &point) == 0) {
         update_memory_map(memory_map, &point);
-        for (int i = 0; i < point.n_vars; i++) {
+        for (uint32_t i = 0; i < point.n_vars; i++) {
             compute_buffer_size(memory_map, state, &point.vars[i]);
         }
 
         /* Copy contents out of shared state buffers */
-        point.sizes = malloc_copy(point.sizes,
-                                  point.n_sizes * sizeof(trace_buffer_size));
-        point.vars = malloc_copy(point.vars,
-                                 point.n_vars * sizeof(trace_var_info));
-        point.aux = malloc_copy(point.aux, point.n_aux * sizeof(*point.aux));
+        point.sizes =
+            (trace_buffer_size*)malloc_copy(point.sizes,
+                                             point.n_sizes * sizeof(trace_buffer_size));
+        point.vars = (trace_var_info*)malloc_copy(point.vars,
+                                                   point.n_vars * sizeof(trace_var_info));
+        point.aux = (uint64_t*)malloc_copy(point.aux, point.n_aux * sizeof(*point.aux));
 
-        ENSURE_BUFFER_SIZE(trace.points, sizeof(trace_point),
-                           trace.n_points_allocated, trace.n_points + 1);
-        trace.points[trace.n_points++] = point;
+        void *tmp = new_trace.points;
+        ENSURE_BUFFER_SIZE(tmp, sizeof(trace_point),
+                           new_trace.n_points_allocated, new_trace.n_points + 1);
+        new_trace.points = (trace_point*)tmp;
+        new_trace.points[new_trace.n_points++] = point;
     }
 
     free_memory_map(memory_map);
 
     /* Move names and types from state into trace */
-    trace.names = state->names;
-    trace.n_names = state->n_names;
+    new_trace.names = state->names;
+    new_trace.n_names = state->n_names;
     state->names = NULL;
 
-    trace.types = state->types;
-    trace.n_types = state->n_types;
+    new_trace.types = state->types;
+    new_trace.n_types = state->n_types;
     state->types = NULL;
 
     end_reading(state);
 
     /* Store trace */
-    ENSURE_BUFFER_SIZE(db->traces, sizeof(trace),
+    void *tmp = db->traces;
+    ENSURE_BUFFER_SIZE(tmp, sizeof(trace),
                        db->n_traces_allocated, db->n_traces + 1);
-    db->traces[db->n_traces++] = trace;
+    db->traces = (trace*) tmp;
+    db->traces[db->n_traces++] = new_trace;
 }
 
 void free_db(trace_db *db)
 {
-    for (int i = 0; i < db->n_traces; i++) {
+    for (uint64_t i = 0; i < db->n_traces; i++) {
         if (db->traces[i].n_points > 0)
             free(db->traces[i].points);
         free(db->traces);
