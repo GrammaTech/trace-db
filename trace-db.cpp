@@ -1,4 +1,6 @@
+#include <assert.h>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 
 extern "C" {
@@ -163,8 +165,11 @@ void compute_buffer_size(const skip_list *memory_map,
 
 #define INITIAL_TRACE_SIZE (1 << 16)
 
-void add_trace(trace_db *db, trace_read_state *state)
+void add_trace(trace_db *db, trace_read_state *state, uint64_t max)
 {
+    if (max == 0)
+        max = UINT64_MAX;
+
     trace_point *points =
         (trace_point*)malloc(INITIAL_TRACE_SIZE * sizeof(trace_point));
     trace new_trace = { points, 0, INITIAL_TRACE_SIZE };
@@ -172,7 +177,7 @@ void add_trace(trace_db *db, trace_read_state *state)
 
     /* Read trace points */
     trace_point point;
-    while (read_trace_point(state, &point) == 0) {
+    for (uint64_t i = 0; i < max && (read_trace_point(state, &point) == 0); i++) {
         update_memory_map(memory_map, &point);
         for (uint32_t i = 0; i < point.n_vars; i++) {
             compute_buffer_size(memory_map, state, &point.vars[i]);
@@ -222,4 +227,92 @@ void free_db(trace_db *db)
         free(db->traces);
     }
     free(db);
+}
+
+bool type_compatible(const free_variable &free_var, const trace_var_info &real_var)
+{
+    for (uint32_t i = 0; i < free_var.n_allowed_types; i++) {
+        if (free_var.allowed_types[i] == real_var.type_index)
+            return true;
+    }
+    return false;
+}
+
+// Cartesian product of vectors
+std::vector<std::vector<uint32_t> > cartesian(const std::vector<std::vector<uint32_t> > &vectors)
+{
+    std::vector<std::vector<uint32_t> > results;
+    std::vector<uint32_t> current(vectors.size());
+
+    size_t n_results = 1;
+    for (auto v : vectors)
+        n_results *= v.size();
+    results.reserve(n_results);
+
+    // Enumerate all results, using modular arithmetic to index into
+    // individual vectors.
+    for (size_t result_i = 0; result_i < n_results; result_i++) {
+        size_t quotient = result_i;
+        for (size_t v_i = 0; v_i < vectors.size(); v_i++) {
+            auto v = vectors[v_i];
+            size_t n = quotient % v.size();
+            current[v_i] = v[n];
+            quotient /= v.size();
+        }
+        results.push_back(current);
+    }
+
+    return results;
+}
+
+void query_trace(const trace_db *db, uint64_t index, const query *query,
+                 trace_point **results_out, uint64_t *n_results_out)
+{
+    assert(index < db->n_traces);
+    std::vector<trace_point> results;
+    const trace *trace = &db->traces[index];
+
+    for (uint32_t point_i = 0; point_i < trace->n_points; point_i++) {
+        trace_point *current = &trace->points[point_i];
+
+        // Find possible bindings for each free variable
+        std::vector<std::vector<uint32_t> > matching_vars(query->n_variables);
+        for (uint32_t free_var_i = 0; free_var_i < query->n_variables; free_var_i++) {
+            for (uint32_t point_var_i = 0; point_var_i < current->n_vars; point_var_i++) {
+                if (type_compatible(query->variables[free_var_i],
+                                    current->vars[point_var_i]))
+                    matching_vars[free_var_i].push_back(point_var_i);
+            }
+        }
+
+        // Collect all combinations of bindings
+        for (auto bindings : cartesian(matching_vars)) {
+            trace_point point = { current->statement };
+            point.n_vars = bindings.size();
+            point.vars = (trace_var_info *)malloc(point.n_vars * sizeof(trace_var_info));
+            for (uint32_t i = 0; i < point.n_vars; i++) {
+                point.vars[i] = current->vars[bindings[i]];
+            }
+            results.push_back(point);
+        }
+    }
+
+    // Allocate buffer and return a copy of the results
+    size_t results_size = results.size() * sizeof(trace_point);
+    if (results_size > 0) {
+        *results_out = (trace_point*)malloc(results_size);
+        memcpy(*results_out, &results[0], results_size);
+    }
+    else {
+        *results_out = NULL;
+    }
+    *n_results_out = results.size();
+}
+
+void free_query_result(trace_point *results, uint64_t n_results)
+{
+    for (uint64_t i = 0; i < n_results; i++)
+        free(results[i].vars);
+    if (n_results > 0)
+        free(results);
 }
