@@ -5,7 +5,9 @@
                iterate
                cffi
                cffi-libffi
-               trivial-garbage)
+               trivial-garbage
+               named-readtables
+               curry-compose-reader-macros)
   :components
   ((:module lisp
             :pathname "lisp"
