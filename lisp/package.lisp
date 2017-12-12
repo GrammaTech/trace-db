@@ -4,10 +4,16 @@
         :alexandria
         :iterate
         :cffi
-        :trivial-garbage)
+        :trivial-garbage
+        :named-readtables
+        :curry-compose-reader-macros)
   (:export :read-trace
            :+trace-id-file-bits+
            :+trace-id-statement-bits+
            :trace-db
            :get-trace
-           :add-trace))
+           :add-trace
+           :n-traces
+           :trace-size
+           :trace-types
+           :query-trace))
