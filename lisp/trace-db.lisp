@@ -1,4 +1,5 @@
 (in-package :trace-db)
+(in-readtable :curry-compose-reader-macros)
 
 (define-constant +lib-dir+
     (make-pathname :directory (butlast (pathname-directory
@@ -207,7 +208,8 @@
 
 ;;; Trace DB interface
 (defcfun create-db :pointer)
-(defcfun ("add_trace" c-add-trace) :void (db :pointer) (state :pointer))
+(defcfun ("add_trace" c-add-trace) :void
+  (db :pointer) (state :pointer) (max :uint64))
 (defcfun free-db :void (db :pointer))
 
 (defcstruct c-trace
@@ -235,23 +237,47 @@
     (setf (slot-value instance 'db-pointer) db-pointer)
     (finalize instance (lambda () (free-db db-pointer)))))
 
+(defun get-trace-struct (db index)
+  (let ((db-struct (mem-aref (db-pointer db) '(:struct trace-db))))
+    (assert (< index (getf db-struct 'n-traces)))
+    (mem-aref (getf db-struct 'traces) '(:struct c-trace) index)))
+
+(defmethod n-traces ((db trace-db))
+  (getf (mem-aref (db-pointer db) '(:struct trace-db))
+        'n-traces))
+
+(defmethod trace-size ((db trace-db) index)
+  (getf (get-trace-struct db index) 'n-points))
+
 (defmethod add-trace ((db trace-db) filename timeout
-                      metadata)
+                      metadata &key max)
   (let ((state-pointer (start-reading filename timeout)))
     (assert (not (null state-pointer)))
-    (c-add-trace (db-pointer db) state-pointer)
+    (c-add-trace (db-pointer db) state-pointer
+                 (or max 0))
     (push metadata (trace-metadata db)))
   nil)
 
-(defmethod get-trace ((db trace-db) index &key (predicate #'identity) max
-                      &aux (collected 0))
+(defmethod trace-types ((db trace-db) index)
+  (let ((db-struct (mem-aref (db-pointer db) '(:struct trace-db))))
+    (let* ((trace (get-trace-struct db index))
+           (names (iter (with ptr = (getf trace 'names))
+                        (for i below (getf trace 'n-names))
+                        (for str = (mem-aref ptr :string i))
+                        (collect str result-type 'vector))))
+      (iter (with ptr = (getf trace 'types))
+            (for i below (getf trace 'n-types))
+            (collect
+                (aref names
+                      (type-name-index (mem-aref ptr
+                                                 '(:struct type-description)
+                                                 i))))))))
+
+(defmethod get-trace ((db trace-db) index)
   "Get a trace from DB and convert to a list."
 
   (let ((db-struct (mem-aref (db-pointer db) '(:struct trace-db))))
-    (assert (< index (getf db-struct 'n-traces)))
-
-    (let* ((trace (mem-aref (getf db-struct 'traces)
-                            '(:struct c-trace) index))
+    (let* ((trace (get-trace-struct db index))
            (names (ignore-errors
                     (iter (with ptr = (getf trace 'names))
                           (for i below (getf trace 'n-names))
@@ -267,14 +293,97 @@
                           (collect str result-type 'vector)))))
       (when (and types names)
         (iter (for i below (getf trace 'n-points))
-              (while (or (null max) (< collected max)))
-              (for trace-point =
-                   (convert-trace-point names types
-                                        (getf trace 'points)
-                                        i))
-              (when (funcall predicate trace-point)
-                (incf collected)
-                (collect trace-point into points))
+              (collect (convert-trace-point names types
+                                            (getf trace 'points)
+                                            i)
+                into points)
               (finally
                (return (cons (cons :trace points)
                              (elt (trace-metadata db) index)))))))))
+
+(defcstruct free-variable
+  (n-allowed-types :uint32)
+  (allowed-types (:pointer :uint32)))
+
+(defcstruct query
+  (n-variables :uint32)
+  (variables (:pointer (:struct free-variable))))
+
+(defcfun ("query_trace" c-query-trace) :void
+  (db (:pointer (:struct trace-db)))
+  (index :uint64)
+  (query (:pointer (:struct query)))
+  (results-out :pointer)
+  (n-results :pointer))
+
+(defcfun free-query-result :void
+  (results-out :pointer)
+  (n-results :uint64))
+
+(defmethod query-trace ((db trace-db) index var-types)
+  (let* ((n-vars (length var-types))
+         (trace-types (trace-types db index))
+         ;; Convert type names to indices
+         (type-indices
+          (mapcar {map 'vector {position _ trace-types :test #'string=}}
+                  var-types))
+         ;; Create an array of free_variable structs
+         (free-vars
+          (let ((var-array (foreign-alloc '(:struct free-variable)
+                                          :count n-vars)))
+            (iter (for types in type-indices)
+                  (for i upfrom 0)
+                  (for type-array = (foreign-alloc :uint32
+                                                   :count (length types)))
+                  (lisp-array-to-foreign types type-array
+                                         `(:array :uint32 ,(length types)))
+                   (setf (mem-aref var-array '(:struct free-variable) i)
+                         `(n-allowed-types ,(length types)
+                           allowed-types ,type-array)))
+            var-array)))
+    (with-foreign-object (results-ptr '(:pointer (:struct trace-point)))
+      (setf (mem-aref results-ptr '(:pointer (:struct trace-point)))
+            (null-pointer))
+      (with-foreign-object (n-results-ptr ':uint64)
+        (setf (mem-aref n-results-ptr ':uint64) 0)
+        (unwind-protect
+             (with-foreign-object (query '(:struct query))
+               (with-foreign-slots ((n-variables variables)
+                                    query (:struct query))
+                 (setf n-variables n-vars)
+                 (setf variables free-vars))
+
+               (c-query-trace (db-pointer db) index query
+                              results-ptr n-results-ptr)
+
+               (let* ((trace (get-trace-struct db index))
+                      (names (ignore-errors
+                               (iter (with ptr = (getf trace 'names))
+                                     (for i below (getf trace 'n-names))
+                                     (for str = (mem-aref ptr :string i))
+                                     (while str)
+                                     (collect str result-type 'vector))))
+                      (types (ignore-errors
+                               (iter (with ptr = (getf trace 'types))
+                                     (for i below (getf trace 'n-types))
+                                     (for str =
+                                          (mem-aref ptr '(:struct type-description) i))
+                                     (while str)
+                                     (collect str result-type 'vector)))))
+                 (when (and types names)
+                   (iter (for i below (mem-ref n-results-ptr :uint64))
+                         (collect
+                             (convert-trace-point names types
+                                                  (mem-ref results-ptr
+                                                           '(:pointer (:struct trace-point)))
+                                                       i))))))
+
+         (progn
+           ;; Free memory
+           (free-query-result (mem-ref results-ptr :pointer)
+                              (mem-ref n-results-ptr :pointer))
+           (iter (for i below n-vars)
+                 (foreign-free (getf (mem-aref free-vars
+                                               '(:struct free-variable) i)
+                                     'allowed-types)))
+           (foreign-free free-vars)))))))
