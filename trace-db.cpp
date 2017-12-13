@@ -229,7 +229,8 @@ void free_db(trace_db *db)
     free(db);
 }
 
-bool type_compatible(const free_variable &free_var, const trace_var_info &real_var)
+static bool type_compatible(const free_variable &free_var,
+                            const trace_var_info &real_var)
 {
     for (uint32_t i = 0; i < free_var.n_allowed_types; i++) {
         if (free_var.allowed_types[i] == real_var.type_index)
@@ -239,7 +240,8 @@ bool type_compatible(const free_variable &free_var, const trace_var_info &real_v
 }
 
 // Cartesian product of vectors
-std::vector<std::vector<uint32_t> > cartesian(const std::vector<std::vector<uint32_t> > &vectors)
+static std::vector<std::vector<uint32_t> >
+cartesian(const std::vector<std::vector<uint32_t> > &vectors)
 {
     std::vector<std::vector<uint32_t> > results;
     std::vector<uint32_t> current(vectors.size());
@@ -265,6 +267,45 @@ std::vector<std::vector<uint32_t> > cartesian(const std::vector<std::vector<uint
     return results;
 }
 
+static bool satisfies_predicate(const trace *trace,
+                                const std::vector<uint32_t> &bindings,
+                                const predicate *predicate)
+{
+    // Trivial predicate
+    if (predicate == NULL)
+        return true;
+
+    switch (predicate->kind) {
+    case AND:
+      for (uint32_t i = 0; i < predicate->data.n_children; i++) {
+          if (!satisfies_predicate(trace, bindings, &predicate->children[i]))
+              return false;
+      }
+      return true;
+    case OR:
+      for (uint32_t i = 0; i < predicate->data.n_children; i++) {
+          if (satisfies_predicate(trace, bindings, &predicate->children[i]))
+              return true;
+      }
+      return false;
+    case DISTINCT_VARS:
+        {
+            assert(predicate->data.n_children == 2);
+            const struct predicate &c0 = predicate->children[0];
+            const struct predicate &c1 = predicate->children[1];
+
+            assert(c0.kind == VAR_REFERENCE);
+            assert(c1.kind == VAR_REFERENCE);
+            return (bindings[c0.data.var_index] != bindings[c1.data.var_index]);
+        }
+    case VAR_REFERENCE:
+      assert(false);            // should not reach VAR_REFERENCE nodes
+    }
+
+    // We should never reach this point. All cases must return a value.
+    assert(false);
+}
+
 void query_trace(const trace_db *db, uint64_t index, const query *query,
                  trace_point **results_out, uint64_t *n_results_out)
 {
@@ -287,13 +328,15 @@ void query_trace(const trace_db *db, uint64_t index, const query *query,
 
         // Collect all combinations of bindings
         for (auto bindings : cartesian(matching_vars)) {
-            trace_point point = { current->statement };
-            point.n_vars = bindings.size();
-            point.vars = (trace_var_info *)malloc(point.n_vars * sizeof(trace_var_info));
-            for (uint32_t i = 0; i < point.n_vars; i++) {
-                point.vars[i] = current->vars[bindings[i]];
+            if (satisfies_predicate(trace, bindings, query->predicate)) {
+                trace_point point = { current->statement };
+                point.n_vars = bindings.size();
+                point.vars = (trace_var_info *)malloc(point.n_vars * sizeof(trace_var_info));
+                for (uint32_t i = 0; i < point.n_vars; i++) {
+                    point.vars[i] = current->vars[bindings[i]];
+                }
+                results.push_back(point);
             }
-            results.push_back(point);
         }
     }
 
@@ -315,4 +358,21 @@ void free_query_result(trace_point *results, uint64_t n_results)
         free(results[i].vars);
     if (n_results > 0)
         free(results);
+}
+
+static void free_predicate_helper(predicate *predicate)
+{
+    if (predicate->kind != VAR_REFERENCE) {
+        for (uint32_t i = 0; i < predicate->data.n_children; i++)
+            free_predicate_helper(&predicate->children[i]);
+        free(predicate->children);
+    }
+}
+
+void free_predicate(predicate *predicate)
+{
+    if (predicate != NULL) {
+        free_predicate_helper(predicate);
+        free(predicate);
+    }
 }
