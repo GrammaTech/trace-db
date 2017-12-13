@@ -15,4 +15,6 @@
            :n-traces
            :trace-size
            :trace-types
-           :query-trace))
+           :query-trace
+           :trace-metadata
+           :distinct))
