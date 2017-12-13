@@ -36,11 +36,23 @@ typedef struct free_variable
     uint32_t *allowed_types;
 } free_variable;
 
-typedef struct query
+enum predicate_kind
 {
-    uint32_t n_variables;
-    free_variable *variables;
-} query;
+    VAR_REFERENCE,
+    AND,
+    OR,
+    DISTINCT_VARS
+};
+
+typedef struct predicate
+{
+    enum predicate_kind kind;
+    union {
+        uint32_t n_children;
+        uint32_t var_index;
+    } data;
+    struct predicate *children;
+} predicate;
 
 /* Return all results which match query.
 
@@ -54,9 +66,12 @@ typedef struct query
    The caller must pass the results to free_query_result to deallocate
    memory.
 */
-void query_trace(const trace_db *db, uint64_t index, const query *query,
+void query_trace(const trace_db *db, uint64_t index,
+                 uint32_t n_variables, const free_variable *variables,
+                 const predicate *predicate,
                  trace_point **results_out, uint64_t *n_results_out);
 void free_query_result(trace_point *results, uint64_t n_results);
+void free_predicate(predicate *predicate);
 
 typedef struct skip_list skip_list;
 
