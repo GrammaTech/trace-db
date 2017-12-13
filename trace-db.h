@@ -39,9 +39,13 @@ typedef struct free_variable
 enum predicate_kind
 {
     VAR_REFERENCE,
+    VAR_SIZE,
+    VAR_VALUE,
     AND,
     OR,
-    DISTINCT_VARS
+    DISTINCT_VARS,
+    GREATER_THAN,
+    LESS_THAN
 };
 
 typedef struct predicate

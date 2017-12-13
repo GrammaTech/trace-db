@@ -307,9 +307,13 @@
 
 (defcenum predicate-kind
   :var-reference
+  :var-size
+  :var-value
   :and
   :or
-  :distinct-vars)
+  :distinct-vars
+  :greater-than
+  :less-than)
 
 (defcstruct predicate
   (kind predicate-kind)
@@ -347,14 +351,18 @@
            (list 'kind :var-reference
                  'data index
                  'children (null-pointer))
-           (error "undefined variable in predicate: ~a" predicate)))
+           (error "undefined variable in predicate: ~a" var)))
        (build-operator (expr)
          (destructuring-bind (op . args) expr
            (list
             'kind (ecase op
                     (distinct :distinct-vars)
                     (or :or)
-                    (and :and))
+                    (and :and)
+                    (v/size :var-size)
+                    (v/value :var-value)
+                    (> :greater-than)
+                    (< :less-than))
             'data (length args)
             'children (create-foreign-array '(:struct predicate)
                                             (map 'vector #'helper args)))))
@@ -411,15 +419,15 @@
                           (iter (with ptr = (getf trace 'types))
                                 (for i below (getf trace 'n-types))
                                 (for str =
-                                     (mem-aref ptr '(:struct type-description) i))
+                                     (mem-aref ptr '(:struct type-description)
+                                               i))
                                 (while str)
                                 (collect str result-type 'vector)))))
             (when (and types names)
               (iter (for i below (mem-ref n-results-ptr :uint64))
                     (collect
                         (convert-trace-point names types
-                                             (mem-ref results-ptr
-                                                      '(:pointer (:struct trace-point)))
+                                             (mem-ref results-ptr :pointer)
                                              i)))))
 
          (progn
