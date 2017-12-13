@@ -267,7 +267,115 @@ cartesian(const std::vector<std::vector<uint32_t> > &vectors)
     return results;
 }
 
+struct int_value
+{
+    bool is_signed;
+    bool is_valid;
+    union {
+        uint64_t u;
+        int64_t s;
+    } value;
+
+    int_value(uint64_t val)
+        : is_signed(false), is_valid(true)
+    {
+        value.u = val;
+    }
+
+    int_value(int64_t val)
+        : is_signed(true), is_valid(true)
+    {
+        value.s = val;
+    }
+
+    int_value() : is_valid(false)
+    {}
+
+    bool greater_than(const int_value &other)
+    {
+        if (!(is_valid && other.is_valid))
+            return false;
+
+        if (is_signed) {
+            if (other.is_signed)
+                return value.s > other.value.s;
+            else
+                return value.s >= 0 && (uint64_t)value.s > other.value.u;
+        }
+        else {
+            if (other.is_signed)
+                return other.value.s < 0 || value.u > (uint64_t)other.value.s;
+            else
+                return value.u > other.value.u;
+        }
+    }
+
+    bool less_than(const int_value &other)
+    {
+        if (!(is_valid && other.is_valid))
+            return false;
+
+        if (is_signed) {
+            if (other.is_signed)
+                return value.s < other.value.s;
+            else
+                return value.s < 0 || (uint64_t)value.s < other.value.u;
+        }
+        else {
+            if (other.is_signed)
+                return other.value.s >= 0 && value.u < (uint64_t)other.value.s;
+            else
+                return value.u < other.value.u;
+        }
+    }
+};
+
+static trace_var_info *var_lookup(const trace *trace,
+                                  const trace_point *point,
+                                  const std::vector<uint32_t> &bindings,
+                                  int var_index)
+{
+    return &point->vars[bindings[var_index]];
+}
+
+static int_value evaluate(const trace *trace,
+                          const trace_point *point,
+                          const std::vector<uint32_t> &bindings,
+                          const predicate *predicate)
+{
+    switch (predicate->kind) {
+    case VAR_SIZE:
+        {
+            assert(predicate->data.n_children == 1);
+            const struct predicate &c = predicate->children[0];
+            assert(c.kind == VAR_REFERENCE);
+            trace_var_info *var = var_lookup(trace, point, bindings, c.data.var_index);
+            return var->has_buffer_size ? int_value(var->buffer_size) : int_value();
+        }
+
+    case VAR_VALUE:
+        {
+            assert(predicate->data.n_children == 1);
+            const struct predicate &c = predicate->children[0];
+            assert(c.kind == VAR_REFERENCE);
+            trace_var_info *var = var_lookup(trace, point, bindings, c.data.var_index);
+            enum type_format f = trace->types[var->type_index].format;
+            if (f == UNSIGNED)
+                return int_value(var->value.u);
+            else if (f == SIGNED)
+                return int_value(var->value.s);
+            else
+                return int_value();
+        }
+    default:
+      // Should never reach var reference or logical operators here
+      assert(false);
+    }
+
+}
+
 static bool satisfies_predicate(const trace *trace,
+                                const trace_point *point,
                                 const std::vector<uint32_t> &bindings,
                                 const predicate *predicate)
 {
@@ -278,13 +386,13 @@ static bool satisfies_predicate(const trace *trace,
     switch (predicate->kind) {
     case AND:
       for (uint32_t i = 0; i < predicate->data.n_children; i++) {
-          if (!satisfies_predicate(trace, bindings, &predicate->children[i]))
+          if (!satisfies_predicate(trace, point, bindings, &predicate->children[i]))
               return false;
       }
       return true;
     case OR:
       for (uint32_t i = 0; i < predicate->data.n_children; i++) {
-          if (satisfies_predicate(trace, bindings, &predicate->children[i]))
+          if (satisfies_predicate(trace, point, bindings, &predicate->children[i]))
               return true;
       }
       return false;
@@ -298,8 +406,25 @@ static bool satisfies_predicate(const trace *trace,
             assert(c1.kind == VAR_REFERENCE);
             return (bindings[c0.data.var_index] != bindings[c1.data.var_index]);
         }
-    case VAR_REFERENCE:
-      assert(false);            // should not reach VAR_REFERENCE nodes
+    case GREATER_THAN:
+        {
+            assert(predicate->data.n_children == 2);
+            int_value v0 = evaluate(trace, point, bindings, &predicate->children[0]);
+            int_value v1 = evaluate(trace, point, bindings, &predicate->children[1]);
+
+            return v0.greater_than(v1);
+        }
+    case LESS_THAN:
+        {
+            assert(predicate->data.n_children == 2);
+            int_value v0 = evaluate(trace, point, bindings, &predicate->children[0]);
+            int_value v1 = evaluate(trace, point, bindings, &predicate->children[1]);
+
+            return v0.less_than(v1);
+        }
+    default:
+      // should not reach var references or arithmetic expressions here
+      assert(false);
     }
 
     // We should never reach this point. All cases must return a value.
@@ -330,7 +455,7 @@ void query_trace(const trace_db *db, uint64_t index,
 
         // Collect all combinations of bindings
         for (auto bindings : cartesian(matching_vars)) {
-            if (satisfies_predicate(trace, bindings, predicate)) {
+            if (satisfies_predicate(trace, current, bindings, predicate)) {
                 trace_point point = { current->statement };
                 point.n_vars = bindings.size();
                 point.vars = (trace_var_info *)malloc(point.n_vars * sizeof(trace_var_info));
