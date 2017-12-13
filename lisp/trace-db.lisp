@@ -305,9 +305,21 @@
   (n-allowed-types :uint32)
   (allowed-types (:pointer :uint32)))
 
+(defcenum predicate-kind
+  :var-reference
+  :and
+  :or
+  :distinct-vars)
+
+(defcstruct predicate
+  (kind predicate-kind)
+  (data :uint32)
+  (children (:pointer (:struct predicate))))
+
 (defcstruct query
   (n-variables :uint32)
-  (variables (:pointer (:struct free-variable))))
+  (variables (:pointer (:struct free-variable)))
+  (predicate (:pointer (:struct predicate))))
 
 (defcfun ("query_trace" c-query-trace) :void
   (db (:pointer (:struct trace-db)))
@@ -320,7 +332,49 @@
   (results-out :pointer)
   (n-results :uint64))
 
-(defmethod query-trace ((db trace-db) index var-types)
+(defcfun free-predicate :void
+  (predicate :pointer))
+
+(defun create-foreign-array (type contents)
+  "Allocate a foreign array and fill it with the contents of a Lisp array."
+  (let* ((length (length contents))
+         (array (foreign-alloc type :count length)))
+    (lisp-array-to-foreign contents array
+                           `(:array ,type ,length))
+    array))
+
+(defun build-predicate (var-names predicate)
+  (labels
+      ((build-var-reference (var)
+         (if-let ((index (position var var-names)))
+           (list 'kind :var-reference
+                 'data index
+                 'children (null-pointer))
+           (error "undefined variable in predicate: ~a" predicate)))
+       (build-operator (expr)
+         (destructuring-bind (op . args) expr
+           (list
+            'kind (ecase op
+                    (distinct :distinct-vars)
+                    (or :or)
+                    (and :and))
+            'data (length args)
+            'children (create-foreign-array '(:struct predicate)
+                                            (map 'vector #'helper args)))))
+       (helper (tree)
+         (if (listp tree)
+             (build-operator tree)
+             (build-var-reference tree))))
+
+      (if predicate
+       (let ((result (foreign-alloc '(:struct predicate))))
+         (setf (mem-aref result '(:struct predicate))
+               (helper predicate))
+         result)
+       (null-pointer))))
+
+(defmethod query-trace ((db trace-db) index var-names var-types
+                        &key predicate)
   (let* ((n-vars (length var-types))
          (trace-types (trace-types db index))
          ;; Convert type names to indices
@@ -333,14 +387,12 @@
                                           :count n-vars)))
             (iter (for types in type-indices)
                   (for i upfrom 0)
-                  (for type-array = (foreign-alloc :uint32
-                                                   :count (length types)))
-                  (lisp-array-to-foreign types type-array
-                                         `(:array :uint32 ,(length types)))
-                   (setf (mem-aref var-array '(:struct free-variable) i)
-                         `(n-allowed-types ,(length types)
-                           allowed-types ,type-array)))
-            var-array)))
+                  (for type-array = (create-foreign-array :uint32 types))
+                  (setf (mem-aref var-array '(:struct free-variable) i)
+                        `(n-allowed-types ,(length types)
+                          allowed-types ,type-array)))
+            var-array))
+         (predicate-ptr (build-predicate var-names predicate)))
     (with-foreign-object (results-ptr '(:pointer (:struct trace-point)))
       (setf (mem-aref results-ptr '(:pointer (:struct trace-point)))
             (null-pointer))
@@ -348,11 +400,11 @@
         (setf (mem-aref n-results-ptr ':uint64) 0)
         (unwind-protect
              (with-foreign-object (query '(:struct query))
-               (with-foreign-slots ((n-variables variables)
+               (with-foreign-slots ((n-variables variables predicate)
                                     query (:struct query))
-                 (setf n-variables n-vars)
-                 (setf variables free-vars))
-
+                 (setf n-variables n-vars
+                       variables free-vars
+                       predicate predicate-ptr))
                (c-query-trace (db-pointer db) index query
                               results-ptr n-results-ptr)
 
@@ -381,7 +433,8 @@
          (progn
            ;; Free memory
            (free-query-result (mem-ref results-ptr :pointer)
-                              (mem-ref n-results-ptr :pointer))
+                              (mem-ref n-results-ptr :uint64))
+           (free-predicate predicate-ptr)
            (iter (for i below n-vars)
                  (foreign-free (getf (mem-aref free-vars
                                                '(:struct free-variable) i)
