@@ -306,7 +306,9 @@ static bool satisfies_predicate(const trace *trace,
     assert(false);
 }
 
-void query_trace(const trace_db *db, uint64_t index, const query *query,
+void query_trace(const trace_db *db, uint64_t index,
+                 uint32_t n_variables, const free_variable *variables,
+                 const predicate *predicate,
                  trace_point **results_out, uint64_t *n_results_out)
 {
     assert(index < db->n_traces);
@@ -317,10 +319,10 @@ void query_trace(const trace_db *db, uint64_t index, const query *query,
         trace_point *current = &trace->points[point_i];
 
         // Find possible bindings for each free variable
-        std::vector<std::vector<uint32_t> > matching_vars(query->n_variables);
-        for (uint32_t free_var_i = 0; free_var_i < query->n_variables; free_var_i++) {
+        std::vector<std::vector<uint32_t> > matching_vars(n_variables);
+        for (uint32_t free_var_i = 0; free_var_i < n_variables; free_var_i++) {
             for (uint32_t point_var_i = 0; point_var_i < current->n_vars; point_var_i++) {
-                if (type_compatible(query->variables[free_var_i],
+                if (type_compatible(variables[free_var_i],
                                     current->vars[point_var_i]))
                     matching_vars[free_var_i].push_back(point_var_i);
             }
@@ -328,7 +330,7 @@ void query_trace(const trace_db *db, uint64_t index, const query *query,
 
         // Collect all combinations of bindings
         for (auto bindings : cartesian(matching_vars)) {
-            if (satisfies_predicate(trace, bindings, query->predicate)) {
+            if (satisfies_predicate(trace, bindings, predicate)) {
                 trace_point point = { current->statement };
                 point.n_vars = bindings.size();
                 point.vars = (trace_var_info *)malloc(point.n_vars * sizeof(trace_var_info));
