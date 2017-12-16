@@ -431,6 +431,58 @@ static bool satisfies_predicate(const trace *trace,
     assert(false);
 }
 
+static void print_predicate(FILE *stream, const predicate *predicate,
+                            int indent=0, bool do_indent=false)
+{
+    if (!predicate)
+        return;
+
+    if (do_indent)
+        fprintf(stream, "%*c", indent - 1, ' ');
+
+    if (predicate->kind == VAR_REFERENCE) {
+        fprintf(stream, "<v%u>", predicate->data.var_index);
+    }
+    else {
+        const char *name;
+        switch (predicate->kind) {
+        case VAR_SIZE:
+          name = "v/size";
+          break;
+        case VAR_VALUE:
+          name = "v/value";
+          break;
+        case AND:
+          name = "and";
+          break;
+        case OR:
+          name = "or";
+          break;
+        case DISTINCT_VARS:
+          name = "distinct";
+          break;
+        case LESS_THAN:
+          name = "<";
+          break;
+        case GREATER_THAN:
+          name = ">";
+          break;
+        default:
+          assert(false);
+        }
+        indent += fprintf(stream, "(%s ", name);
+
+        for (uint32_t i = 0; i < predicate->data.n_children; i++)
+        {
+            print_predicate(stream, &predicate->children[i], indent,
+                            i != 0);
+            fprintf(stream, (i == predicate->data.n_children - 1) ? ")" : "\n");
+        }
+    }
+    if (indent == 0)
+        fprintf(stream, "\n");
+}
+
 void query_trace(const trace_db *db, uint64_t index,
                  uint32_t n_variables, const free_variable *variables,
                  const predicate *predicate,
