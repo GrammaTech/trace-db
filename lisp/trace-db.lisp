@@ -404,10 +404,6 @@
       (with-foreign-object (n-results-ptr ':uint64)
         (setf (mem-aref n-results-ptr ':uint64) 0)
         (unwind-protect
-             (c-query-trace (db-pointer db) index
-                            n-vars free-vars predicate-ptr
-                            results-ptr n-results-ptr)
-
           (let* ((trace (get-trace-struct db index))
                  (names (ignore-errors
                           (iter (with ptr = (getf trace 'names))
@@ -423,6 +419,9 @@
                                                i))
                                 (while str)
                                 (collect str result-type 'vector)))))
+            (c-query-trace (db-pointer db) index
+                           n-vars free-vars predicate-ptr
+                           results-ptr n-results-ptr)
             (when (and types names)
               (iter (for i below (mem-ref n-results-ptr :uint64))
                     (collect
