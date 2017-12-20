@@ -330,16 +330,16 @@ struct int_value
     }
 };
 
-static trace_var_info *var_lookup(const trace *trace,
-                                  const trace_point *point,
-                                  const std::vector<uint32_t> &bindings,
-                                  int var_index)
+static const trace_var_info &var_lookup(const trace &trace,
+                                        const trace_point &point,
+                                        const std::vector<uint32_t> &bindings,
+                                        int var_index)
 {
-    return &point->vars[bindings[var_index]];
+    return point.vars[bindings[var_index]];
 }
 
-static int_value evaluate(const trace *trace,
-                          const trace_point *point,
+static int_value evaluate(const trace &trace,
+                          const trace_point &point,
                           const std::vector<uint32_t> &bindings,
                           const predicate *predicate)
 {
@@ -349,8 +349,10 @@ static int_value evaluate(const trace *trace,
             assert(predicate->data.n_children == 1);
             const struct predicate &c = predicate->children[0];
             assert(c.kind == VAR_REFERENCE);
-            trace_var_info *var = var_lookup(trace, point, bindings, c.data.var_index);
-            return var->has_buffer_size ? int_value(var->buffer_size) : int_value();
+            const trace_var_info &var = var_lookup(trace, point, bindings,
+                                                   c.data.var_index);
+            return var.has_buffer_size ? int_value(var.buffer_size)
+                : int_value();
         }
 
     case VAR_VALUE:
@@ -358,12 +360,13 @@ static int_value evaluate(const trace *trace,
             assert(predicate->data.n_children == 1);
             const struct predicate &c = predicate->children[0];
             assert(c.kind == VAR_REFERENCE);
-            trace_var_info *var = var_lookup(trace, point, bindings, c.data.var_index);
-            enum type_format f = trace->types[var->type_index].format;
+            const trace_var_info &var = var_lookup(trace, point, bindings,
+                                                   c.data.var_index);
+            enum type_format f = trace.types[var.type_index].format;
             if (f == UNSIGNED)
-                return int_value(var->value.u);
+                return int_value(var.value.u);
             else if (f == SIGNED)
-                return int_value(var->value.s);
+                return int_value(var.value.s);
             else
                 return int_value();
         }
@@ -374,8 +377,8 @@ static int_value evaluate(const trace *trace,
 
 }
 
-static bool satisfies_predicate(const trace *trace,
-                                const trace_point *point,
+static bool satisfies_predicate(const trace &trace,
+                                const trace_point &point,
                                 const std::vector<uint32_t> &bindings,
                                 const predicate *predicate)
 {
@@ -483,42 +486,44 @@ static void print_predicate(FILE *stream, const predicate *predicate,
         fprintf(stream, "\n");
 }
 
-void query_trace(const trace_db *db, uint64_t index,
-                 uint32_t n_variables, const free_variable *variables,
-                 const predicate *predicate,
-                 trace_point **results_out, uint64_t *n_results_out)
+// Find matching variable bindings at a single trace point, and push them
+// onto vector results_out.
+static void collect_results_at_point(const trace &trace,
+                                     const trace_point &current,
+                                     uint32_t n_variables,
+                                     const free_variable *variables,
+                                     const predicate *predicate,
+                                     std::vector<trace_point> *results_out)
 {
-    assert(index < db->n_traces);
-    std::vector<trace_point> results;
-    const trace *trace = &db->traces[index];
-
-    for (uint32_t point_i = 0; point_i < trace->n_points; point_i++) {
-        trace_point *current = &trace->points[point_i];
-
-        // Find possible bindings for each free variable
-        std::vector<std::vector<uint32_t> > matching_vars(n_variables);
-        for (uint32_t free_var_i = 0; free_var_i < n_variables; free_var_i++) {
-            for (uint32_t point_var_i = 0; point_var_i < current->n_vars; point_var_i++) {
-                if (type_compatible(variables[free_var_i],
-                                    current->vars[point_var_i]))
-                    matching_vars[free_var_i].push_back(point_var_i);
-            }
-        }
-
-        // Collect all combinations of bindings
-        for (auto bindings : cartesian(matching_vars)) {
-            if (satisfies_predicate(trace, current, bindings, predicate)) {
-                trace_point point = { current->statement };
-                point.n_vars = bindings.size();
-                point.vars = (trace_var_info *)malloc(point.n_vars * sizeof(trace_var_info));
-                for (uint32_t i = 0; i < point.n_vars; i++) {
-                    point.vars[i] = current->vars[bindings[i]];
-                }
-                results.push_back(point);
-            }
+    // Find possible bindings for each free variable
+    std::vector<std::vector<uint32_t> > matching_vars(n_variables);
+    for (uint32_t free_var_i = 0; free_var_i < n_variables; free_var_i++) {
+        for (uint32_t point_var_i = 0; point_var_i < current.n_vars; point_var_i++) {
+            if (type_compatible(variables[free_var_i],
+                                current.vars[point_var_i]))
+                matching_vars[free_var_i].push_back(point_var_i);
         }
     }
 
+    // Collect all combinations of bindings
+    for (auto bindings : cartesian(matching_vars)) {
+        if (satisfies_predicate(trace, current, bindings, predicate)) {
+            trace_point point = { current.statement };
+            point.n_vars = bindings.size();
+            point.vars = (trace_var_info *)malloc(point.n_vars * sizeof(trace_var_info));
+            for (uint32_t i = 0; i < point.n_vars; i++) {
+                point.vars[i] = current.vars[bindings[i]];
+            }
+            results_out->push_back(point);
+        }
+    }
+}
+
+// Allocate an array and fill it with the contents of result vector.
+static void results_vector_to_array(const std::vector<trace_point> results,
+                                    trace_point **results_out,
+                                    uint64_t *n_results_out)
+{
     // Allocate buffer and return a copy of the results
     size_t results_size = results.size() * sizeof(trace_point);
     if (results_size > 0) {
@@ -529,6 +534,23 @@ void query_trace(const trace_db *db, uint64_t index,
         *results_out = NULL;
     }
     *n_results_out = results.size();
+}
+
+void query_trace(const trace_db *db, uint64_t index,
+                 uint32_t n_variables, const free_variable *variables,
+                 const predicate *predicate,
+                 trace_point **results_out, uint64_t *n_results_out)
+{
+    assert(index < db->n_traces);
+    std::vector<trace_point> results;
+    const trace &trace = db->traces[index];
+
+    for (uint32_t point_i = 0; point_i < trace.n_points; point_i++) {
+        collect_results_at_point(trace, trace.points[point_i], n_variables,
+                                 variables, predicate, &results);
+    }
+
+    results_vector_to_array(results, results_out, n_results_out);
 }
 
 void free_query_result(trace_point *results, uint64_t n_results)
