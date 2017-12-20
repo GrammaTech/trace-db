@@ -1,5 +1,5 @@
 (in-package :trace-db)
-(enable-curry-compose-reader-macros :include-utf8)
+(in-readtable :curry-compose-reader-macros)
 
 (define-constant +lib-dir+
     (make-pathname :directory (butlast (pathname-directory

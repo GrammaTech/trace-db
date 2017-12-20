@@ -6,6 +6,7 @@
                cffi
                cffi-libffi
                trivial-garbage
+               named-readtables
                curry-compose-reader-macros)
   :components
   ((:module lisp
