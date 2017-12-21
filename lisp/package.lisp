@@ -17,6 +17,7 @@
            :trace-size
            :trace-types
            :query-trace
+           :query-point
            :trace-metadata
            :distinct
            :v/value
