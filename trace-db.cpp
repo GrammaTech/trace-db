@@ -553,6 +553,22 @@ void query_trace(const trace_db *db, uint64_t index,
     results_vector_to_array(results, results_out, n_results_out);
 }
 
+void query_point(const trace_db *db, uint64_t trace_index, uint64_t point_index,
+                 uint32_t n_variables, const free_variable *variables,
+                 const predicate *predicate,
+                 trace_point **results_out, uint64_t *n_results_out)
+{
+    assert(trace_index < db->n_traces);
+    const trace &trace = db->traces[trace_index];
+    assert(point_index < trace.n_points);
+
+    std::vector<trace_point> results;
+    collect_results_at_point(trace, trace.points[point_index], n_variables,
+                             variables, predicate, &results);
+    results_vector_to_array(results, results_out, n_results_out);
+}
+
+
 void free_query_result(trace_point *results, uint64_t n_results)
 {
     for (uint64_t i = 0; i < n_results; i++)
