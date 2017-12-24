@@ -131,6 +131,7 @@ void free_memory_map(skip_list *list)
         free(current);
         current = next;
     }
+    free(list->head.next);
     free(list);
 }
 
@@ -222,10 +223,24 @@ void add_trace(trace_db *db, trace_read_state *state, uint64_t max)
 void free_db(trace_db *db)
 {
     for (uint64_t i = 0; i < db->n_traces; i++) {
-        if (db->traces[i].n_points > 0)
-            free(db->traces[i].points);
-        free(db->traces);
+        const trace &trace = db->traces[i];
+        for (size_t j = 0; j < trace.n_points; j++) {
+            free(trace.points[j].vars);
+            free(trace.points[j].sizes);
+            free(trace.points[j].aux);
+        }
+
+        if (trace.n_points > 0)
+            free(trace.points);
+        if (trace.n_names > 0)
+            free((void *)trace.names[0]);
+        if (trace.names)
+            free((void *)trace.names);
+        if (trace.types)
+            free((void *)trace.types);
     }
+    if (db->n_traces > 0)
+        free(db->traces);
     free(db);
 }
 
