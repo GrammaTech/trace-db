@@ -153,6 +153,12 @@ void end_reading(trace_read_state *state)
     }
     if (state->types)
         free((void *)state->types);
+    if (state->size_buffer)
+        free(state->size_buffer);
+    if (state->var_buffer)
+        free(state->var_buffer);
+    if (state->aux_buffer)
+        free(state->aux_buffer);
     free(state);
 }
 
