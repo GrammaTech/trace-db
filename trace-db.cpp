@@ -238,8 +238,8 @@ void free_db(trace_db *db)
         }
         if (trace.types)
             free((void *)trace.types);
-        free(db->traces);
     }
+    free(db->traces);
     free(db);
 }
 
