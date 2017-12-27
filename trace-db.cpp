@@ -232,14 +232,15 @@ void free_db(trace_db *db)
 
         if (trace.n_points > 0)
             free(trace.points);
-        if (trace.names) {
+        if (trace.n_names > 0)
             free((void *)trace.names[0]);
+        if (trace.names)
             free((void *)trace.names);
-        }
         if (trace.types)
             free((void *)trace.types);
     }
-    free(db->traces);
+    if (db->n_traces > 0)
+        free(db->traces);
     free(db);
 }
 
