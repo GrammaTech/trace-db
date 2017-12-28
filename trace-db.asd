@@ -1,4 +1,4 @@
-(defsystem :trace-db
+(defsystem "trace-db"
   :description "Writing, reading, storing, and searching of program traces"
   :version "0.0.0"
   :depends-on (alexandria
