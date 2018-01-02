@@ -343,6 +343,98 @@ struct int_value
                 return value.u < other.value.u;
         }
     }
+
+    bool equal(const int_value &other)
+    {
+        if (!(is_valid && other.is_valid))
+            return false;
+
+        if (is_signed) {
+            if (other.is_signed)
+                return value.s == other.value.s;
+            else
+                return value.s >= 0 && (uint64_t)value.s == other.value.u;
+        }
+        else {
+            if (other.is_signed)
+                return other.value.s >= 0 && value.u == (uint64_t)other.value.s;
+            else
+                return value.u == other.value.u;
+        }
+    }
+
+
+    int_value operator+(const int_value &other)
+    {
+        if (!(is_valid && other.is_valid))
+            return int_value();
+        else if (is_signed) {
+            if (other.is_signed)
+                return int_value(value.s + other.value.s);
+            else
+                return int_value(value.s + other.value.u);
+        }
+        else {
+            if (other.is_signed)
+                return int_value(value.u + other.value.s);
+            else
+                return int_value(value.u + other.value.u);
+        }
+    }
+
+    int_value operator-(const int_value &other)
+    {
+        if (!(is_valid && other.is_valid))
+            return int_value();
+        else if (is_signed) {
+            if (other.is_signed)
+                return int_value(value.s - other.value.s);
+            else
+                return int_value(value.s - other.value.u);
+        }
+        else {
+            if (other.is_signed)
+                return int_value(value.u - other.value.s);
+            else
+                return int_value(value.u - other.value.u);
+        }
+    }
+
+    int_value operator*(const int_value &other)
+    {
+        if (!(is_valid && other.is_valid))
+            return int_value();
+        else if (is_signed) {
+            if (other.is_signed)
+                return int_value(value.s * other.value.s);
+            else
+                return int_value(value.s * other.value.u);
+        }
+        else {
+            if (other.is_signed)
+                return int_value(value.u * other.value.s);
+            else
+                return int_value(value.u * other.value.u);
+        }
+    }
+
+    int_value operator/(const int_value &other)
+    {
+        if (!(is_valid && other.is_valid))
+            return int_value();
+        else if (is_signed) {
+            if (other.is_signed)
+                return int_value(value.s / other.value.s);
+            else
+                return int_value(value.s / other.value.u);
+        }
+        else {
+            if (other.is_signed)
+                return int_value(value.u / other.value.s);
+            else
+                return int_value(value.u / other.value.u);
+        }
+    }
 };
 
 static const trace_var_info &var_lookup(const trace &trace,
@@ -385,11 +477,50 @@ static int_value evaluate(const trace &trace,
             else
                 return int_value();
         }
+    case SIGNED_INTEGER:
+      return int_value(predicate->data.signed_value);
+    case UNSIGNED_INTEGER:
+      return int_value(predicate->data.unsigned_value);
+    case ADD:
+      {
+            assert(predicate->data.n_children == 2);
+            int_value v0 = evaluate(trace, point, bindings,
+                                    &predicate->children[0]);
+            int_value v1 = evaluate(trace, point, bindings,
+                                    &predicate->children[1]);
+            return v0 + v1;
+        }
+    case SUBTRACT:
+      {
+            assert(predicate->data.n_children == 2);
+            int_value v0 = evaluate(trace, point, bindings,
+                                    &predicate->children[0]);
+            int_value v1 = evaluate(trace, point, bindings,
+                                    &predicate->children[1]);
+            return v0 - v1;
+        }
+    case MULTIPLY:
+      {
+            assert(predicate->data.n_children == 2);
+            int_value v0 = evaluate(trace, point, bindings,
+                                    &predicate->children[0]);
+            int_value v1 = evaluate(trace, point, bindings,
+                                    &predicate->children[1]);
+            return v0 * v1;
+        }
+    case DIVIDE:
+      {
+            assert(predicate->data.n_children == 2);
+            int_value v0 = evaluate(trace, point, bindings,
+                                    &predicate->children[0]);
+            int_value v1 = evaluate(trace, point, bindings,
+                                    &predicate->children[1]);
+            return v0 / v1;
+        }
     default:
       // Should never reach var reference or logical operators here
       assert(false);
     }
-
 }
 
 static bool satisfies_predicate(const trace &trace,
@@ -404,13 +535,15 @@ static bool satisfies_predicate(const trace &trace,
     switch (predicate->kind) {
     case AND:
       for (uint32_t i = 0; i < predicate->data.n_children; i++) {
-          if (!satisfies_predicate(trace, point, bindings, &predicate->children[i]))
+          if (!satisfies_predicate(trace, point, bindings,
+                                   &predicate->children[i]))
               return false;
       }
       return true;
     case OR:
       for (uint32_t i = 0; i < predicate->data.n_children; i++) {
-          if (satisfies_predicate(trace, point, bindings, &predicate->children[i]))
+          if (satisfies_predicate(trace, point, bindings,
+                                  &predicate->children[i]))
               return true;
       }
       return false;
@@ -427,18 +560,32 @@ static bool satisfies_predicate(const trace &trace,
     case GREATER_THAN:
         {
             assert(predicate->data.n_children == 2);
-            int_value v0 = evaluate(trace, point, bindings, &predicate->children[0]);
-            int_value v1 = evaluate(trace, point, bindings, &predicate->children[1]);
+            int_value v0 = evaluate(trace, point, bindings,
+                                    &predicate->children[0]);
+            int_value v1 = evaluate(trace, point, bindings,
+                                    &predicate->children[1]);
 
             return v0.greater_than(v1);
         }
     case LESS_THAN:
         {
             assert(predicate->data.n_children == 2);
-            int_value v0 = evaluate(trace, point, bindings, &predicate->children[0]);
-            int_value v1 = evaluate(trace, point, bindings, &predicate->children[1]);
+            int_value v0 = evaluate(trace, point, bindings,
+                                    &predicate->children[0]);
+            int_value v1 = evaluate(trace, point, bindings,
+                                    &predicate->children[1]);
 
             return v0.less_than(v1);
+        }
+    case EQUAL:
+        {
+            assert(predicate->data.n_children == 2);
+            int_value v0 = evaluate(trace, point, bindings,
+                                    &predicate->children[0]);
+            int_value v1 = evaluate(trace, point, bindings,
+                                    &predicate->children[1]);
+
+            return v0.equal(v1);
         }
     default:
       // should not reach var references or arithmetic expressions here
@@ -459,7 +606,13 @@ static void print_predicate(FILE *stream, const predicate *predicate,
         fprintf(stream, "%*c", indent - 1, ' ');
 
     if (predicate->kind == VAR_REFERENCE) {
-        fprintf(stream, "<v%u>", predicate->data.var_index);
+        fprintf(stream, "<v%lu>", predicate->data.var_index);
+    }
+    else if (predicate->kind == SIGNED_INTEGER) {
+        fprintf(stream, "%ld", predicate->data.signed_value);
+    }
+    else if (predicate->kind == UNSIGNED_INTEGER) {
+        fprintf(stream, "%luu", predicate->data.unsigned_value);
     }
     else {
         const char *name;
@@ -594,7 +747,9 @@ void free_query_result(trace_point *results, uint64_t n_results)
 
 static void free_predicate_helper(predicate *predicate)
 {
-    if (predicate->kind != VAR_REFERENCE) {
+    if (!(predicate->kind == VAR_REFERENCE ||
+          predicate->kind == SIGNED_INTEGER ||
+          predicate->kind == UNSIGNED_INTEGER)) {
         for (uint32_t i = 0; i < predicate->data.n_children; i++)
             free_predicate_helper(&predicate->children[i]);
         free(predicate->children);
