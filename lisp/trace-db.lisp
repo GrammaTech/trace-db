@@ -309,15 +309,22 @@
   :var-reference
   :var-size
   :var-value
+  :signed-integer
+  :unsigned-integer
   :and
   :or
   :distinct-vars
   :greater-than
-  :less-than)
+  :less-than
+  :equal
+  :add
+  :subtract
+  :multiply
+  :divide)
 
 (defcstruct predicate
   (kind predicate-kind)
-  (data :uint32)
+  (data :uint64)
   (children (:pointer (:struct predicate))))
 
 (defcfun ("query_trace" c-query-trace) :void
@@ -362,6 +369,12 @@
                  'data index
                  'children (null-pointer))
            (error "undefined variable in predicate: ~a" var)))
+       (build-number (number)
+         (list 'kind (if (negative-integer-p number)
+                         :signed-integer
+                         :unsigned-integer)
+               'data number
+               'children (null-pointer)))
        (build-operator (expr)
          (destructuring-bind (op . args) expr
            (list
@@ -372,14 +385,20 @@
                     (v/size :var-size)
                     (v/value :var-value)
                     (> :greater-than)
-                    (< :less-than))
+                    (< :less-than)
+                    (= :equal)
+                    (+ :add)
+                    (- :subtract)
+                    (* :multiply)
+                    (/ :divide))
             'data (length args)
             'children (create-foreign-array '(:struct predicate)
                                             (map 'vector #'helper args)))))
        (helper (tree)
-         (if (listp tree)
-             (build-operator tree)
-             (build-var-reference tree))))
+         (cond
+           ((listp tree) (build-operator tree))
+           ((numberp tree) (build-number tree))
+           (t (build-var-reference tree)))))
 
       (if predicate
        (let ((result (foreign-alloc '(:struct predicate))))

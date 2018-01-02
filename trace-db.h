@@ -41,19 +41,28 @@ enum predicate_kind
     VAR_REFERENCE,
     VAR_SIZE,
     VAR_VALUE,
+    SIGNED_INTEGER,
+    UNSIGNED_INTEGER,
     AND,
     OR,
     DISTINCT_VARS,
     GREATER_THAN,
-    LESS_THAN
+    LESS_THAN,
+    EQUAL,
+    ADD,
+    SUBTRACT,
+    MULTIPLY,
+    DIVIDE
 };
 
 typedef struct predicate
 {
     enum predicate_kind kind;
     union {
-        uint32_t n_children;
-        uint32_t var_index;
+        uint64_t n_children;
+        uint64_t var_index;
+        uint64_t unsigned_value;
+        int64_t signed_value;
     } data;
     struct predicate *children;
 } predicate;
