@@ -21,4 +21,5 @@
            :trace-metadata
            :distinct
            :v/value
-           :v/size))
+           :v/size
+           :set-trace))

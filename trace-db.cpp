@@ -212,33 +212,49 @@ void add_trace(trace_db *db, trace_read_state *state, uint64_t max)
 
     end_reading(state);
 
-    /* Store trace */
-    void *tmp = db->traces;
-    ENSURE_BUFFER_SIZE(tmp, sizeof(trace),
-                       db->n_traces_allocated, db->n_traces + 1);
-    db->traces = (trace*) tmp;
-    db->traces[db->n_traces++] = new_trace;
+    set_trace(db, db->n_traces, &new_trace);
+}
+
+static void free_trace(const trace &trace)
+{
+    for (size_t j = 0; j < trace.n_points; j++) {
+        free(trace.points[j].vars);
+        free(trace.points[j].sizes);
+        free(trace.points[j].aux);
+    }
+
+    if (trace.n_points > 0)
+        free(trace.points);
+    if (trace.n_names > 0)
+        free((void *)trace.names[0]);
+    if (trace.names)
+        free((void *)trace.names);
+    if (trace.types)
+        free((void *)trace.types);
+
+}
+
+void set_trace(trace_db *db, uint32_t index, trace *new_trace)
+{
+    if (index < db->n_traces) {
+        free_trace(db->traces[index]);
+        db->traces[index] = *new_trace;
+    }
+    else {
+        uint32_t length = index + 1;
+        void *tmp = db->traces;
+        ENSURE_BUFFER_SIZE(tmp, sizeof(trace),
+                           db->n_traces_allocated, length);
+        db->traces = (trace*) tmp;
+        db->traces[index] = *new_trace;
+        db->n_traces = length;
+    }
 }
 
 void free_db(trace_db *db)
 {
-    for (uint64_t i = 0; i < db->n_traces; i++) {
-        const trace &trace = db->traces[i];
-        for (size_t j = 0; j < trace.n_points; j++) {
-            free(trace.points[j].vars);
-            free(trace.points[j].sizes);
-            free(trace.points[j].aux);
-        }
-
-        if (trace.n_points > 0)
-            free(trace.points);
-        if (trace.n_names > 0)
-            free((void *)trace.names[0]);
-        if (trace.names)
-            free((void *)trace.names);
-        if (trace.types)
-            free((void *)trace.types);
-    }
+    for (uint64_t i = 0; i < db->n_traces; i++)
+        free_trace(db->traces[i]);
     if (db->n_traces > 0)
         free(db->traces);
     free(db);

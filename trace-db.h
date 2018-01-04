@@ -27,6 +27,7 @@ typedef struct trace_db
 
 trace_db *create_db();
 void add_trace(trace_db *db, trace_read_state *state, uint64_t max);
+void set_trace(trace_db *db, uint32_t index, trace *trace);
 void free_db(trace_db *db);
 
 typedef struct free_variable
