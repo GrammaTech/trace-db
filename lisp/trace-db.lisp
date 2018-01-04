@@ -530,3 +530,81 @@
                                                '(:struct free-variable) i)
                                      'allowed-types)))
            (foreign-free free-vars)))))))
+
+(defcfun ("set_trace" c-set-trace) :void
+  (db :pointer)
+  (index :uint32)
+  (trace :pointer))
+
+(defmethod set-trace ((db trace-db) index trace metadata)
+  "Convert TRACE to C structures and store in DB at INDEX.
+
+If INDEX is equal to the current N-TRACES, extend traces by
+one. Otherwise replace an existing trace.
+
+This is intended primarily for testing. It does not handle blobs and
+may not be particularly efficient.
+"
+  (assert (<= index (n-traces db)))
+
+  (let* ((type-hash (make-hash-table :test #'equal))
+         (var-names (mappend (lambda (point)
+                               (mapcar (lambda (var-info)
+                                         (let ((type (elt var-info 1)))
+                                           (setf (gethash type type-hash)
+                                                 (or (< (elt var-info 2) 0)
+                                                     (gethash type type-hash))))
+                                         (elt var-info 0))
+                                       (cdr (assoc :scopes point))))
+                             trace))
+         (type-names (hash-table-keys type-hash))
+         (all-names (append type-names
+                            (remove-duplicates var-names :test #'string=)))
+         (types
+          (iter (for name in type-names)
+                (collect
+                    `(name-index ,(position name all-names :test #'string=)
+                                 format ,(if (gethash name type-hash)
+                                             :signed :unsigned)
+                                 size 8)
+                  result-type 'vector)))
+         (points
+          (mapcar
+           (lambda (point)
+             (let ((vars (mapcar
+                          (lambda (var-info)
+                            (let ((has-size (and (= 4 (length var-info))
+                                                 (elt var-info 3))))
+                              `(value ,(elt var-info 2)
+                                      name-index ,(position (elt var-info 0)
+                                                            all-names
+                                                            :test #'string=)
+                                      type-index ,(position (elt var-info 1)
+                                                            all-names
+                                                            :test #'string=)
+                                      has-buffer-size ,(if has-size 1 0)
+                                      buffer-size ,(if has-size
+                                                       (elt var-info 3) 0))))
+                          (cdr (assoc :scopes point)))))
+
+               `(statement ,(cdr (assoc :c point))
+                           n-sizes 0 sizes ,(null-pointer)
+                           n-aux 0 aux ,(null-pointer)
+                           n-vars ,(length vars)
+                           vars ,(create-foreign-array '(:struct var-info)
+                                                       (coerce vars 'vector)))))
+           trace))
+         (trace-struct (foreign-alloc '(:struct c-trace))))
+    (setf (mem-ref trace-struct '(:struct c-trace))
+          `(points ,(create-foreign-array '(:struct trace-point)
+                                          (coerce points 'vector))
+            n-points ,(length points)
+            n-points-allocated ,(length points)
+            names ,(create-foreign-array :string (coerce all-names 'vector))
+            n-names ,(length all-names)
+            types ,(create-foreign-array '(:struct type-description) types)
+            n-types ,(length types)))
+    (c-set-trace (db-pointer db) index trace-struct)
+    (if (< index (length (trace-metadata db)))
+        (setf (nth index (trace-metadata db)) metadata)
+        (push metadata (trace-metadata db)))))
