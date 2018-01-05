@@ -407,7 +407,7 @@
        (null-pointer))))
 
 (defmethod query-trace ((db trace-db) index var-names var-types
-                        &key predicate)
+                        &key predicate filter)
   (let* ((n-vars (length var-types))
          (trace-types (trace-types db index))
          ;; Convert type names to indices
@@ -452,10 +452,15 @@
                            results-ptr n-results-ptr)
             (when (and types names)
               (iter (for i below (mem-ref n-results-ptr :uint64))
-                    (collect
-                        (convert-trace-point names types
-                                             (mem-ref results-ptr :pointer)
-                                             i)))))
+                    (let ((point
+                           (convert-trace-point names types
+                                                (mem-ref results-ptr :pointer)
+                                                i)))
+                      (when (or (not filter)
+                                (apply filter
+                                       (cdr (assoc :c point))
+                                       (cdr (assoc :scopes point))))
+                        (collect point))))))
 
          (progn
            ;; Free memory
@@ -469,7 +474,7 @@
            (foreign-free free-vars)))))))
 
 (defmethod query-point ((db trace-db) trace-index point-index
-                        var-names var-types &key predicate)
+                        var-names var-types &key predicate filter)
   (let* ((n-vars (length var-types))
          (trace-types (trace-types db trace-index))
          ;; Convert type names to indices
@@ -509,15 +514,21 @@
                                                i))
                                 (while str)
                                 (collect str result-type 'vector)))))
+            (assert (< point-index (getf trace 'n-points)))
             (c-query-point (db-pointer db) trace-index point-index
                            n-vars free-vars predicate-ptr
                            results-ptr n-results-ptr)
             (when (and types names)
               (iter (for i below (mem-ref n-results-ptr :uint64))
-                    (collect
-                        (convert-trace-point names types
-                                             (mem-ref results-ptr :pointer)
-                                             i)))))
+                    (let ((point
+                           (convert-trace-point names types
+                                                (mem-ref results-ptr :pointer)
+                                                i)))
+                      (when (or (not filter)
+                                (apply filter
+                                       (cdr (assoc :c point))
+                                       (cdr (assoc :scopes point))))
+                        (collect point))))))
 
          (progn
            ;; Free memory
