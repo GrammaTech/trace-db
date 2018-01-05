@@ -679,6 +679,14 @@ static void collect_results_at_point(const trace &trace,
                                      const predicate *predicate,
                                      std::vector<trace_point> *results_out)
 {
+    // No free variables. Match every trace point once, with no bindings.
+    if (n_variables == 0) {
+        assert(predicate == NULL); // can't have predicate without variables
+        trace_point point = { current.statement };
+        results_out->push_back(point);
+        return;
+    }
+
     // Find possible bindings for each free variable
     std::vector<std::vector<uint32_t> > matching_vars(n_variables);
     for (uint32_t free_var_i = 0; free_var_i < n_variables; free_var_i++) {
