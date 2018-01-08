@@ -730,36 +730,26 @@ static void results_vector_to_array(const std::vector<trace_point> results,
 
 void query_trace(const trace_db *db, uint64_t index,
                  uint32_t n_variables, const free_variable *variables,
-                 const predicate *predicate,
+                 const predicate *predicate, int pick,
                  trace_point **results_out, uint64_t *n_results_out)
 {
     assert(index < db->n_traces);
     std::vector<trace_point> results;
     const trace &trace = db->traces[index];
 
-    for (uint32_t point_i = 0; point_i < trace.n_points; point_i++) {
-        collect_results_at_point(trace, trace.points[point_i], n_variables,
-                                 variables, predicate, &results);
+    if (pick) {
+        collect_results_at_point(trace, trace.points[rand() % trace.n_points],
+                                 n_variables, variables, predicate, &results);
+    }
+    else {
+        for (uint32_t point_i = 0; point_i < trace.n_points; point_i++) {
+            collect_results_at_point(trace, trace.points[point_i], n_variables,
+                                     variables, predicate, &results);
+        }
     }
 
     results_vector_to_array(results, results_out, n_results_out);
 }
-
-void query_point(const trace_db *db, uint64_t trace_index, uint64_t point_index,
-                 uint32_t n_variables, const free_variable *variables,
-                 const predicate *predicate,
-                 trace_point **results_out, uint64_t *n_results_out)
-{
-    assert(trace_index < db->n_traces);
-    const trace &trace = db->traces[trace_index];
-    assert(point_index < trace.n_points);
-
-    std::vector<trace_point> results;
-    collect_results_at_point(trace, trace.points[point_index], n_variables,
-                             variables, predicate, &results);
-    results_vector_to_array(results, results_out, n_results_out);
-}
-
 
 void free_query_result(trace_point *results, uint64_t n_results)
 {
