@@ -333,16 +333,7 @@
   (n-variables :uint32)
   (variables (:pointer (:struct free-variable)))
   (predicate (:pointer (:struct predicate)))
-  (results-out :pointer)
-  (n-results :pointer))
-
-(defcfun ("query_point" c-query-point) :void
-  (db (:pointer (:struct trace-db)))
-  (trace-index :uint64)
-  (point-index :uint64)
-  (n-variables :uint32)
-  (variables (:pointer (:struct free-variable)))
-  (predicate (:pointer (:struct predicate)))
+  (pick :int)
   (results-out :pointer)
   (n-results :pointer))
 
@@ -408,7 +399,8 @@
        (null-pointer))))
 
 (defmethod query-trace ((db trace-db) index var-names var-types
-                        &key predicate filter)
+                        &key pick predicate filter)
+  (when predicate (assert var-names))
   (let* ((n-vars (length var-types))
          (trace-types (trace-types db index))
          ;; Convert type names to indices
@@ -450,74 +442,7 @@
                                 (collect str result-type 'vector)))))
             (c-query-trace (db-pointer db) index
                            n-vars free-vars predicate-ptr
-                           results-ptr n-results-ptr)
-            (when (and types names)
-              (iter (for i below (mem-ref n-results-ptr :uint64))
-                    (let ((point
-                           (convert-trace-point names types
-                                                (mem-ref results-ptr :pointer)
-                                                i)))
-                      (when (or (not filter)
-                                (apply filter
-                                       (cdr (assoc :c point))
-                                       (cdr (assoc :scopes point))))
-                        (collect point))))))
-
-         (progn
-           ;; Free memory
-           (free-query-result (mem-ref results-ptr :pointer)
-                              (mem-ref n-results-ptr :uint64))
-           (free-predicate predicate-ptr)
-           (iter (for i below n-vars)
-                 (foreign-free (getf (mem-aref free-vars
-                                               '(:struct free-variable) i)
-                                     'allowed-types)))
-           (foreign-free free-vars)))))))
-
-(defmethod query-point ((db trace-db) trace-index point-index
-                        var-names var-types &key predicate filter)
-  (let* ((n-vars (length var-types))
-         (trace-types (trace-types db trace-index))
-         ;; Convert type names to indices
-         (type-indices
-          (mapcar {map 'vector {position _ trace-types :test #'string=}}
-                  var-types))
-         ;; Create an array of free_variable structs
-         (free-vars
-          (let ((var-array (foreign-alloc '(:struct free-variable)
-                                          :count n-vars)))
-            (iter (for types in type-indices)
-                  (for i upfrom 0)
-                  (for type-array = (create-foreign-array :uint32 types))
-                  (setf (mem-aref var-array '(:struct free-variable) i)
-                        `(n-allowed-types ,(length types)
-                          allowed-types ,type-array)))
-            var-array))
-         (predicate-ptr (build-predicate var-names predicate)))
-    (with-foreign-object (results-ptr '(:pointer (:struct trace-point)))
-      (setf (mem-aref results-ptr '(:pointer (:struct trace-point)))
-            (null-pointer))
-      (with-foreign-object (n-results-ptr ':uint64)
-        (setf (mem-aref n-results-ptr ':uint64) 0)
-        (unwind-protect
-          (let* ((trace (get-trace-struct db trace-index))
-                 (names (ignore-errors
-                          (iter (with ptr = (getf trace 'names))
-                                (for i below (getf trace 'n-names))
-                                (for str = (mem-aref ptr :string i))
-                                (while str)
-                                (collect str result-type 'vector))))
-                 (types (ignore-errors
-                          (iter (with ptr = (getf trace 'types))
-                                (for i below (getf trace 'n-types))
-                                (for str =
-                                     (mem-aref ptr '(:struct type-description)
-                                               i))
-                                (while str)
-                                (collect str result-type 'vector)))))
-            (assert (< point-index (getf trace 'n-points)))
-            (c-query-point (db-pointer db) trace-index point-index
-                           n-vars free-vars predicate-ptr
+                           (if pick 1 0)
                            results-ptr n-results-ptr)
             (when (and types names)
               (iter (for i below (mem-ref n-results-ptr :uint64))
