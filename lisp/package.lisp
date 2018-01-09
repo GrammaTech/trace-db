@@ -21,4 +21,5 @@
            :distinct
            :v/value
            :v/size
-           :set-trace))
+           :set-trace
+           :restrict-to-file))
