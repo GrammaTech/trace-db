@@ -206,6 +206,7 @@
           (end-reading state-ptr))))))
 
 
+
 ;;; Trace DB interface
 (defcfun create-db :pointer)
 (defcfun ("add_trace" c-add-trace) :void
@@ -238,19 +239,23 @@
     (finalize instance (lambda () (free-db db-pointer)))))
 
 (defun get-trace-struct (db index)
+  "Return the C trace struct."
   (let ((db-struct (mem-aref (db-pointer db) '(:struct trace-db))))
     (assert (< index (getf db-struct 'n-traces)))
     (mem-aref (getf db-struct 'traces) '(:struct c-trace) index)))
 
 (defmethod n-traces ((db trace-db))
+  "Return the number of traces stored in DB."
   (getf (mem-aref (db-pointer db) '(:struct trace-db))
         'n-traces))
 
 (defmethod trace-size ((db trace-db) index)
+  "Return the number of points in the trace at INDEX in DB."
   (getf (get-trace-struct db index) 'n-points))
 
 (defmethod add-trace ((db trace-db) filename timeout
                       metadata &key max)
+  "Read a trace from FILENAME into DB."
   (let ((state-pointer (start-reading (namestring filename) timeout)))
     (assert (not (null state-pointer)))
     (c-add-trace (db-pointer db) state-pointer
@@ -259,6 +264,7 @@
   nil)
 
 (defmethod trace-types ((db trace-db) index)
+  "Return the type names from the header of the trace at INDEX in DB."
   (let ((db-struct (mem-aref (db-pointer db) '(:struct trace-db))))
     (let* ((trace (get-trace-struct db index))
            (names (iter (with ptr = (getf trace 'names))
@@ -273,34 +279,44 @@
                                                  '(:struct type-description)
                                                  i))))))))
 
+(defun convert-results (db index n-results results-ptr
+                        &key filter)
+  (let* ((trace (get-trace-struct db index))
+         (names (iter (with ptr = (getf trace 'names))
+                      (for i below (getf trace 'n-names))
+                      (for str = (mem-aref ptr :string i))
+                      (while str)
+                      (collect str result-type 'vector)))
+         (types (iter (with ptr = (getf trace 'types))
+                      (for i below (getf trace 'n-types))
+                      (for str =
+                           (mem-aref ptr '(:struct type-description) i))
+                      (while str)
+                      (collect str result-type 'vector))))
+      (iter (for i below n-results)
+            (let ((point (convert-trace-point names types
+                                              results-ptr
+                                              i)))
+              (when (or (not filter)
+                        (apply filter
+                               (cdr (assoc :c point))
+                               (cdr (assoc :scopes point))))
+                (collect point))))))
+
 (defmethod get-trace ((db trace-db) index)
-  "Get a trace from DB and convert to a list."
+  "Retrieve the trace at INDEX in DB.
 
-  (let ((db-struct (mem-aref (db-pointer db) '(:struct trace-db))))
-    (let* ((trace (get-trace-struct db index))
-           (names (ignore-errors
-                    (iter (with ptr = (getf trace 'names))
-                          (for i below (getf trace 'n-names))
-                          (for str = (mem-aref ptr :string i))
-                          (while str)
-                          (collect str result-type 'vector))))
-           (types (ignore-errors
-                    (iter (with ptr = (getf trace 'types))
-                          (for i below (getf trace 'n-types))
-                          (for str =
-                               (mem-aref ptr '(:struct type-description) i))
-                          (while str)
-                          (collect str result-type 'vector)))))
-      (when (and types names)
-        (iter (for i below (getf trace 'n-points))
-              (collect (convert-trace-point names types
-                                            (getf trace 'points)
-                                            i)
-                into points)
-              (finally
-               (return (cons (cons :trace points)
-                             (elt (trace-metadata db) index)))))))))
+The result looks like: (METADATA (:trace (TRACE-POINTS))), where each
+TRACE-POINT is an alist with the usual :C :F :SCOPES, etc.
+"
+  (let ((trace (get-trace-struct db index)))
+    (cons (cons :trace (convert-results db index
+                                        (getf trace 'n-points)
+                                        (getf trace 'points)))
+          (elt (trace-metadata db) index))))
 
+
+;;; Database queries
 (defcstruct free-variable
   (n-allowed-types :uint32)
   (allowed-types (:pointer :uint32)))
@@ -309,11 +325,11 @@
   :var-reference
   :var-size
   :var-value
+  :distinct-vars
   :signed-integer
   :unsigned-integer
   :and
   :or
-  :distinct-vars
   :greater-than
   :less-than
   :equal
@@ -355,6 +371,7 @@
     array))
 
 (defun build-predicate (var-names predicate)
+  "Build a predicate struct from an s-expression."
   (labels
       ((build-var-reference (var)
          (if-let ((index (position var var-names)))
@@ -401,7 +418,19 @@
        (null-pointer))))
 
 (defgeneric query-trace (db index var-names var-types
-                         &key pick file-id predicate filter))
+                         &key pick file-id predicate filter)
+  (:documentation "Find bindings of VAR-NAMES in DB which satisfy PREDICATE.
+
+VAR-TYPES is a list of lists containing the names of allowed types for
+each variable.
+
+Keyword arguments:
+PICK ----------- return results from a single randomly-selected trace point
+                 instead of searching all trace points.
+FILE-ID -------- restrict search to trace points in this file
+PREDICATE ------ S-expression representing a database predicate
+FILTER --------- A function taking (LOCATION VARS...) as arguments.
+                 Results for which it returns false are discarded."))
 (defmethod query-trace ((db trace-db) index var-names var-types
                         &key pick file-id predicate filter)
   (when predicate (assert var-names))
@@ -429,43 +458,21 @@
       (with-foreign-object (n-results-ptr ':uint64)
         (setf (mem-aref n-results-ptr ':uint64) 0)
         (unwind-protect
-          (let* ((trace (get-trace-struct db index))
-                 (names (ignore-errors
-                          (iter (with ptr = (getf trace 'names))
-                                (for i below (getf trace 'n-names))
-                                (for str = (mem-aref ptr :string i))
-                                (while str)
-                                (collect str result-type 'vector))))
-                 (types (ignore-errors
-                          (iter (with ptr = (getf trace 'types))
-                                (for i below (getf trace 'n-types))
-                                (for str =
-                                     (mem-aref ptr '(:struct type-description)
-                                               i))
-                                (while str)
-                                (collect str result-type 'vector)))))
-            (c-query-trace (db-pointer db) index
-                           n-vars free-vars predicate-ptr
-                           (if pick 1 0)
-                           (if file-id
-                               (ash (1- (ash 1 +trace-id-file-bits+))
-                                    +trace-id-statement-bits+)
-                               0)
-                           (if file-id
-                               (ash file-id +trace-id-statement-bits+)
-                               0)
-                           results-ptr n-results-ptr)
-            (when (and types names)
-              (iter (for i below (mem-ref n-results-ptr :uint64))
-                    (let ((point
-                           (convert-trace-point names types
-                                                (mem-ref results-ptr :pointer)
-                                                i)))
-                      (when (or (not filter)
-                                (apply filter
-                                       (cdr (assoc :c point))
-                                       (cdr (assoc :scopes point))))
-                        (collect point))))))
+             (progn
+               (c-query-trace (db-pointer db) index
+                              n-vars free-vars predicate-ptr
+                              (if pick 1 0)
+                              (if file-id
+                                  (ash (1- (ash 1 +trace-id-file-bits+))
+                                       +trace-id-statement-bits+)
+                                  0)
+                              (if file-id
+                                  (ash file-id +trace-id-statement-bits+)
+                                  0)
+                              results-ptr n-results-ptr)
+               (convert-results db index (mem-ref n-results-ptr :uint64)
+                                (mem-ref results-ptr :pointer)
+                                :filter filter))
 
          (progn
            ;; Free memory
@@ -483,15 +490,15 @@
   (index :uint32)
   (trace :pointer))
 
-(defmethod set-trace ((db trace-db) index trace metadata)
-  "Convert TRACE to C structures and store in DB at INDEX.
+(defgeneric setr-trace (db index trace metadata)
+  (:documentation "Convert TRACE to C structures and store in DB at INDEX.
 
 If INDEX is equal to the current N-TRACES, extend traces by
 one. Otherwise replace an existing trace.
 
 This is intended primarily for testing. It does not handle blobs and
-may not be particularly efficient.
-"
+may not be particularly efficient."))
+(defmethod set-trace ((db trace-db) index trace metadata)
   (assert (<= index (n-traces db)))
 
   (let* ((type-hash (make-hash-table :test #'equal))
@@ -563,6 +570,7 @@ may not be particularly efficient.
    "Wrapper around trace-db which restricts queries to one file of a project."))
 
 (defmethod restrict-to-file ((db trace-db) file-id)
+  "Return a wrapper around DB which restricts results by FILE-ID."
   ;; New instance is created without a db-pointer, so it will not
   ;; create a finalizer. The original DB is still the owner of the
   ;; database and will free it.
