@@ -731,6 +731,7 @@ static void results_vector_to_array(const std::vector<trace_point> results,
 void query_trace(const trace_db *db, uint64_t index,
                  uint32_t n_variables, const free_variable *variables,
                  const predicate *predicate, int pick,
+                 uint64_t statement_mask, uint64_t statement,
                  trace_point **results_out, uint64_t *n_results_out)
 {
     assert(index < db->n_traces);
@@ -738,13 +739,20 @@ void query_trace(const trace_db *db, uint64_t index,
     const trace &trace = db->traces[index];
 
     if (pick) {
-        collect_results_at_point(trace, trace.points[rand() % trace.n_points],
-                                 n_variables, variables, predicate, &results);
+        const trace_point *point;
+        do {
+            point = &trace.points[rand() % trace.n_points];
+        } while ((point->statement & statement_mask) != statement);
+        collect_results_at_point(trace, *point,
+                                 n_variables, variables, predicate,
+                                 &results);
     }
     else {
         for (uint32_t point_i = 0; point_i < trace.n_points; point_i++) {
-            collect_results_at_point(trace, trace.points[point_i], n_variables,
-                                     variables, predicate, &results);
+            const trace_point &point = trace.points[point_i];
+            if ((point.statement & statement_mask) == statement)
+                collect_results_at_point(trace, point, n_variables,
+                                         variables, predicate, &results);
         }
     }
 

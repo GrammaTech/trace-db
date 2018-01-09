@@ -334,6 +334,8 @@
   (variables (:pointer (:struct free-variable)))
   (predicate (:pointer (:struct predicate)))
   (pick :int)
+  (statement-mask :uint64)
+  (statement :uint64)
   (results-out :pointer)
   (n-results :pointer))
 
@@ -398,8 +400,10 @@
          result)
        (null-pointer))))
 
+(defgeneric query-trace (db index var-names var-types
+                         &key pick file-id predicate filter))
 (defmethod query-trace ((db trace-db) index var-names var-types
-                        &key pick predicate filter)
+                        &key pick file-id predicate filter)
   (when predicate (assert var-names))
   (let* ((n-vars (length var-types))
          (trace-types (trace-types db index))
@@ -443,6 +447,13 @@
             (c-query-trace (db-pointer db) index
                            n-vars free-vars predicate-ptr
                            (if pick 1 0)
+                           (if file-id
+                               (ash (1- (ash 1 +trace-id-file-bits+))
+                                    +trace-id-statement-bits+)
+                               0)
+                           (if file-id
+                               (ash file-id +trace-id-statement-bits+)
+                               0)
                            results-ptr n-results-ptr)
             (when (and types names)
               (iter (for i below (mem-ref n-results-ptr :uint64))
@@ -544,3 +555,26 @@ may not be particularly efficient.
     (if (< index (length (trace-metadata db)))
         (setf (nth index (trace-metadata db)) metadata)
         (push metadata (trace-metadata db)))))
+
+(defclass single-file-trace-db (trace-db)
+  ((file-id :reader file-id :type number)
+   (parent-db :initarg :parent-db :type trace-db))
+  (:documentation
+   "Wrapper around trace-db which restricts queries to one file of a project."))
+
+(defmethod restrict-to-file ((db trace-db) file-id)
+  ;; New instance is created without a db-pointer, so it will not
+  ;; create a finalizer. The original DB is still the owner of the
+  ;; database and will free it.
+  (let ((result (make-instance 'single-file-trace-db
+                               :parent-db db)))
+    (setf (slot-value result 'file-id) file-id)
+    (setf (slot-value result 'db-pointer) (db-pointer db))
+    result))
+
+(defmethod query-trace :around ((db single-file-trace-db) index
+                                var-names var-types
+                                &key pick file-id predicate filter)
+  (call-next-method db index var-names var-types
+                    :pick pick :predicate predicate :filter filter
+                    :file-id (or file-id (file-id db))))
