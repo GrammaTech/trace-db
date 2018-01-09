@@ -26,7 +26,9 @@ typedef struct trace_db
 } trace_db;
 
 trace_db *create_db();
+/* Read a trace into the DB */
 void add_trace(trace_db *db, trace_read_state *state, uint64_t max);
+/* Store an existing trace in the DB */
 void set_trace(trace_db *db, uint32_t index, trace *trace);
 void free_db(trace_db *db);
 
@@ -37,19 +39,33 @@ typedef struct free_variable
     uint32_t *allowed_types;
 } free_variable;
 
+/* QUERY PREDICATES
+
+   A predicate is a simple expression tree containing logical and arithmetic
+   operators, numeric comparisons, variables, and numeric values.
+
+   Predicates are type-checked during query processing, and will generate
+   assertion failures if, for example, a number is used where a boolean value
+   is required.
+*/
 enum predicate_kind
 {
+    /* Properties of variables */
     VAR_REFERENCE,
     VAR_SIZE,
     VAR_VALUE,
+    DISTINCT_VARS,
+    /* Numeric values */
     SIGNED_INTEGER,
     UNSIGNED_INTEGER,
+    /* Logical operators */
     AND,
     OR,
-    DISTINCT_VARS,
+    /* Comparisons */
     GREATER_THAN,
     LESS_THAN,
     EQUAL,
+    /* Arithmetic operators */
     ADD,
     SUBTRACT,
     MULTIPLY,
@@ -82,6 +98,15 @@ typedef struct predicate
 
    The caller must pass the results to free_query_result to deallocate
    memory.
+
+   Results are generated at each trace point by finding all possible bindings
+   for the free variables, then evaluating the predicate over those variables
+   to filter. If there are no free variables, each trace point will generate
+   one result.
+
+   Trace points where (statement_id & statement_mask) != statement are
+   skipped. Setting both arguments to zero will ensure that all statements
+   are queried.
 */
 void query_trace(const trace_db *db, uint64_t index,
                  uint32_t n_variables, const free_variable *variables,
@@ -93,9 +118,13 @@ void free_predicate(predicate *predicate);
 
 typedef struct skip_list skip_list;
 
+/* Create a skip list for tracking memory regions */
 skip_list *create_memory_map();
 void free_memory_map(skip_list *list);
+/* Update memory map with buffer sizes from point.  */
 void update_memory_map(skip_list *memory_map, const trace_point *point);
+/* Compute size of buffer from memory map, storing the result into a
+   var_info. */
 void compute_buffer_size(const skip_list *memory_map,
                          const trace_read_state *state,
                          trace_var_info *var);

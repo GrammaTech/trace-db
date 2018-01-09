@@ -56,8 +56,8 @@ static void skip_list_remove(skip_list *list, uint64_t key)
                 break;
             update[i]->next[1] = current->next[i];
         }
-        free(current->next);
-        free(current);
+        delete current->next;
+        delete current;
 
         while (list->height > 1
                && list->head.next[list->height] == &list->head)
@@ -90,10 +90,10 @@ static void skip_list_update(skip_list *list, uint64_t key, uint64_t value)
     }
     else {
         int level = random_level();
-        snode *new_node = (snode *)malloc(sizeof(snode));
+        snode *new_node = new snode;
         new_node->key = key;
         new_node->value = value;
-        new_node->next = (snode **)malloc(sizeof(snode*) * (level + 1));
+        new_node->next = new snode*[level + 1];
 
         snode *current = &list->head;
         for (int i = list->height; i >= 1; i--) {
@@ -111,10 +111,10 @@ static void skip_list_update(skip_list *list, uint64_t key, uint64_t value)
 
 skip_list *create_memory_map()
 {
-    skip_list *memory_map = (skip_list *)malloc(sizeof(skip_list));
+    skip_list *memory_map = new skip_list;
     memory_map->height = 1;
     memory_map->head.key = UINT64_MAX;
-    memory_map->head.next = (snode **)malloc(sizeof(snode*) * (SKIP_LIST_MAX_HEIGHT + 1));
+    memory_map->head.next = new snode*[SKIP_LIST_MAX_HEIGHT + 1];
     for (int i = 0; i <= SKIP_LIST_MAX_HEIGHT; i++) {
         memory_map->head.next[i] = &memory_map->head;
     }
@@ -127,12 +127,12 @@ void free_memory_map(skip_list *list)
     snode *current = list->head.next[1];
     while(current != &list->head) {
         snode *next = current->next[1];
-        free(current->next);
-        free(current);
+        delete current->next;
+        delete current;
         current = next;
     }
-    free(list->head.next);
-    free(list);
+    delete list->head.next;
+    delete list;
 }
 
 void update_memory_map(skip_list *memory_map, const trace_point *point)
@@ -185,12 +185,14 @@ void add_trace(trace_db *db, trace_read_state *state, uint64_t max)
         }
 
         /* Copy contents out of shared state buffers */
-        point.sizes =
-            (trace_buffer_size*)malloc_copy(point.sizes,
-                                             point.n_sizes * sizeof(trace_buffer_size));
-        point.vars = (trace_var_info*)malloc_copy(point.vars,
-                                                   point.n_vars * sizeof(trace_var_info));
-        point.aux = (uint64_t*)malloc_copy(point.aux, point.n_aux * sizeof(*point.aux));
+        point.sizes = (trace_buffer_size*)
+                      malloc_copy(point.sizes,
+                                  point.n_sizes * sizeof(trace_buffer_size));
+        point.vars = (trace_var_info*)
+                     malloc_copy(point.vars,
+                                 point.n_vars * sizeof(trace_var_info));
+        point.aux = (uint64_t*)
+                    malloc_copy(point.aux, point.n_aux * sizeof(*point.aux));
 
         void *tmp = new_trace.points;
         ENSURE_BUFFER_SIZE(tmp, sizeof(trace_point),
@@ -689,11 +691,11 @@ static void collect_results_at_point(const trace &trace,
 
     // Find possible bindings for each free variable
     std::vector<std::vector<uint32_t> > matching_vars(n_variables);
-    for (uint32_t free_var_i = 0; free_var_i < n_variables; free_var_i++) {
-        for (uint32_t point_var_i = 0; point_var_i < current.n_vars; point_var_i++) {
-            if (type_compatible(variables[free_var_i],
-                                current.vars[point_var_i]))
-                matching_vars[free_var_i].push_back(point_var_i);
+    for (uint32_t free_i = 0; free_i < n_variables; free_i++) {
+        for (uint32_t var_i = 0; var_i < current.n_vars; var_i++) {
+            if (type_compatible(variables[free_i],
+                                current.vars[var_i]))
+                matching_vars[free_i].push_back(var_i);
         }
     }
 
@@ -702,7 +704,8 @@ static void collect_results_at_point(const trace &trace,
         if (satisfies_predicate(trace, current, bindings, predicate)) {
             trace_point point = { current.statement };
             point.n_vars = bindings.size();
-            point.vars = (trace_var_info *)malloc(point.n_vars * sizeof(trace_var_info));
+            point.vars = (trace_var_info *)
+                         malloc(point.n_vars * sizeof(trace_var_info));
             for (uint32_t i = 0; i < point.n_vars; i++) {
                 point.vars[i] = current.vars[bindings[i]];
             }
