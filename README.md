@@ -50,3 +50,27 @@ by that many bytes of data.
 A type description consists of a name (represented by an index into the
 dictionary), a format (e.g. signed integer, float, blob), and a size. For
 more details, see the `type_description` struct in [types.h](types.h)
+
+## Storing Traces
+The `trace_db` type and its associated functions can be used to store
+and retrieve traces. Traces are stored in memory, in a format that is
+convenient for queries. Clients using the C API may access stored
+traces directly, but the representation of traces may change over
+time. The recommended method for accessing traces is through queries.
+
+## Queries
+
+The `query_trace` function searches a trace. A query consists of a set
+of free variables, associated type constraints, and a predicate over
+the free variables. At each trace point, the database finds all
+combinations of valid assignments for the free variables, and collects
+those assignments which satisfy the predicate.
+
+The result is returned as a set of trace points, which each point
+contains only a statement ID and the information for the bound
+variables.
+
+Queries can also be restricted by statement ID.
+
+Finally, query trace has a `pick` mode which randomly selects one
+trace point to query.
