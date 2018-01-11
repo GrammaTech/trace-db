@@ -68,6 +68,10 @@ static void skip_list_remove(skip_list *list, uint64_t key)
 /* Return node with largest key less than or equal to desired key. */
 static snode *skip_list_find(const skip_list *list, uint64_t key)
 {
+    // This value is used as a sentinel and can't be used as a key
+    if (key == UINT64_MAX)
+        return NULL;
+
     const snode *current = &list->head;
     for (int i = list->height; i >= 1; i--) {
         while (current->next[i]->key <= key) {

@@ -382,6 +382,21 @@ void test_memory_map()
     var.value.ptr = (void *)100;
     compute_buffer_size(memory_map, &state, &var);
     assert(var.has_buffer_size == 0);
+
+    /* UINT64_MAX is never found in map (used as a sentinel) */
+    var.value.ptr = (void *)UINT64_MAX;
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.has_buffer_size == 0);
+
+    /* Inserting UINT64_MAX does nothing */
+    sizes[0] = (trace_buffer_size) {UINT64_MAX, 5};
+    update_memory_map(memory_map, &point);
+    var.value.ptr = (void *)UINT64_MAX;
+    compute_buffer_size(memory_map, &state, &var);
+    assert(var.has_buffer_size == 0);
+
+    /* Free works */
+    free_memory_map(memory_map);
 }
 
 int main(int argc, char **argv)
