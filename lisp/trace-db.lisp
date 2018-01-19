@@ -436,6 +436,7 @@ FILTER --------- A function taking (LOCATION VARS...) as arguments.
                  Results for which it returns false are discarded."))
 (defmethod query-trace ((db trace-db) index var-names var-types
                         &key pick file-id predicate filter)
+  (assert (< index (n-traces db)))
   (when predicate (assert var-names))
   (let* ((n-vars (length var-types))
          (trace-types (trace-types db index))
