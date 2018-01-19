@@ -265,19 +265,18 @@
 
 (defmethod trace-types ((db trace-db) index)
   "Return the type names from the header of the trace at INDEX in DB."
-  (let ((db-struct (mem-aref (db-pointer db) '(:struct trace-db))))
-    (let* ((trace (get-trace-struct db index))
-           (names (iter (with ptr = (getf trace 'names))
-                        (for i below (getf trace 'n-names))
-                        (for str = (mem-aref ptr :string i))
-                        (collect str result-type 'vector))))
-      (iter (with ptr = (getf trace 'types))
-            (for i below (getf trace 'n-types))
-            (collect
-                (aref names
-                      (type-name-index (mem-aref ptr
-                                                 '(:struct type-description)
-                                                 i))))))))
+  (let* ((trace (get-trace-struct db index))
+         (names (iter (with ptr = (getf trace 'names))
+                      (for i below (getf trace 'n-names))
+                      (for str = (mem-aref ptr :string i))
+                      (collect str result-type 'vector))))
+    (iter (with ptr = (getf trace 'types))
+          (for i below (getf trace 'n-types))
+          (collect
+              (aref names
+                    (type-name-index (mem-aref ptr
+                                               '(:struct type-description)
+                                               i)))))))
 
 (defun convert-results (db index n-results results-ptr
                         &key filter)
