@@ -29,9 +29,9 @@ typedef struct skip_list
     struct snode head;
 } skip_list;
 
-static int random_level()
+static unsigned int random_level()
 {
-    int level = 1;
+    unsigned int level = 1;
     while (rand() < RAND_MAX/2 && level < SKIP_LIST_MAX_HEIGHT)
         level++;
     return level;
@@ -54,7 +54,7 @@ static void skip_list_remove(skip_list *list, uint64_t key)
         for (unsigned int i = 1; i <= list->height; i++) {
             if (update[i]->next[i] != current)
                 break;
-            update[i]->next[1] = current->next[i];
+            update[i]->next[i] = current->next[i];
         }
         delete current->next;
         delete current;
@@ -93,14 +93,19 @@ static void skip_list_update(skip_list *list, uint64_t key, uint64_t value)
         existing->value = value;
     }
     else {
-        int level = random_level();
+        unsigned int level = random_level();
+        if (level > list->height) {
+            list->height++;
+            level = list->height;
+        }
+
         snode *new_node = new snode;
         new_node->key = key;
         new_node->value = value;
         new_node->next = new snode*[level + 1];
 
         snode *current = &list->head;
-        for (int i = list->height; i >= 1; i--) {
+        for (unsigned int i = list->height; i >= 1; i--) {
             while (current->next[i]->key < key) {
                 current = current->next[i];
             }
