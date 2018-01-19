@@ -302,16 +302,20 @@
                                (cdr (assoc :scopes point))))
                 (collect point))))))
 
-(defmethod get-trace ((db trace-db) index)
+(defmethod get-trace ((db trace-db) index &key file-id)
   "Retrieve the trace at INDEX in DB.
 
 The result looks like: (METADATA (:trace (TRACE-POINTS))), where each
 TRACE-POINT is an alist with the usual :C :F :SCOPES, etc.
 "
-  (let ((trace (get-trace-struct db index)))
-    (cons (cons :trace (convert-results db index
-                                        (getf trace 'n-points)
-                                        (getf trace 'points)))
+  (let* ((struct (get-trace-struct db index))
+         (points (convert-results db index
+                                  (getf struct 'n-points)
+                                  (getf struct 'points))))
+    (cons (cons :trace  (if file-id
+                            (remove-if-not [{eq file-id} #'cdr {assoc :f}]
+                                           points)
+                            points))
           (elt (trace-metadata db) index))))
 
 
@@ -564,7 +568,7 @@ may not be particularly efficient."))
 
 (defclass single-file-trace-db (trace-db)
   ((file-id :reader file-id :type number)
-   (parent-db :initarg :parent-db :type trace-db))
+   (parent-db :initarg :parent-db :type trace-db :accessor parent-db))
   (:documentation
    "Wrapper around trace-db which restricts queries to one file of a project."))
 
@@ -585,3 +589,10 @@ may not be particularly efficient."))
   (call-next-method db index var-names var-types
                     :pick pick :predicate predicate :filter filter
                     :file-id (or file-id (file-id db))))
+
+(defmethod get-trace :around ((db single-file-trace-db) index
+                              &key file-id)
+  (call-next-method db index :file-id (or file-id (file-id db))))
+
+(defmethod trace-metadata ((db single-file-trace-db))
+  (or (slot-value db 'trace-metadata) (trace-metadata (parent-db db))))
