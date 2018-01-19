@@ -508,7 +508,7 @@ static int_value evaluate(const trace &trace,
       return int_value(predicate->data.signed_value);
     case UNSIGNED_INTEGER:
       return int_value(predicate->data.unsigned_value);
-          case ADD:
+    case ADD:
       {
             assert(predicate->data.n_children == 2);
             int_value v0 = evaluate(trace, point, bindings,
