@@ -489,7 +489,7 @@ FILTER --------- A function taking (LOCATION VARS...) as arguments.
   (index :uint32)
   (trace :pointer))
 
-(defgeneric setr-trace (db index trace metadata)
+(defgeneric set-trace (db index trace metadata)
   (:documentation "Convert TRACE to C structures and store in DB at INDEX.
 
 If INDEX is equal to the current N-TRACES, extend traces by
