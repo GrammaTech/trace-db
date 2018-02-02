@@ -293,7 +293,8 @@
                       (while str)
                       (collect str result-type 'vector))))
       (iter (for i below n-results)
-            (let ((point (convert-trace-point names types
+            (let ((point (convert-trace-point names
+                                              types
                                               results-ptr
                                               i)))
               (when (or (not filter)
@@ -312,10 +313,10 @@ TRACE-POINT is an alist with the usual :C :F :SCOPES, etc.
          (points (convert-results db index
                                   (getf struct 'n-points)
                                   (getf struct 'points))))
-    (cons (cons :trace  (if file-id
-                            (remove-if-not [{eq file-id} #'cdr {assoc :f}]
-                                           points)
-                            points))
+    (cons (cons :trace (if file-id
+                           (remove-if-not [{eq file-id} #'cdr {assoc :f}]
+                                          points)
+                           points))
           (elt (trace-metadata db) index))))
 
 
