@@ -495,7 +495,7 @@ FILTER --------- A function taking (LOCATION VARS...) as arguments.
   (index :uint32)
   (trace :pointer))
 
-(defgeneric set-trace (db index trace metadata)
+(defgeneric set-trace (db index trace &optional metadata)
   (:documentation "Convert TRACE to C structures and store in DB at INDEX.
 
 If INDEX is equal to the current N-TRACES, extend traces by
@@ -503,7 +503,7 @@ one. Otherwise replace an existing trace.
 
 This is intended primarily for testing. It does not handle blobs and
 may not be particularly efficient."))
-(defmethod set-trace ((db trace-db) index trace metadata)
+(defmethod set-trace ((db trace-db) index trace &optional metadata)
   (assert (<= index (n-traces db)))
 
   (let* ((type-hash (make-hash-table :test #'equal))
