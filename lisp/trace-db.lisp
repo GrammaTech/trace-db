@@ -475,7 +475,8 @@ FILTER --------- A function taking (LOCATION VARS...) as arguments.
                                   (ash file-id +trace-id-statement-bits+)
                                   0)
                               results-ptr n-results-ptr)
-               (convert-results db index (mem-ref n-results-ptr :uint64)
+               (convert-results db index
+                                (mem-ref n-results-ptr :uint64)
                                 (mem-ref results-ptr :pointer)
                                 :filter filter))
 
