@@ -353,7 +353,7 @@ TRACE-POINT is an alist with the usual :C :F :SCOPES, etc.
   (n-variables :uint32)
   (variables (:pointer (:struct free-variable)))
   (predicate (:pointer (:struct predicate)))
-  (pick :int)
+  (seed :uint32)
   (statement-mask :uint64)
   (statement :uint64)
   (results-out :pointer)
@@ -466,7 +466,7 @@ FILTER --------- A function taking (LOCATION VARS...) as arguments.
              (progn
                (c-query-trace (db-pointer db) index
                               n-vars free-vars predicate-ptr
-                              (if pick 1 0)
+                              (if pick (random (expt 2 32)) 0)
                               (if file-id
                                   (ash (1- (ash 1 +trace-id-file-bits+))
                                        +trace-id-statement-bits+)
