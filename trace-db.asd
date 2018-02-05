@@ -3,6 +3,7 @@
   :version "0.0.0"
   :depends-on (alexandria
                iterate
+               cl-store
                cffi
                cffi-libffi
                trivial-garbage

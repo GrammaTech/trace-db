@@ -238,6 +238,23 @@
     (setf (slot-value instance 'db-pointer) db-pointer)
     (finalize instance (lambda () (free-db db-pointer)))))
 
+(defvar *trace-db-obj-code* (register-code 255 'trace-db)
+  "Object code for serialization of trace-db software objects.")
+
+(defstore-cl-store (obj trace-db stream)
+  (let ((trace-list (iter (for i from 0 to (1- (n-traces obj)))
+                          (collect (get-trace obj i)))))
+    (output-type-code *trace-db-obj-code* stream)
+    (cl-store::store-object trace-list stream)))
+
+(defrestore-cl-store (trace-db stream)
+  (let ((trace-db (make-instance 'trace-db))
+        (trace-list (cl-store::restore-object stream)))
+    (iter (for (trace . metadata) in trace-list)
+          (for i upfrom 0)
+          (set-trace trace-db i (cdr trace) metadata))
+    trace-db))
+
 (defun get-trace-struct (db index)
   "Return the C trace struct."
   (let ((db-struct (mem-aref (db-pointer db) '(:struct trace-db))))
@@ -567,13 +584,24 @@ may not be particularly efficient."))
     (c-set-trace (db-pointer db) index trace-struct)
     (if (< index (length (trace-metadata db)))
         (setf (nth index (trace-metadata db)) metadata)
-        (push metadata (trace-metadata db)))))
+        (appendf (trace-metadata db) (list metadata)))))
 
 (defclass single-file-trace-db (trace-db)
   ((file-id :reader file-id :type number)
    (parent-db :initarg :parent-db :type trace-db :accessor parent-db))
   (:documentation
    "Wrapper around trace-db which restricts queries to one file of a project."))
+
+(defvar *single-file-trace-db-obj-code* (register-code 256 'single-file-trace-db)
+  "Object code for serialization of single-file-trace-db software objects.")
+
+(defstore-cl-store (obj single-file-trace-db stream)
+  ;; Do not serialize single file trace databases
+  (output-type-code *single-file-trace-db-obj-code* stream)
+  (cl-store::store-object nil stream))
+
+(defrestore-cl-store (single-file-trace-db stream)
+  (cl-store::restore-object stream))
 
 (defmethod restrict-to-file ((db trace-db) file-id)
   "Return a wrapper around DB which restricts results by FILE-ID."

@@ -3,6 +3,7 @@
   (:use :common-lisp
         :alexandria
         :iterate
+        :cl-store
         :cffi
         :trivial-garbage
         :named-readtables
