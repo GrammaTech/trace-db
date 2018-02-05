@@ -742,7 +742,7 @@ static void results_vector_to_array(const std::vector<trace_point> results,
 
 void query_trace(const trace_db *db, uint64_t index,
                  uint32_t n_variables, const free_variable *variables,
-                 const predicate *predicate, int pick,
+                 const predicate *predicate, uint32_t seed,
                  uint64_t statement_mask, uint64_t statement,
                  trace_point **results_out, uint64_t *n_results_out)
 {
@@ -750,8 +750,9 @@ void query_trace(const trace_db *db, uint64_t index,
     std::vector<trace_point> results;
     const trace &trace = db->traces[index];
 
-    if (pick) {
+    if (seed) {
         const trace_point *point;
+        srand(seed);
         do {
             point = &trace.points[rand() % trace.n_points];
         } while ((point->statement & statement_mask) != statement);

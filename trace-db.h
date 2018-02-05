@@ -110,7 +110,7 @@ typedef struct predicate
 */
 void query_trace(const trace_db *db, uint64_t index,
                  uint32_t n_variables, const free_variable *variables,
-                 const predicate *predicate, int pick,
+                 const predicate *predicate, uint32_t seed,
                  uint64_t statement_mask, uint64_t statement,
                  trace_point **results_out, uint64_t *n_results_out);
 void free_query_result(trace_point *results, uint64_t n_results);
