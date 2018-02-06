@@ -47,7 +47,7 @@
   ;; CFFI's handling of the union here seems to be broken.
   ;; Use an integer here to get the correct layout, and figure out the
   ;; real type when we dereference.
-  (value :int64)
+  (value :uint64)
   (name-index :uint32)
   (type-index :uint32)
   (size :uint32)
