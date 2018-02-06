@@ -537,13 +537,17 @@ may not be particularly efficient."))
          (type-names (hash-table-keys type-hash))
          (all-names (append type-names
                             (remove-duplicates var-names :test #'string=)))
+         (name-hash (iter (with ht = (make-hash-table :test #'equal))
+                          (for name in all-names)
+                          (for i upfrom 0)
+                          (setf (gethash name ht) i)
+                          (finally (return ht))))
          (types
           (iter (for name in type-names)
                 (collect
-                    `(name-index ,(position name all-names :test #'string=)
-                                 format ,(if (gethash name type-hash)
-                                             :signed :unsigned)
-                                 size 8)
+                    `(name-index ,(gethash name name-hash)
+                      format ,(if (gethash name type-hash) :signed :unsigned)
+                      size 8)
                   result-type 'vector)))
          (points
           (mapcar
@@ -553,12 +557,10 @@ may not be particularly efficient."))
                             (let ((has-size (and (= 4 (length var-info))
                                                  (elt var-info 3))))
                               `(value ,(elt var-info 2)
-                                      name-index ,(position (elt var-info 0)
-                                                            all-names
-                                                            :test #'string=)
-                                      type-index ,(position (elt var-info 1)
-                                                            all-names
-                                                            :test #'string=)
+                                      name-index ,(gethash (elt var-info 0)
+                                                           name-hash)
+                                      type-index ,(gethash (elt var-info 1)
+                                                           name-hash)
                                       has-buffer-size ,(if has-size 1 0)
                                       buffer-size ,(if has-size
                                                        (elt var-info 3) 0))))
