@@ -751,14 +751,20 @@ void query_trace(const trace_db *db, uint64_t index,
     const trace &trace = db->traces[index];
 
     if (seed) {
-        const trace_point *point;
-        srand(seed);
-        do {
-            point = &trace.points[rand() % trace.n_points];
-        } while ((point->statement & statement_mask) != statement);
-        collect_results_at_point(trace, *point,
-                                 n_variables, variables, predicate,
-                                 &results);
+        std::vector<trace_point*> points;
+
+        points.reserve(trace.n_points);
+        for (uint32_t point_i = 0; point_i < trace.n_points; point_i++) {
+            if ((trace.points[point_i].statement & statement_mask) == statement)
+                points.push_back(trace.points+point_i);
+        }
+
+        if (!points.empty()) {
+            srand(seed);
+            collect_results_at_point(trace, *points[rand() % points.size()],
+                                     n_variables, variables, predicate,
+                                     &results);
+        }
     }
     else {
         for (uint32_t point_i = 0; point_i < trace.n_points; point_i++) {
