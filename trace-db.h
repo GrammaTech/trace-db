@@ -6,6 +6,10 @@ extern "C" {
 #endif
 #include "read-trace.h"
 
+#define FILE_MASK 0x7FFFFF0000000000
+#define TRACE_ID_FILE_BITS 23
+#define TRACE_ID_STATEMENT_BITS 40
+
 typedef struct trace
 {
     trace_point *points;
@@ -16,6 +20,10 @@ typedef struct trace
     uint32_t n_names;
     const type_description *types;
     uint32_t n_types;
+
+    trace_point*** file_index;
+    uint64_t *file_index_points;
+    uint32_t n_files;
 } trace;
 
 typedef struct trace_db
@@ -103,15 +111,10 @@ typedef struct predicate
    for the free variables, then evaluating the predicate over those variables
    to filter. If there are no free variables, each trace point will generate
    one result.
-
-   Trace points where (statement_id & statement_mask) != statement are
-   skipped. Setting both arguments to zero will ensure that all statements
-   are queried.
 */
-void query_trace(const trace_db *db, uint64_t index,
+void query_trace(const trace_db *db, uint64_t index, uint32_t file_id,
                  uint32_t n_variables, const free_variable *variables,
                  const predicate *predicate, uint32_t seed,
-                 uint64_t statement_mask, uint64_t statement,
                  trace_point **results_out, uint64_t *n_results_out);
 void free_query_result(trace_point *results, uint64_t n_results);
 void free_predicate(predicate *predicate);

@@ -221,7 +221,11 @@
   (names (:pointer :string))
   (n-names :uint32)
   (types (:pointer (:struct type-description)))
-  (n-types :uint32))
+  (n-types :uint32)
+
+  (file-index (:pointer (:pointer (:pointer (:struct trace-point)))))
+  (file-index-points (:pointer :uint64))
+  (n-files :uint32))
 
 (defcstruct trace-db
   (traces (:pointer (:struct c-trace)))
@@ -367,12 +371,10 @@ TRACE-POINT is an alist with the usual :C :F :SCOPES, etc.
 (defcfun ("query_trace" c-query-trace) :void
   (db (:pointer (:struct trace-db)))
   (index :uint64)
-  (n-variables :uint32)
+  (file-id :uint32)
   (variables (:pointer (:struct free-variable)))
   (predicate (:pointer (:struct predicate)))
   (seed :uint32)
-  (statement-mask :uint64)
-  (statement :uint64)
   (results-out :pointer)
   (n-results :pointer))
 
@@ -453,7 +455,8 @@ PREDICATE ------ S-expression representing a database predicate
 FILTER --------- A function taking (LOCATION VARS...) as arguments.
                  Results for which it returns false are discarded."))
 (defmethod query-trace ((db trace-db) index var-names var-types
-                        &key pick file-id predicate filter)
+                        &key (file-id (1- (expt 2 32)))
+                             pick predicate filter)
   (assert (< index (n-traces db)))
   (when predicate (assert var-names))
   (let* ((n-vars (length var-types))
@@ -481,16 +484,9 @@ FILTER --------- A function taking (LOCATION VARS...) as arguments.
         (setf (mem-aref n-results-ptr ':uint64) 0)
         (unwind-protect
              (progn
-               (c-query-trace (db-pointer db) index
+               (c-query-trace (db-pointer db) index file-id
                               n-vars free-vars predicate-ptr
                               (if pick (random (expt 2 32)) 0)
-                              (if file-id
-                                  (ash (1- (ash 1 +trace-id-file-bits+))
-                                       +trace-id-statement-bits+)
-                                  0)
-                              (if file-id
-                                  (ash file-id +trace-id-statement-bits+)
-                                  0)
                               results-ptr n-results-ptr)
                (convert-results db index
                                 (mem-ref n-results-ptr :uint64)

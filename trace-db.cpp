@@ -2,6 +2,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <map>
+#include <limits>
 #include <random>
 
 extern "C" {
@@ -183,7 +185,8 @@ void add_trace(trace_db *db, trace_read_state *state, uint64_t max)
 
     trace_point *points =
         (trace_point*)malloc(INITIAL_TRACE_SIZE * sizeof(trace_point));
-    trace new_trace = { points, 0, INITIAL_TRACE_SIZE };
+    trace new_trace = { points, 0, INITIAL_TRACE_SIZE,
+                        NULL, 0, NULL, 0, NULL, NULL, 0 };
     skip_list *memory_map = create_memory_map();
 
     /* Read trace points */
@@ -235,6 +238,10 @@ static void free_trace(const trace &trace)
         free(trace.points[j].aux);
     }
 
+    for (size_t j = 0; j < trace.n_files; j++) {
+        free(trace.file_index[j]);
+    }
+
     if (trace.n_points > 0)
         free(trace.points);
     if (trace.n_names > 0)
@@ -243,11 +250,52 @@ static void free_trace(const trace &trace)
         free((void *)trace.names);
     if (trace.types)
         free((void *)trace.types);
-
+    if (trace.file_index)
+        free((void *)trace.file_index);
+    if (trace.file_index_points)
+        free((void *)trace.file_index_points);
 }
 
 void set_trace(trace_db *db, uint32_t index, trace *new_trace)
 {
+    std::map< int, std::vector<trace_point*> > m;
+
+    /* Split trace on a per-file basis and store in file_index */
+    new_trace->n_files = 0;
+
+    for (trace_point * point = new_trace->points;
+                       point < new_trace->points + new_trace->n_points;
+                       point++) {
+        const uint32_t file_id = ((point->statement & FILE_MASK) >>
+                                  TRACE_ID_STATEMENT_BITS);
+        m[file_id].push_back(point);
+        new_trace->n_files = (file_id > new_trace->n_files) ?
+                             file_id :
+                             new_trace->n_files;
+    }
+
+    new_trace->n_files++;
+    new_trace->file_index = (trace_point***) calloc(new_trace->n_files,
+                                                    sizeof(trace_point**));
+    new_trace->file_index_points = (uint64_t*) calloc(new_trace->n_files,
+                                                      sizeof(uint64_t));
+
+    for (size_t i = 0; i < new_trace->n_files; i++) {
+        new_trace->file_index_points[i] = 0;
+        new_trace->file_index[i] = NULL;
+    }
+
+    for (auto & iter : m) {
+        new_trace->file_index[iter.first] =
+            (trace_point**) calloc(iter.second.size(),
+                                  sizeof(trace_point*));
+        std::copy(iter.second.begin(),
+                  iter.second.end(),
+                  new_trace->file_index[iter.first]);
+        new_trace->file_index_points[iter.first] = iter.second.size();
+    }
+
+    /* Update the database */
     if (index < db->n_traces) {
         free_trace(db->traces[index]);
         db->traces[index] = *new_trace;
@@ -741,10 +789,9 @@ static void results_vector_to_array(const std::vector<trace_point> results,
     *n_results_out = results.size();
 }
 
-void query_trace(const trace_db *db, uint64_t index,
+void query_trace(const trace_db *db, uint64_t index, uint32_t file_id,
                  uint32_t n_variables, const free_variable *variables,
                  const predicate *predicate, uint32_t seed,
-                 uint64_t statement_mask, uint64_t statement,
                  trace_point **results_out, uint64_t *n_results_out)
 {
     assert(index < db->n_traces);
@@ -752,27 +799,47 @@ void query_trace(const trace_db *db, uint64_t index,
     const trace &trace = db->traces[index];
 
     if (seed) {
-        std::vector<trace_point*> points;
+        uint64_t size = 0;
+        trace_point *point = NULL;
         std::mt19937 mt(seed);
 
-        points.reserve(trace.n_points);
-        for (uint32_t point_i = 0; point_i < trace.n_points; point_i++) {
-            if ((trace.points[point_i].statement & statement_mask) == statement)
-                points.push_back(trace.points+point_i);
+        if (file_id == std::numeric_limits<uint32_t>::max()) {
+            size = trace.n_points;
+            std::uniform_int_distribution<uint64_t> dist(0, size-1);
+            point = trace.points + dist(mt);
+            collect_results_at_point(trace, *point,
+                                     n_variables, variables, predicate,
+                                     &results);
         }
-
-        if (!points.empty()) {
-            std::uniform_int_distribution<uint64_t> dist(0, trace.n_points-1);
-            collect_results_at_point(trace, *points[dist(mt)], n_variables,
-                                     variables, predicate, &results);
+        else if (file_id < trace.n_files) {
+            size = trace.file_index_points[file_id];
+            std::uniform_int_distribution<uint64_t> dist(0, size-1);
+            point = trace.file_index[file_id][dist(mt)];
+            collect_results_at_point(trace, *point,
+                                     n_variables, variables, predicate,
+                                     &results);
         }
     }
     else {
-        for (uint32_t point_i = 0; point_i < trace.n_points; point_i++) {
-            const trace_point &point = trace.points[point_i];
-            if ((point.statement & statement_mask) == statement)
-                collect_results_at_point(trace, point, n_variables,
-                                         variables, predicate, &results);
+        if (file_id == std::numeric_limits<uint32_t>::max()) {
+            for (uint64_t point_i = 0;
+                          point_i < trace.n_points;
+                          point_i++) {
+                const trace_point *point = trace.points + point_i;
+                collect_results_at_point(trace, *point,
+                                         n_variables, variables, predicate,
+                                         &results);
+            }
+        }
+        else if (file_id < trace.n_files) {
+            for (uint64_t point_i = 0;
+                          point_i < trace.file_index_points[file_id];
+                          point_i++) {
+                const trace_point *point = trace.file_index[file_id][point_i];
+                collect_results_at_point(trace, *point,
+                                         n_variables, variables, predicate,
+                                         &results);
+            }
         }
     }
 
