@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <random>
 
 extern "C" {
 #include "read-trace.h"
@@ -752,6 +753,7 @@ void query_trace(const trace_db *db, uint64_t index,
 
     if (seed) {
         std::vector<trace_point*> points;
+        std::mt19937 mt(seed);
 
         points.reserve(trace.n_points);
         for (uint32_t point_i = 0; point_i < trace.n_points; point_i++) {
@@ -760,10 +762,9 @@ void query_trace(const trace_db *db, uint64_t index,
         }
 
         if (!points.empty()) {
-            srand(seed);
-            collect_results_at_point(trace, *points[rand() % points.size()],
-                                     n_variables, variables, predicate,
-                                     &results);
+            std::uniform_int_distribution<uint64_t> dist(0, trace.n_points-1);
+            collect_results_at_point(trace, *points[dist(mt)], n_variables,
+                                     variables, predicate, &results);
         }
     }
     else {
