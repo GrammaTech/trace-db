@@ -2,7 +2,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <map>
 #include <random>
+#include <utility>
 
 extern "C" {
 #include "read-trace.h"
@@ -10,6 +12,19 @@ extern "C" {
 }
 
 #include "trace-db.h"
+
+// Cache for query_trace function
+static std::map< const trace*,
+                 std::map<const std::pair<uint64_t, uint64_t>,
+                          std::vector<const trace_point*> > > cache;
+
+void free_cache(const trace *t)
+{
+    if (cache.find(t) != cache.end()) {
+        cache.erase(cache.find(t));
+    }
+}
+
 
 trace_db *create_db()
 {
@@ -250,6 +265,7 @@ void set_trace(trace_db *db, uint32_t index, trace *new_trace)
 {
     if (index < db->n_traces) {
         free_trace(db->traces[index]);
+        free_cache(db->traces+index);
         db->traces[index] = *new_trace;
     }
     else {
@@ -265,8 +281,10 @@ void set_trace(trace_db *db, uint32_t index, trace *new_trace)
 
 void free_db(trace_db *db)
 {
-    for (uint64_t i = 0; i < db->n_traces; i++)
+    for (uint64_t i = 0; i < db->n_traces; i++) {
         free_trace(db->traces[i]);
+        free_cache(db->traces+i);
+    }
     if (db->n_traces > 0)
         free(db->traces);
     free(db);
@@ -747,32 +765,42 @@ void query_trace(const trace_db *db, uint64_t index,
                  uint64_t statement_mask, uint64_t statement,
                  trace_point **results_out, uint64_t *n_results_out)
 {
+
     assert(index < db->n_traces);
+    const trace *trace = db->traces + index;
+    const std::pair<uint64_t, uint64_t> key =
+        std::make_pair(statement_mask, statement);
+
+    // Cache results of filtering trace with statement_mask
+    // TODO: cache expiration
+    if (cache[trace].find(key) == cache[trace].end()) {
+        cache[trace][key] = std::vector<const trace_point*>();
+        for (auto point = trace->points;
+                  point < trace->points + trace->n_points;
+                  point++) {
+            if ((point->statement & statement_mask) == statement)
+                cache[trace][key].push_back(point);
+        }
+        cache[trace][key].shrink_to_fit();
+    }
+
+    // Perform the query on the filtered points
     std::vector<trace_point> results;
-    const trace &trace = db->traces[index];
+    const std::vector<const trace_point*> &points = cache[trace][key];
 
     if (seed) {
-        std::vector<trace_point*> points;
         std::mt19937 mt(seed);
-
-        points.reserve(trace.n_points);
-        for (uint32_t point_i = 0; point_i < trace.n_points; point_i++) {
-            if ((trace.points[point_i].statement & statement_mask) == statement)
-                points.push_back(trace.points+point_i);
-        }
+        std::uniform_int_distribution<uint64_t> dist(0, points.size()-1);
 
         if (!points.empty()) {
-            std::uniform_int_distribution<uint64_t> dist(0, trace.n_points-1);
-            collect_results_at_point(trace, *points[dist(mt)], n_variables,
+            collect_results_at_point(*trace, *points[dist(mt)], n_variables,
                                      variables, predicate, &results);
         }
     }
     else {
-        for (uint32_t point_i = 0; point_i < trace.n_points; point_i++) {
-            const trace_point &point = trace.points[point_i];
-            if ((point.statement & statement_mask) == statement)
-                collect_results_at_point(trace, point, n_variables,
-                                         variables, predicate, &results);
+        for (auto point : points) {
+            collect_results_at_point(*trace, *point, n_variables,
+                                     variables, predicate, &results);
         }
     }
 
