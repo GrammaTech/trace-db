@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -302,7 +303,8 @@ static bool type_compatible(const free_variable &free_var,
 
 // Cartesian product of vectors
 static std::vector<std::vector<uint32_t> >
-cartesian(const std::vector<std::vector<uint32_t> > &vectors)
+cartesian(const std::vector<std::vector<uint32_t> > &vectors,
+          const int max)
 {
     std::vector<std::vector<uint32_t> > results;
     std::vector<uint32_t> current(vectors.size());
@@ -310,6 +312,7 @@ cartesian(const std::vector<std::vector<uint32_t> > &vectors)
     size_t n_results = 1;
     for (auto v : vectors)
         n_results *= v.size();
+    n_results = max ? max : n_results;
     results.reserve(n_results);
 
     // Enumerate all results, using modular arithmetic to index into
@@ -700,12 +703,15 @@ static void print_predicate(FILE *stream, const predicate *predicate,
         fprintf(stream, "\n");
 }
 
+#define MAX_BINDINGS 64
+
 // Find matching variable bindings at a single trace point, and push them
 // onto vector results_out.
 static void collect_results_at_point(const trace &trace,
                                      const trace_point &current,
                                      uint32_t n_variables,
                                      const free_variable *variables,
+                                     const int max_bindings,
                                      const predicate *predicate,
                                      std::vector<trace_point> *results_out)
 {
@@ -727,15 +733,20 @@ static void collect_results_at_point(const trace &trace,
         }
     }
 
+    // Shuffle the possible bindings for each free variable
+    for (auto match : matching_vars) {
+        std::random_shuffle(match.begin(), match.end());
+    }
+
     // Collect all combinations of bindings
-    for (auto bindings : cartesian(matching_vars)) {
+    for (auto bindings : cartesian(matching_vars, max_bindings)) {
         if (satisfies_predicate(trace, current, bindings, predicate)) {
             trace_point point = { current.statement };
             point.n_vars = bindings.size();
             point.vars = (trace_var_info *)
                          malloc(point.n_vars * sizeof(trace_var_info));
-            for (uint32_t i = 0; i < point.n_vars; i++) {
-                point.vars[i] = current.vars[bindings[i]];
+            for (uint32_t j = 0; j < point.n_vars; j++) {
+                point.vars[j] = current.vars[bindings[j]];
             }
             results_out->push_back(point);
         }
@@ -788,19 +799,25 @@ void query_trace(const trace_db *db, uint64_t index,
     std::vector<trace_point> results;
     const std::vector<const trace_point*> &points = cache[trace][key];
 
+    srand(seed ? seed : time(NULL));
+
     if (seed) {
         std::mt19937 mt(seed);
         std::uniform_int_distribution<uint64_t> dist(0, points.size()-1);
 
         if (!points.empty()) {
-            collect_results_at_point(*trace, *points[dist(mt)], n_variables,
-                                     variables, predicate, &results);
+            collect_results_at_point(*trace, *points[dist(mt)], 
+                                     n_variables, variables,
+                                     MAX_BINDINGS, predicate,
+                                     &results);
         }
     }
     else {
         for (auto point : points) {
-            collect_results_at_point(*trace, *point, n_variables,
-                                     variables, predicate, &results);
+            collect_results_at_point(*trace, *point,
+                                     n_variables, variables,
+                                     seed, predicate,
+                                     &results);
         }
     }
 
