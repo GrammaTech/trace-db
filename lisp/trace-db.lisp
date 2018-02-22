@@ -277,8 +277,7 @@
     (assert (not (null state-pointer)))
     (c-add-trace (db-pointer db) state-pointer
                  (or max 0))
-    (push metadata (trace-metadata db)))
-  nil)
+    (push metadata (trace-metadata db))))
 
 (defmethod trace-types ((db trace-db) index)
   "Return the type names from the header of the trace at INDEX in DB."
