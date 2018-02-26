@@ -565,7 +565,12 @@ may not be particularly efficient."))
                                                        (elt var-info 3) 0))))
                           (cdr (assoc :scopes point)))))
 
-               `(statement ,(cdr (assoc :c point))
+               `(statement ,(if (cdr (assoc :f point))
+                                (logior (ash 1 63)                      ;flag bit
+                                        (ash (cdr (assoc :f point))
+                                             +trace-id-statement-bits+) ;file ID
+                                        (cdr (assoc :c point)))         ;AST ID
+                                (cdr (assoc :c point)))
                            n-sizes 0 sizes ,(null-pointer)
                            n-aux 0 aux ,(null-pointer)
                            n-vars ,(length vars)
