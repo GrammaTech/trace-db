@@ -1,3 +1,6 @@
+;; binary-trace-db.lisp - Trace database which uses a proprietary trace
+;; format and C backend.
+
 (in-package :trace-db)
 (in-readtable :curry-compose-reader-macros)
 
@@ -172,8 +175,8 @@
          (push (cons :c statement) result)))))
   result)
 
-(defun read-trace (file timeout &key (predicate #'identity) max
-                   &aux (collected 0))
+(defun read-binary-trace (file timeout &key (predicate #'identity) max
+                          &aux (collected 0))
   "Read a trace and convert to a list."
   (load-libtrace-db)
   (let ((state-ptr (start-reading file timeout)))
@@ -228,27 +231,27 @@
   (n-traces :uint64)
   (n-traces-allocated :uint64))
 
-(defclass trace-db ()
+(defclass binary-trace-db (trace-db)
   ((db-pointer :reader db-pointer)
    (trace-metadata :initform nil :accessor trace-metadata :type 'list)))
 
-(defmethod initialize-instance :after ((instance trace-db) &key)
+(defmethod initialize-instance :after ((instance binary-trace-db) &key)
   (load-libtrace-db)
   (let ((db-pointer (create-db)))
     (setf (slot-value instance 'db-pointer) db-pointer)
     (finalize instance (lambda () (free-db db-pointer)))))
 
-(defvar *trace-db-obj-code* (register-code 255 'trace-db)
-  "Object code for serialization of trace-db software objects.")
+(defvar *binary-trace-db-obj-code* (register-code 255 'binary-trace-db)
+  "Object code for serialization of binary-trace-db software objects.")
 
-(defstore-cl-store (obj trace-db stream)
+(defstore-cl-store (obj binary-trace-db stream)
   (let ((trace-list (iter (for i from 0 to (1- (n-traces obj)))
                           (collect (get-trace obj i)))))
-    (output-type-code *trace-db-obj-code* stream)
+    (output-type-code *binary-trace-db-obj-code* stream)
     (cl-store::store-object trace-list stream)))
 
-(defrestore-cl-store (trace-db stream)
-  (let ((trace-db (make-instance 'trace-db))
+(defrestore-cl-store (binary-trace-db stream)
+  (let ((trace-db (make-instance 'binary-trace-db))
         (trace-list (cl-store::restore-object stream)))
     (iter (for (trace . metadata) in trace-list)
           (for i upfrom 0)
@@ -261,25 +264,24 @@
     (assert (< index (getf db-struct 'n-traces)))
     (mem-aref (getf db-struct 'traces) '(:struct c-trace) index)))
 
-(defmethod n-traces ((db trace-db))
+(defmethod n-traces ((db binary-trace-db))
   "Return the number of traces stored in DB."
   (getf (mem-aref (db-pointer db) '(:struct trace-db))
         'n-traces))
 
-(defmethod trace-size ((db trace-db) index)
+(defmethod trace-size ((db binary-trace-db) index)
   "Return the number of points in the trace at INDEX in DB."
   (getf (get-trace-struct db index) 'n-points))
 
-(defmethod add-trace ((db trace-db) filename timeout
+(defmethod add-trace ((db binary-trace-db) filename timeout
                       metadata &key max)
-  "Read a trace from FILENAME into DB."
   (let ((state-pointer (start-reading (namestring filename) timeout)))
     (assert (not (null state-pointer)))
     (c-add-trace (db-pointer db) state-pointer
                  (or max 0))
     (push metadata (trace-metadata db))))
 
-(defmethod trace-types ((db trace-db) index)
+(defmethod trace-types ((db binary-trace-db) index)
   "Return the type names from the header of the trace at INDEX in DB."
   (let* ((trace (get-trace-struct db index))
          (names (iter (with ptr = (getf trace 'names))
@@ -319,12 +321,7 @@
                                (cdr (assoc :scopes point))))
                 (collect point))))))
 
-(defmethod get-trace ((db trace-db) index &key file-id)
-  "Retrieve the trace at INDEX in DB.
-
-The result looks like: (METADATA (:trace (TRACE-POINTS))), where each
-TRACE-POINT is an alist with the usual :C :F :SCOPES, etc.
-"
+(defmethod get-trace ((db binary-trace-db) index &key file-id)
   (let* ((struct (get-trace-struct db index))
          (points (convert-results db index
                                   (getf struct 'n-points)
@@ -437,21 +434,7 @@ TRACE-POINT is an alist with the usual :C :F :SCOPES, etc.
          result)
        (null-pointer))))
 
-(defgeneric query-trace (db index var-names var-types
-                         &key pick file-id predicate filter)
-  (:documentation "Find bindings of VAR-NAMES in DB which satisfy PREDICATE.
-
-VAR-TYPES is a list of lists containing the names of allowed types for
-each variable.
-
-Keyword arguments:
-PICK ----------- return results from a single randomly-selected trace point
-                 instead of searching all trace points.
-FILE-ID -------- restrict search to trace points in this file
-PREDICATE ------ S-expression representing a database predicate
-FILTER --------- A function taking (LOCATION VARS...) as arguments.
-                 Results for which it returns false are discarded."))
-(defmethod query-trace ((db trace-db) index var-names var-types
+(defmethod query-trace ((db binary-trace-db) index var-names var-types
                         &key pick file-id predicate filter)
   (assert (< index (n-traces db)))
   (when predicate (assert var-names))
@@ -512,15 +495,10 @@ FILTER --------- A function taking (LOCATION VARS...) as arguments.
   (index :uint32)
   (trace :pointer))
 
-(defgeneric set-trace (db index trace &optional metadata)
-  (:documentation "Convert TRACE to C structures and store in DB at INDEX.
 
-If INDEX is equal to the current N-TRACES, extend traces by
-one. Otherwise replace an existing trace.
-
-This is intended primarily for testing. It does not handle blobs and
-may not be particularly efficient."))
-(defmethod set-trace ((db trace-db) index trace &optional metadata)
+(defmethod set-trace ((db binary-trace-db) index trace &optional metadata)
+  ;; This is intended primarily for testing. It does not handle blobs and
+  ;; may not be particularly efficient
   (assert (<= index (n-traces db)))
 
   (let* ((type-hash (make-hash-table :test #'equal))
@@ -592,44 +570,46 @@ may not be particularly efficient."))
         (setf (nth index (trace-metadata db)) metadata)
         (appendf (trace-metadata db) (list metadata)))))
 
-(defclass single-file-trace-db (trace-db)
+(defclass single-file-binary-trace-db (binary-trace-db)
   ((file-id :reader file-id :type number)
-   (parent-db :initarg :parent-db :type trace-db :accessor parent-db))
+   (parent-db :initarg :parent-db :type binary-trace-db :accessor parent-db))
   (:documentation
-   "Wrapper around trace-db which restricts queries to one file of a project."))
+   "Wrapper around binary-trace-db which restricts queries to one file of a
+project."))
 
-(defvar *single-file-trace-db-obj-code* (register-code 256 'single-file-trace-db)
+(defvar *single-file-binary-trace-db-obj-code*
+  (register-code 256 'single-file-binary-trace-db)
   "Object code for serialization of single-file-trace-db software objects.")
 
-(defstore-cl-store (obj single-file-trace-db stream)
+(defstore-cl-store (obj single-file-binary-trace-db stream)
   ;; Do not serialize single file trace databases
-  (output-type-code *single-file-trace-db-obj-code* stream)
+  (output-type-code *single-file-binary-trace-db-obj-code* stream)
   (cl-store::store-object nil stream))
 
-(defrestore-cl-store (single-file-trace-db stream)
+(defrestore-cl-store (single-file-binary-trace-db stream)
   (cl-store::restore-object stream))
 
-(defmethod restrict-to-file ((db trace-db) file-id)
+(defmethod restrict-to-file ((db binary-trace-db) file-id)
   "Return a wrapper around DB which restricts results by FILE-ID."
   ;; New instance is created without a db-pointer, so it will not
   ;; create a finalizer. The original DB is still the owner of the
   ;; database and will free it.
-  (let ((result (make-instance 'single-file-trace-db
+  (let ((result (make-instance 'single-file-binary-trace-db
                                :parent-db db)))
     (setf (slot-value result 'file-id) file-id)
     (setf (slot-value result 'db-pointer) (db-pointer db))
     result))
 
-(defmethod query-trace :around ((db single-file-trace-db) index
+(defmethod query-trace :around ((db single-file-binary-trace-db) index
                                 var-names var-types
                                 &key pick file-id predicate filter)
   (call-next-method db index var-names var-types
                     :pick pick :predicate predicate :filter filter
                     :file-id (or file-id (file-id db))))
 
-(defmethod get-trace :around ((db single-file-trace-db) index
+(defmethod get-trace :around ((db single-file-binary-trace-db) index
                               &key file-id)
   (call-next-method db index :file-id (or file-id (file-id db))))
 
-(defmethod trace-metadata ((db single-file-trace-db))
+(defmethod trace-metadata ((db single-file-binary-trace-db))
   (or (slot-value db 'trace-metadata) (trace-metadata (parent-db db))))

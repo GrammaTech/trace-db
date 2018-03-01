@@ -2,7 +2,9 @@
   :description "Writing, reading, storing, and searching of program traces"
   :version "0.0.0"
   :depends-on (alexandria
+               bordeaux-threads
                iterate
+               cl-arrows
                cl-store
                cffi
                cffi-libffi
@@ -15,7 +17,9 @@
             :serial t
             :components
             ((:file "package")
-             (:file "trace-db"))))
+             (:file "trace-db-interface")
+             (:file "binary-trace-db")
+             (:file "sexp-trace-db"))))
   :output-files (prepare-op (o c) (list "libtrace-db.so"))
   :perform (prepare-op :before (o c)
              (uiop::run-program

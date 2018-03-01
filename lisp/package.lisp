@@ -2,16 +2,21 @@
   (:documentation "Wrapper for trace-db.")
   (:use :common-lisp
         :alexandria
+        :bordeaux-threads
         :iterate
+        :cl-arrows
         :cl-store
         :cffi
         :trivial-garbage
         :named-readtables
         :curry-compose-reader-macros)
-  (:export :read-trace
+  (:export :read-binary-trace
+           :read-sexp-trace
            :+trace-id-file-bits+
            :+trace-id-statement-bits+
            :trace-db
+           :binary-trace-db
+           :sexp-trace-db
            :get-trace
            :add-trace
            :n-traces
