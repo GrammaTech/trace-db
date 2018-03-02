@@ -110,23 +110,69 @@ trace_var_info read_var_info(trace_read_state *state)
     }
 
     type_description type = state->types[result.type_index];
-    if (type.format == BLOB) {
-        /* Blob type: store value on the heap */
-        uint32_t size = type.size;
-        if (type.size == 0) {
-            /* Variable-sized type: read size from trace */
-            FREAD_CHECK(&size, sizeof(size), 1, state);
-        }
-        result.size = size;
 
-        result.value.ptr = malloc(size);
-        FREAD_CHECK(result.value.ptr, size, 1, state);
-    }
-    else {
-        /* Primitive type: read directly into result */
-        result.size = type.size;
-        result.value.u = 0;
+    result.size = type.size;
+    result.value.u = 0;
+
+    switch (type.format) {
+    case SIGNED:
+        {
+            switch (result.size) {
+            case 1:
+                {
+                    int8_t tmp;
+                    FREAD_CHECK(&tmp, result.size, 1, state);
+                    result.value.s = tmp;
+                }
+                break;
+            case 2:
+                {
+                    int16_t tmp;
+                    FREAD_CHECK(&tmp, result.size, 1, state);
+                    result.value.s = tmp;
+                }
+                break;
+            case 4:
+                {
+                    int32_t tmp;
+                    FREAD_CHECK(&tmp, result.size, 1, state);
+                    result.value.s = tmp;
+                }
+                break;
+            case 8:
+                {
+                    int64_t tmp;
+                    FREAD_CHECK(&tmp, result.size, 1, state);
+                    result.value.s = tmp;
+                }
+                break;
+            default:
+                goto error;
+            }
+        }
+        break;
+    case UNSIGNED:
+    case FLOAT:
+    case POINTER:
         FREAD_CHECK(&result.value.u, result.size, 1, state);
+        break;
+    case BLOB:
+        {
+            /* Blob type: store value on the heap */
+            uint32_t size = result.size;
+            if (size == 0) {
+                /* Variable-sized type: read size from trace */
+                FREAD_CHECK(&size, sizeof(size), 1, state);
+            }
+            result.size = size;
+
+            result.value.ptr = malloc(size);
+            FREAD_CHECK(result.value.ptr, size, 1, state);
+            break;
+        }
+    case INVALID_FORMAT:
+    default:
+        goto error;
     }
 
  error:
