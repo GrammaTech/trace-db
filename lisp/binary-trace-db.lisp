@@ -276,7 +276,7 @@
 (defmethod add-trace ((db binary-trace-db) filename timeout
                       metadata &key max)
   (let ((state-pointer (start-reading (namestring filename) timeout)))
-    (assert (not (null state-pointer)))
+    (assert (not (null-pointer-p state-pointer)))
     (c-add-trace (db-pointer db) state-pointer
                  (or max 0))
     (push metadata (trace-metadata db))))
