@@ -400,7 +400,9 @@
          (list 'kind (if (negative-integer-p number)
                          :signed-integer
                          :unsigned-integer)
-               'data number
+               'data (if (negative-integer-p number)
+                         (+ (expt 2 64) number)
+                         number)
                'children (null-pointer)))
        (build-operator (expr)
          (destructuring-bind (op . args) expr
