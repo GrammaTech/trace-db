@@ -6,6 +6,8 @@
 #include <random>
 #include <utility>
 
+#include <boost/multiprecision/cpp_int.hpp>
+
 extern "C" {
 #include "read-trace.h"
 #include "utils.h"
@@ -330,24 +332,13 @@ cartesian(const std::vector<std::vector<uint32_t> > &vectors)
 
 struct int_value
 {
-    bool is_signed;
     bool is_valid;
-    union {
-        uint64_t u;
-        int64_t s;
-    } value;
+    boost::multiprecision::cpp_int value;
 
-    int_value(uint64_t val)
-        : is_signed(false), is_valid(true)
-    {
-        value.u = val;
-    }
-
-    int_value(int64_t val)
-        : is_signed(true), is_valid(true)
-    {
-        value.s = val;
-    }
+    int_value(const boost::multiprecision::cpp_int &val)
+        : is_valid(true),
+          value(val)
+    {}
 
     int_value() : is_valid(false)
     {}
@@ -356,57 +347,21 @@ struct int_value
     {
         if (!(is_valid && other.is_valid))
             return false;
-
-        if (is_signed) {
-            if (other.is_signed)
-                return value.s > other.value.s;
-            else
-                return value.s >= 0 && (uint64_t)value.s > other.value.u;
-        }
-        else {
-            if (other.is_signed)
-                return other.value.s < 0 || value.u > (uint64_t)other.value.s;
-            else
-                return value.u > other.value.u;
-        }
+        return value > other.value;
     }
 
     bool less_than(const int_value &other)
     {
         if (!(is_valid && other.is_valid))
             return false;
-
-        if (is_signed) {
-            if (other.is_signed)
-                return value.s < other.value.s;
-            else
-                return value.s < 0 || (uint64_t)value.s < other.value.u;
-        }
-        else {
-            if (other.is_signed)
-                return other.value.s >= 0 && value.u < (uint64_t)other.value.s;
-            else
-                return value.u < other.value.u;
-        }
+        return value < other.value;
     }
 
     bool equal(const int_value &other)
     {
         if (!(is_valid && other.is_valid))
             return false;
-
-        if (is_signed) {
-            if (other.is_signed)
-                return value.s == other.value.s;
-            else
-                return value.s >= 0 && (uint64_t)value.s == other.value.u;
-        }
-        else {
-            if (other.is_signed)
-                return other.value.s >= 0 && value.u == (uint64_t)other.value.s;
-            else
-                return value.u == other.value.u;
-        }
+        return value == other.value;
     }
 
 
@@ -414,72 +369,28 @@ struct int_value
     {
         if (!(is_valid && other.is_valid))
             return int_value();
-        else if (is_signed) {
-            if (other.is_signed)
-                return int_value(value.s + other.value.s);
-            else
-                return int_value(value.s + other.value.u);
-        }
-        else {
-            if (other.is_signed)
-                return int_value(value.u + other.value.s);
-            else
-                return int_value(value.u + other.value.u);
-        }
+        return int_value(value + other.value);
     }
 
     int_value operator-(const int_value &other)
     {
         if (!(is_valid && other.is_valid))
             return int_value();
-        else if (is_signed) {
-            if (other.is_signed)
-                return int_value(value.s - other.value.s);
-            else
-                return int_value(value.s - other.value.u);
-        }
-        else {
-            if (other.is_signed)
-                return int_value(value.u - other.value.s);
-            else
-                return int_value(value.u - other.value.u);
-        }
+        return int_value(value - other.value);
     }
 
     int_value operator*(const int_value &other)
     {
         if (!(is_valid && other.is_valid))
             return int_value();
-        else if (is_signed) {
-            if (other.is_signed)
-                return int_value(value.s * other.value.s);
-            else
-                return int_value(value.s * other.value.u);
-        }
-        else {
-            if (other.is_signed)
-                return int_value(value.u * other.value.s);
-            else
-                return int_value(value.u * other.value.u);
-        }
+        return int_value(value * other.value);
     }
 
     int_value operator/(const int_value &other)
     {
         if (!(is_valid && other.is_valid))
             return int_value();
-        else if (is_signed) {
-            if (other.is_signed)
-                return int_value(value.s / other.value.s);
-            else
-                return int_value(value.s / other.value.u);
-        }
-        else {
-            if (other.is_signed)
-                return int_value(value.u / other.value.s);
-            else
-                return int_value(value.u / other.value.u);
-        }
+        return int_value(value / other.value);
     }
 };
 
