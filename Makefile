@@ -1,4 +1,4 @@
-CCFLAGS = -O0 -Wall -g -I. -fPIC
+CCFLAGS = -O0 -Wall -g -I. -Ithird-party/ -fPIC
 CFLAGS = $(CCFLAGS) -std=gnu11
 CXXFLAGS = $(CCFLAGS) -std=c++11
 
