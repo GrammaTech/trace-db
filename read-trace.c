@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include "utils.h"
 
 #include "read-trace.h"
@@ -14,10 +18,12 @@
         }                                                                        \
     } while (0)
 
-trace_read_state *start_reading(const char *filename, int timeout_seconds)
+trace_read_state *start_reading(const char *filename)
 {
     trace_read_state *state = (trace_read_state *)calloc(1, sizeof(trace_read_state));
-    state->file = open_with_timeout(filename, timeout_seconds);
+    int fd = open(filename, O_RDONLY);
+
+    state->file = fdopen(fd, "rb");
     if (!state->file)
         goto error;
 

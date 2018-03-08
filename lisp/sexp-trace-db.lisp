@@ -18,7 +18,7 @@
 
 (defclass single-file-sexp-trace-db (sexp-trace-db) ())
 
-(defun read-sexp-trace (file timeout &key (predicate #'identity) max)
+(defun read-sexp-trace (file &key timeout (predicate #'identity) max)
   "Read a trace from FILE-NAME with `read-trace-stream'."
   (when-let ((in (open-file-timeout file timeout)))
     (unwind-protect
@@ -53,9 +53,11 @@ KWARGS are passed on to the OPEN call."
                      ;; Catch errors and return the condition to the main thread
                      (error (condition) condition))))))
     (iter (while (thread-alive-p thread))
-          (let ((remaining (- seconds
-                              (/ (- (get-internal-real-time) start)
-                                 internal-time-units-per-second))))
+          (let ((remaining (if (null seconds)
+                               0.1
+                               (- seconds
+                                  (/ (- (get-internal-real-time) start)
+                                     internal-time-units-per-second)))))
             (if (positive-real-p remaining)
                 (sleep (min 0.1 remaining))
                 (progn (destroy-thread thread)
@@ -71,7 +73,7 @@ KWARGS are passed on to the OPEN call."
                  (return result)))))))
 
 (defmethod add-trace ((db sexp-trace-db) filename timeout metadata &key max)
-  (when-let ((trace (read-sexp-trace filename timeout :max max)))
+  (when-let ((trace (read-sexp-trace filename :timeout timeout :max max)))
     (push trace (traces db))
     (push metadata (trace-metadata db))))
 
