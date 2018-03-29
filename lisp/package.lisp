@@ -4,7 +4,7 @@
         :alexandria
         :bordeaux-threads
         :iterate
-        :cl-arrows
+        :cl-arrowz
         :cl-store
         :cffi
         :trivial-garbage
