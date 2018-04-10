@@ -46,7 +46,7 @@ PICK ----------- return results from a single randomly-selected trace point
                  instead of searching all trace points.
 FILE-ID -------- restrict search to trace points in this file
 PREDICATE ------ S-expression representing a database predicate
-FILTER --------- A function taking (LOCATION VARS...) as arguments.
+FILTER --------- A function taking (FILE LOCATION VARS...) as arguments.
                  Results for which it returns false are discarded."))
 
 (defgeneric restrict-to-file (db file-id)

@@ -318,6 +318,7 @@
                                               i)))
               (when (or (not filter)
                         (apply filter
+                               (cdr (assoc :f point))
                                (cdr (assoc :c point))
                                (cdr (assoc :scopes point))))
                 (collect point))))))
