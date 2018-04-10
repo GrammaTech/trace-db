@@ -297,8 +297,7 @@
                                                '(:struct type-description)
                                                i)))))))
 
-(defun convert-results (db index n-results results-ptr
-                        &key filter)
+(defun convert-results-setup (db index)
   (let* ((trace (get-trace-struct db index))
          (names (iter (with ptr = (getf trace 'names))
                       (for i below (getf trace 'n-names))
@@ -311,17 +310,23 @@
                            (mem-aref ptr '(:struct type-description) i))
                       (while str)
                       (collect str result-type 'vector))))
-      (iter (for i below n-results)
-            (let ((point (convert-trace-point names
-                                              types
-                                              results-ptr
-                                              i)))
-              (when (or (not filter)
-                        (apply filter
-                               (cdr (assoc :f point))
-                               (cdr (assoc :c point))
-                               (cdr (assoc :scopes point))))
-                (collect point))))))
+    (list names types)))
+
+(defun convert-results (db index n-results results-ptr
+                        &key filter)
+  (destructuring-bind (names types)
+      (convert-results-setup db index)
+    (iter (for i below n-results)
+          (let ((point (convert-trace-point names
+                                            types
+                                            results-ptr
+                                            i)))
+            (when (or (not filter)
+                      (apply filter
+                             (cdr (assoc :f point))
+                             (cdr (assoc :c point))
+                             (cdr (assoc :scopes point))))
+              (collect point))))))
 
 (defmethod get-trace ((db binary-trace-db) index &key file-id)
   (let* ((struct (get-trace-struct db index))
@@ -478,15 +483,32 @@
                                   (ash file-id +trace-id-statement-bits+)
                                   0)
                               results-ptr n-results-ptr)
-               (convert-results db index
-                                (mem-ref n-results-ptr :uint64)
-                                (mem-ref results-ptr :pointer)
-                                :filter filter))
-
+               (if filter
+                   (prog1
+                       ;; Convert all results and filter them
+                       (make-instance 'sexp-trace-results
+                                      :results
+                                      (coerce
+                                       (convert-results db index
+                                                        (mem-ref n-results-ptr
+                                                                 :uint64)
+                                                        (mem-ref results-ptr
+                                                                 :pointer)
+                                                        :filter filter)
+                                       'vector)
+                                      :trace-metadata
+                                      (nth index (trace-metadata db)))
+                     (free-query-result (mem-ref results-ptr :pointer)
+                                        (mem-ref n-results-ptr :uint64)))
+                   ;; Save results array for later conversion
+                   (make-instance 'binary-trace-results
+                                  :results-ptr (mem-ref results-ptr :pointer)
+                                  :result-count (mem-ref n-results-ptr :uint64)
+                                  :trace-metadata
+                                  (nth index (trace-metadata db))
+                                  :convert-args
+                                  (convert-results-setup db index))))
          (progn
-           ;; Free memory
-           (free-query-result (mem-ref results-ptr :pointer)
-                              (mem-ref n-results-ptr :uint64))
            (free-predicate predicate-ptr)
            (iter (for i below n-vars)
                  (foreign-free (getf (mem-aref free-vars
@@ -617,3 +639,22 @@ project."))
 
 (defmethod trace-metadata ((db single-file-binary-trace-db))
   (or (slot-value db 'trace-metadata) (trace-metadata (parent-db db))))
+
+
+(defclass binary-trace-results (trace-db-results)
+  ((results-ptr :accessor results-ptr :initarg :results-ptr)
+   (result-count :accessor result-count :initarg :result-count)
+   (convert-args :accessor convert-args :initarg :convert-args)
+   (trace-metadata :accessor trace-metadata :initarg :trace-metadata))
+  (:documentation "Results of a trace-db query."))
+
+(defmethod initialize-instance :after ((instance binary-trace-results)
+                                       &key results-ptr result-count)
+  (finalize instance
+            (lambda ()
+              (free-query-result results-ptr result-count))))
+
+(defmethod get-result ((results binary-trace-results) (index integer))
+  (destructuring-bind (names types)
+      (convert-args results)
+    (convert-trace-point names types (results-ptr results) index)))

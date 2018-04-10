@@ -129,18 +129,24 @@ KWARGS are passed on to the OPEN call."
                                        (cons :scopes vars))
                                  (remove-if #'null)))))))
     (when-let* ((trace (nth index (traces db))))
-      (if pick
-          (->> (random-elt trace)
-               (satisfying-assignments-at-point)
-               (remove-if-not (lambda (pt)
-                                (apply filter (cdr (assoc :f pt))
-                                              (cdr (assoc :c pt))
-                                              (cdr (assoc :scopes pt))))))
-          (->> (mappend #'satisfying-assignments-at-point trace)
-               (remove-if-not (lambda (pt)
-                                (apply filter (cdr (assoc :f pt))
-                                              (cdr (assoc :c pt))
-                                              (cdr (assoc :scopes pt))))))))))
+      (make-instance
+       'sexp-trace-results
+       :trace-metadata
+       (nth index (trace-metadata db))
+       :results
+       (coerce (if pick
+                   (->> (random-elt trace)
+                        (satisfying-assignments-at-point)
+                        (remove-if-not (lambda (pt)
+                                         (apply filter (cdr (assoc :f pt))
+                                                (cdr (assoc :c pt))
+                                                (cdr (assoc :scopes pt))))))
+                   (->> (mappend #'satisfying-assignments-at-point trace)
+                        (remove-if-not (lambda (pt)
+                                         (apply filter (cdr (assoc :f pt))
+                                                (cdr (assoc :c pt))
+                                                (cdr (assoc :scopes pt)))))))
+               'vector)))))
 
 (defmethod restrict-to-file ((db sexp-trace-db) file-id)
   (make-instance 'single-file-sexp-trace-db
@@ -167,3 +173,14 @@ The set \(2 2\) is not included in the result.
                           (cartesian-nil-duplicates (cdr lists)))
                  (list nil))))
     (remove-if [{> (length lists)} #'length] (cartesian-nil-duplicates lists))))
+
+
+(defclass sexp-trace-results (trace-db-results)
+  ((results :accessor results :initarg :results))
+  (:documentation "Results of a trace-db query."))
+
+(defmethod result-count ((results sexp-trace-results))
+  (length (results results)))
+
+(defmethod get-result ((results sexp-trace-results) (index integer))
+  (elt (results results) index))
