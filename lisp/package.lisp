@@ -28,4 +28,8 @@
            :v/value
            :v/size
            :set-trace
-           :restrict-to-file))
+           :restrict-to-file
+           :result-count
+           :get-result
+           :get-all-results
+           :sexp-trace-results))
