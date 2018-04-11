@@ -9,3 +9,5 @@ pkg/
 *.pkg.tar.xz
 *.d
 *.o
+
+local.mk

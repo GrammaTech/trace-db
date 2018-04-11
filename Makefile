@@ -1,3 +1,8 @@
+# Set personal or machine-local flags in a file named local.mk
+ifneq ("$(wildcard local.mk)","")
+include local.mk
+endif
+
 CCFLAGS = -O0 -Wall -g -I. -Ithird-party/ -fPIC
 CFLAGS = $(CCFLAGS) -std=gnu11
 CXXFLAGS = $(CCFLAGS) -std=c++11
