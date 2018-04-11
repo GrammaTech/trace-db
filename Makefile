@@ -12,6 +12,8 @@ OBJS := $(addsuffix .o,$(basename $(SRCS)))
 DEPS := $(addsuffix .d,$(basename $(SRCS)))
 TARGETS := libtrace-db.so sample
 
+all: libtrace-db.so
+
 libtrace-db.so: $(OBJS)
 	$(CXX) $(CFLAGS) -o libtrace-db.so -fPIC -shared $(OBJS)  -Wl,-soname,libtrace-db.so
 
