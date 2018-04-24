@@ -504,6 +504,12 @@ static bool satisfies_predicate(const trace &trace,
               return true;
       }
       return false;
+    case NOT:
+        {
+            assert(predicate->data.n_children == 1);
+            return !satisfies_predicate(trace, point, bindings,
+                                        &predicate->children[0]);
+        }
     case DISTINCT_VARS:
         {
             assert(predicate->data.n_children == 2);
@@ -585,6 +591,9 @@ static void print_predicate(FILE *stream, const predicate *predicate,
           break;
         case OR:
           name = "or";
+          break;
+        case NOT:
+          name = "not";
           break;
         case DISTINCT_VARS:
           name = "distinct";

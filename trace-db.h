@@ -61,6 +61,7 @@ enum predicate_kind
     /* Logical operators */
     AND,
     OR,
+    NOT,
     /* Comparisons */
     GREATER_THAN,
     LESS_THAN,

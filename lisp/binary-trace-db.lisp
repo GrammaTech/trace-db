@@ -354,6 +354,7 @@
   :unsigned-integer
   :and
   :or
+  :not
   :greater-than
   :less-than
   :equal
@@ -418,8 +419,9 @@
            (list
             'kind (ecase op
                     (distinct :distinct-vars)
-                    (or :or)
                     (and :and)
+                    (or :or)
+                    (not :not)
                     (v/size :var-size)
                     (v/value :var-value)
                     (> :greater-than)
