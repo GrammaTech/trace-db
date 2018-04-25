@@ -431,6 +431,8 @@ static int_value evaluate(const trace &trace,
                 return int_value(var.value.u);
             else if (f == SIGNED)
                 return int_value(var.value.s);
+            else if (f == POINTER)
+                return int_value(var.value.u);
             else
                 return int_value();
         }
