@@ -15,6 +15,39 @@
 
 #define N_ELTS(array) sizeof(array)/sizeof(*array)
 
+const char *failure_message = NULL;
+const char *failure_file;
+unsigned int failure_line;
+unsigned int failure_count;
+
+#define ASSERT(cond)                                    \
+    do {                                                \
+        if (!(cond))  {                                 \
+            handle_failure(#cond, __FILE__, __LINE__);  \
+            return;                                     \
+        }                                               \
+    } while (0)
+
+void handle_failure(const char *message, const char *file, unsigned int line)
+{
+    failure_message = message;
+    failure_file = file;
+    failure_line = line;
+}
+
+#define RUN_TEST(name) run_test(&name, #name)
+
+void run_test(void (*test_fun)(), const char *name)
+{
+    failure_message = NULL;
+    test_fun();
+    if (failure_message) {
+        fprintf(stderr, "FAIL: %s\n  %s:%d: %s\n",
+                name, failure_file, failure_line, failure_message);
+        failure_count++;
+    }
+}
+
 const char *test_names[] = { "fixed_blob", "var_blob", "int", "var" };
 type_description test_types[] = { {2, SIGNED, sizeof(int)},
                                   {0, BLOB, 10},
@@ -44,7 +77,7 @@ void test_eof_in_header()
     {
         FILE *out = fopen(TRACE_FILE, "w");
         fclose(out);
-        assert(start_reading(TRACE_FILE) == NULL);
+        ASSERT(start_reading(TRACE_FILE) == NULL);
     }
 
     /* Truncated name dictionary */
@@ -54,7 +87,7 @@ void test_eof_in_header()
         fwrite(val, sizeof(val), 1, out);
         fclose(out);
 
-        assert(start_reading(TRACE_FILE) == NULL);
+        ASSERT(start_reading(TRACE_FILE) == NULL);
     }
 
     /* Missing type dictionary */
@@ -67,7 +100,7 @@ void test_eof_in_header()
         fputc(0, out);
         fclose(out);
 
-        assert(start_reading(TRACE_FILE) == NULL);
+        ASSERT(start_reading(TRACE_FILE) == NULL);
     }
 
     /* Truncated type dictionary */
@@ -82,7 +115,7 @@ void test_eof_in_header()
         fwrite(&vals, sizeof(vals), 1, out);
         fclose(out);
 
-        assert(start_reading(TRACE_FILE) == NULL);
+        ASSERT(start_reading(TRACE_FILE) == NULL);
     }
 }
 
@@ -93,11 +126,11 @@ void test_good_header()
     fclose(out);
 
     trace_read_state *state = start_reading(TRACE_FILE);
-    assert(state);
-    assert(state->n_names == 4);
-    assert(state->n_types == 3);
-    assert(read_tag(state) == END_ENTRY);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(state);
+    ASSERT(state->n_names == 4);
+    ASSERT(state->n_types == 3);
+    ASSERT(read_tag(state) == END_ENTRY);
+    ASSERT(state->error_code == TRACE_OK);
 
     end_reading(state);
 }
@@ -109,9 +142,9 @@ void test_bad_tag()
     fclose(out);
 
     trace_read_state *state = start_reading(TRACE_FILE);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(state->error_code == TRACE_OK);
     read_tag(state);
-    assert(state->error_code == TRACE_ERROR);
+    ASSERT(state->error_code == TRACE_ERROR);
 
     end_reading(state);
 }
@@ -122,9 +155,9 @@ void test_eof_in_tag()
     fclose(out);
 
     trace_read_state *state = start_reading(TRACE_FILE);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(state->error_code == TRACE_OK);
     read_tag(state);
-    assert(state->error_code == TRACE_EOF);
+    ASSERT(state->error_code == TRACE_EOF);
 
     end_reading(state);
 }
@@ -137,10 +170,10 @@ void test_eof_in_id()
     fclose(out);
 
     trace_read_state *state = start_reading(TRACE_FILE);
-    assert(read_tag(state) == STATEMENT_ID);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(read_tag(state) == STATEMENT_ID);
+    ASSERT(state->error_code == TRACE_OK);
     read_id(state);
-    assert(state->error_code == TRACE_EOF);
+    ASSERT(state->error_code == TRACE_EOF);
 }
 
 void test_eof_in_variable()
@@ -152,10 +185,10 @@ void test_eof_in_variable()
     fclose(out);
 
     trace_read_state *state = start_reading(TRACE_FILE);
-    assert(read_tag(state) == VARIABLE);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(read_tag(state) == VARIABLE);
+    ASSERT(state->error_code == TRACE_OK);
     read_var_info(state);
-    assert(state->error_code == TRACE_EOF);
+    ASSERT(state->error_code == TRACE_EOF);
 
     /* EOF in var index */
     out = write_test_header();
@@ -166,10 +199,10 @@ void test_eof_in_variable()
     fclose(out);
 
     state = start_reading(TRACE_FILE);
-    assert(read_tag(state) == VARIABLE);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(read_tag(state) == VARIABLE);
+    ASSERT(state->error_code == TRACE_OK);
     read_var_info(state);
-    assert(state->error_code == TRACE_EOF);
+    ASSERT(state->error_code == TRACE_EOF);
 
     /* EOF in data */
     out = write_trace_with_variable(0, 0);
@@ -177,10 +210,10 @@ void test_eof_in_variable()
     fclose(out);
 
     state = start_reading(TRACE_FILE);
-    assert(read_tag(state) == VARIABLE);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(read_tag(state) == VARIABLE);
+    ASSERT(state->error_code == TRACE_OK);
     read_var_info(state);
-    assert(state->error_code == TRACE_EOF);
+    ASSERT(state->error_code == TRACE_EOF);
 }
 
 void test_eof_in_blob_variable()
@@ -194,10 +227,10 @@ void test_eof_in_blob_variable()
     fclose(out);
 
     state = start_reading(TRACE_FILE);
-    assert(read_tag(state) == VARIABLE);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(read_tag(state) == VARIABLE);
+    ASSERT(state->error_code == TRACE_OK);
     read_var_info(state);
-    assert(state->error_code == TRACE_EOF);
+    ASSERT(state->error_code == TRACE_EOF);
 
     /* EOF in size */
     out = write_trace_with_variable(2, 2);
@@ -205,10 +238,10 @@ void test_eof_in_blob_variable()
     fclose(out);
 
     state = start_reading(TRACE_FILE);
-    assert(read_tag(state) == VARIABLE);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(read_tag(state) == VARIABLE);
+    ASSERT(state->error_code == TRACE_OK);
     read_var_info(state);
-    assert(state->error_code == TRACE_EOF);
+    ASSERT(state->error_code == TRACE_EOF);
 
     /* EOF in variable data */
     out = write_trace_with_variable(2, 2);
@@ -219,10 +252,10 @@ void test_eof_in_blob_variable()
     fclose(out);
 
     state = start_reading(TRACE_FILE);
-    assert(read_tag(state) == VARIABLE);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(read_tag(state) == VARIABLE);
+    ASSERT(state->error_code == TRACE_OK);
     read_var_info(state);
-    assert(state->error_code == TRACE_EOF);
+    ASSERT(state->error_code == TRACE_EOF);
 }
 
 
@@ -238,10 +271,10 @@ void test_bad_index_in_variable()
     fclose(out);
 
     state = start_reading(TRACE_FILE);
-    assert(read_tag(state) == VARIABLE);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(read_tag(state) == VARIABLE);
+    ASSERT(state->error_code == TRACE_OK);
     read_var_info(state);
-    assert(state->error_code == TRACE_ERROR);
+    ASSERT(state->error_code == TRACE_ERROR);
 
     /* Bad type index */
     out = write_trace_with_variable(0, 3);
@@ -249,10 +282,10 @@ void test_bad_index_in_variable()
     fclose(out);
 
     state = start_reading(TRACE_FILE);
-    assert(read_tag(state) == VARIABLE);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(read_tag(state) == VARIABLE);
+    ASSERT(state->error_code == TRACE_OK);
     read_var_info(state);
-    assert(state->error_code == TRACE_ERROR);
+    ASSERT(state->error_code == TRACE_ERROR);
 }
 
 void test_bad_type()
@@ -265,7 +298,7 @@ void test_bad_type()
                            types, N_ELTS(types));
         fclose(out);
 
-        assert(start_reading(TRACE_FILE) == NULL);
+        ASSERT(start_reading(TRACE_FILE) == NULL);
     }
 
     /* Bad name index */
@@ -276,7 +309,7 @@ void test_bad_type()
                            types, N_ELTS(types));
         fclose(out);
 
-        assert(start_reading(TRACE_FILE) == NULL);
+        ASSERT(start_reading(TRACE_FILE) == NULL);
     }
 }
 
@@ -288,10 +321,10 @@ void test_eof_in_buffer_size()
     fclose(out);
 
     trace_read_state *state = start_reading(TRACE_FILE);
-    assert(read_tag(state) == BUFFER_SIZE);
-    assert(state->error_code == TRACE_OK);
+    ASSERT(read_tag(state) == BUFFER_SIZE);
+    ASSERT(state->error_code == TRACE_OK);
     read_buffer_size(state);
-    assert(state->error_code == TRACE_EOF);
+    ASSERT(state->error_code == TRACE_EOF);
 }
 
 void test_read_from_fifo()
@@ -305,9 +338,9 @@ void test_read_from_fifo()
     trace_read_state *state = start_reading("test/fifo");
     unlink("test/fifo");
 
-    assert(state);
+    ASSERT(state);
     read_tag(state);
-    assert(state->error_code == TRACE_EOF);
+    ASSERT(state->error_code == TRACE_EOF);
     end_reading(state);
 
 }
@@ -326,64 +359,64 @@ void test_memory_map()
     trace_var_info var = { .type_index = 0,
                            .value = { .ptr = (void *)3 }};
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.buffer_size == 10);
+    ASSERT(var.buffer_size == 10);
 
     var.value.ptr = (void *)100;
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.buffer_size == 2);
+    ASSERT(var.buffer_size == 2);
 
     /* Pointers in the middle of the buffer */
     var.value.ptr = (void *)8;
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.buffer_size == 5);
+    ASSERT(var.buffer_size == 5);
 
     var.value.ptr = (void *)101;
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.buffer_size == 1);
+    ASSERT(var.buffer_size == 1);
 
     /* End of buffer */
     var.value.ptr = (void *)13;
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.has_buffer_size == 0);
+    ASSERT(var.has_buffer_size == 0);
 
     var.value.ptr = (void *)102;
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.has_buffer_size == 0);
+    ASSERT(var.has_buffer_size == 0);
 
     /* Pointers outside known buffers */
     var.value.ptr = (void *)99;
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.has_buffer_size == 0);
+    ASSERT(var.has_buffer_size == 0);
 
     var.value.ptr = (void *)2;
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.has_buffer_size == 0);
+    ASSERT(var.has_buffer_size == 0);
 
     /* New allocation supersedes old */
     sizes[0] = (trace_buffer_size) {3, 5};
     update_memory_map(memory_map, &point);
     var.value.ptr = (void *)3;
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.buffer_size == 5);
+    ASSERT(var.buffer_size == 5);
 
     /* Freed memory is removed from the map */
     sizes[1] = (trace_buffer_size) {100, 0};
     update_memory_map(memory_map, &point);
     var.value.ptr = (void *)100;
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.has_buffer_size == 0);
+    ASSERT(var.has_buffer_size == 0);
 
     /* UINT64_MAX is never found in map (used as a sentinel) */
     var.value.ptr = (void *)UINT64_MAX;
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.has_buffer_size == 0);
+    ASSERT(var.has_buffer_size == 0);
 
     /* Inserting UINT64_MAX does nothing */
     sizes[0] = (trace_buffer_size) {UINT64_MAX, 5};
     update_memory_map(memory_map, &point);
     var.value.ptr = (void *)UINT64_MAX;
     compute_buffer_size(memory_map, &state, &var);
-    assert(var.has_buffer_size == 0);
+    ASSERT(var.has_buffer_size == 0);
 
     /* Free works */
     free_memory_map(memory_map);
@@ -391,20 +424,28 @@ void test_memory_map()
 
 int main(int argc, char **argv)
 {
-    test_eof_in_header();
-    test_good_header();
-    test_bad_tag();
-    test_eof_in_tag();
-    test_eof_in_id();
-    test_eof_in_variable();
-    test_eof_in_blob_variable();
-    test_bad_index_in_variable();
-    test_bad_type();
-    test_eof_in_buffer_size();
-    test_read_from_fifo();
-    test_memory_map();
+    failure_count = 0;
+    RUN_TEST(test_eof_in_header);
+    RUN_TEST(test_good_header);
+    RUN_TEST(test_bad_tag);
+    RUN_TEST(test_eof_in_tag);
+    RUN_TEST(test_eof_in_id);
+    RUN_TEST(test_eof_in_variable);
+    RUN_TEST(test_eof_in_blob_variable);
+    RUN_TEST(test_bad_index_in_variable);
+    RUN_TEST(test_bad_type);
+    RUN_TEST(test_eof_in_buffer_size);
+    RUN_TEST(test_read_from_fifo);
+    RUN_TEST(test_memory_map);
 
     unlink(TRACE_FILE);
 
-    return 0;
+    if (failure_count == 0) {
+        printf("PASS!\n");
+        return 0;
+    }
+    else {
+        printf("%u failures\n", failure_count);
+        return 1;
+    }
 }
