@@ -388,7 +388,7 @@ struct int_value
 
     int_value operator/(const int_value &other)
     {
-        if (!(is_valid && other.is_valid))
+        if (!(is_valid && other.is_valid) || other.value == 0)
             return int_value();
         return int_value(value / other.value);
     }
