@@ -36,9 +36,9 @@ void write_buffer_size(FILE *out, void *address, size_t size);
 /* Write multiple variables to the trace.
 
    For each variable, the arguments are:
-     uint16_t name_index
-     uint16_t type_index
-     uint16_t size
+     uint32_t name_index
+     uint32_t type_index
+     uint32_t size
      enum type_format format
      value
 */
@@ -47,9 +47,9 @@ void write_trace_variables(FILE *out, uint32_t n_vars, ...);
 /* Write multiple blobs to the trace.
 
    For each variable, the arguments are:
-     uint16_t name_index
-     uint16_t type_index
-     uint16_t size
+     uint32_t name_index
+     uint32_t type_index
+     uint32_t size
      void *value
 */
 void write_trace_blobs(FILE *out, uint32_t n_vars, ...);
