@@ -617,12 +617,15 @@ static void collect_results_at_point(const trace &trace,
                                      const trace_point &current,
                                      uint32_t n_variables,
                                      const free_variable *variables,
-                                     const predicate *predicate,
+                                     const predicate *hard_predicate,
+                                     const predicate **soft_predicates,
+                                     uint32_t n_soft_predicates,
                                      std::vector<trace_point> *results_out)
 {
     // No free variables. Match every trace point once, with no bindings.
     if (n_variables == 0) {
-        assert(predicate == NULL); // can't have predicate without variables
+        // can't have predicate without variables
+        assert(hard_predicate == NULL);
         trace_point point = { current.statement };
         results_out->push_back(point);
         return;
@@ -639,8 +642,9 @@ static void collect_results_at_point(const trace &trace,
     }
 
     // Collect all combinations of bindings
+    std::vector<trace_point> results;
     for (auto bindings : cartesian(matching_vars)) {
-        if (satisfies_predicate(trace, current, bindings, predicate)) {
+        if (satisfies_predicate(trace, current, bindings, hard_predicate)) {
             trace_point point = { current.statement };
             point.n_vars = bindings.size();
             point.vars = (trace_var_info *)
@@ -648,8 +652,36 @@ static void collect_results_at_point(const trace &trace,
             for (uint32_t i = 0; i < point.n_vars; i++) {
                 point.vars[i] = current.vars[bindings[i]];
             }
-            results_out->push_back(point);
+            results.push_back(point);
         }
+    }
+
+    // Maximize soft_predicates
+    if (soft_predicates) {
+        std::vector<unsigned int> sat_counts;
+        // Variables were reordered above so effective bindings are the same
+        // for all results.
+        std::vector<uint32_t> bindings;
+        for (unsigned int i = 0; i < n_variables; i++)
+            bindings.push_back(i);
+
+        unsigned int max_sat = 0;
+        for (auto r : results) {
+            unsigned int this_count = 0;
+            for (unsigned int i = 0; i < n_soft_predicates; i++) {
+                if (satisfies_predicate(trace, r, bindings, soft_predicates[i]))
+                    this_count++;
+            }
+            sat_counts.push_back(this_count);
+            max_sat = std::max(max_sat, this_count);
+        }
+        for (unsigned int i = 0; i < results.size(); i++) {
+            if (sat_counts[i] == max_sat)
+                results_out->push_back(results[i]);
+        }
+    }
+    else {
+        *results_out = results;
     }
 }
 
@@ -672,8 +704,9 @@ static void results_vector_to_array(const std::vector<trace_point> results,
 
 void query_trace(const trace_db *db, uint64_t index,
                  uint32_t n_variables, const free_variable *variables,
-                 const predicate *predicate, uint32_t seed,
-                 uint64_t statement_mask, uint64_t statement,
+                 const predicate *hard_predicate,
+                 const predicate **soft_predicates, uint32_t n_soft_predicates,
+                 uint32_t seed, uint64_t statement_mask, uint64_t statement,
                  trace_point **results_out, uint64_t *n_results_out)
 {
 
@@ -705,13 +738,17 @@ void query_trace(const trace_db *db, uint64_t index,
 
         if (!points.empty()) {
             collect_results_at_point(*trace, *points[dist(mt)], n_variables,
-                                     variables, predicate, &results);
+                                     variables, hard_predicate,
+                                     soft_predicates, n_soft_predicates,
+                                     &results);
         }
     }
     else {
         for (auto point : points) {
             collect_results_at_point(*trace, *point, n_variables,
-                                     variables, predicate, &results);
+                                     variables, hard_predicate,
+                                     soft_predicates, n_soft_predicates,
+                                     &results);
         }
     }
 
