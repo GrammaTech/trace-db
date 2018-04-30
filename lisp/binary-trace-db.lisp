@@ -373,6 +373,8 @@
   (n-variables :uint32)
   (variables (:pointer (:struct free-variable)))
   (predicate (:pointer (:struct predicate)))
+  (soft-predicates :pointer)
+  (n-soft-predicates :uint32)
   (seed :uint32)
   (statement-mask :uint64)
   (statement :uint64)
@@ -444,9 +446,9 @@
        (null-pointer))))
 
 (defmethod query-trace ((db binary-trace-db) index var-names var-types
-                        &key pick file-id predicate filter)
+                        &key pick file-id predicate soft-predicates filter)
   (assert (< index (n-traces db)))
-  (when predicate (assert var-names))
+  (when (or predicate soft-predicates) (assert var-names))
   (let* ((n-vars (length var-types))
          (trace-types (trace-types db index))
          ;; Convert type names to indices
@@ -464,7 +466,11 @@
                         `(n-allowed-types ,(length types)
                           allowed-types ,type-array)))
             var-array))
-         (predicate-ptr (build-predicate var-names predicate)))
+         (predicate-ptr (build-predicate var-names predicate))
+         (soft-predicate-ptrs (map 'vector {build-predicate var-names}
+                                   soft-predicates))
+         (soft-predicate-array (create-foreign-array :pointer
+                                                     soft-predicate-ptrs)))
     (with-foreign-object (results-ptr '(:pointer (:struct trace-point)))
       (setf (mem-aref results-ptr '(:pointer (:struct trace-point)))
             (null-pointer))
@@ -474,6 +480,8 @@
              (progn
                (c-query-trace (db-pointer db) index
                               n-vars free-vars predicate-ptr
+                              soft-predicate-array
+                              (length soft-predicate-ptrs)
                               (if pick (random (expt 2 32)) 0)
                               (if file-id
                                   (ash (1- (ash 1 +trace-id-file-bits+))
@@ -510,6 +518,8 @@
                                   (convert-results-setup db index))))
          (progn
            (free-predicate predicate-ptr)
+           (map 'vector #'free-predicate soft-predicate-ptrs)
+           (foreign-free soft-predicate-array)
            (iter (for i below n-vars)
                  (foreign-free (getf (mem-aref free-vars
                                                '(:struct free-variable) i)
@@ -628,9 +638,13 @@ project."))
 
 (defmethod query-trace :around ((db single-file-binary-trace-db) index
                                 var-names var-types
-                                &key pick file-id predicate filter)
+                                &key pick file-id predicate
+                                  soft-predicates filter)
   (call-next-method db index var-names var-types
-                    :pick pick :predicate predicate :filter filter
+                    :pick pick
+                    :predicate predicate
+                    :soft-predicates soft-predicates
+                    :filter filter
                     :file-id (or file-id (file-id db))))
 
 (defmethod get-trace :around ((db single-file-binary-trace-db) index

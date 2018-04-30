@@ -35,19 +35,25 @@ INDEX in DB."))
   (:documentation "Return the metadata for all traces in DB."))
 
 (defgeneric query-trace (db index var-names var-types
-                         &key pick file-id predicate filter)
+                         &key pick file-id predicate soft-predicates filter)
   (:documentation "Find bindings of VAR-NAMES in DB which satisfy PREDICATE.
 
 VAR-TYPES is a list of lists containing the names of allowed types for
 each variable.
 
+If PREDICATE is given, only results which satisfy it are selected.
+
+If SOFT-PREDICATES is given, then only results which satisfy the
+maximum number of soft predicates at each trace point are selected.
+
 Keyword arguments:
-PICK ----------- return results from a single randomly-selected trace point
-                 instead of searching all trace points.
-FILE-ID -------- restrict search to trace points in this file
-PREDICATE ------ S-expression representing a database predicate
-FILTER --------- A function taking (FILE LOCATION VARS...) as arguments.
-                 Results for which it returns false are discarded."))
+PICK ------------- return results from a single randomly-selected trace point
+                   instead of searching all trace points.
+FILE-ID ---------- restrict search to trace points in this file
+PREDICATE -------- S-expression representing a database predicate
+SOFT-PREDICATES -- Additional predicates to maximize
+FILTER ----------- A function taking (FILE LOCATION VARS...) as arguments.
+                   Results for which it returns false are discarded."))
 
 (defgeneric restrict-to-file (db file-id)
   (:documentation "Return a wrapper around DB which restricts results by

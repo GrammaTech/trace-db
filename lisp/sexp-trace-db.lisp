@@ -111,8 +111,10 @@ KWARGS are passed on to the OPEN call."
                      :test #'string=))
 
 (defmethod query-trace ((db sexp-trace-db) index var-names var-types
-                         &key pick file-id predicate filter)
+                         &key pick file-id predicate soft-predicates filter)
   (declare (ignorable file-id var-names predicate))
+  (assert (null soft-predicates)
+          nil "SOFT-PREDICATES are not supported by SEXP-TRACE-DB")
   (labels ((satisfying-assignments-at-point (pt)
              (->> (mapcar (lambda (type-spec)
                             (remove-if-not (lambda (type)
