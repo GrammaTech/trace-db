@@ -317,10 +317,10 @@
   (destructuring-bind (names types)
       (convert-results-setup db index)
     (iter (for i below n-results)
-          (let ((point (convert-trace-point names
-                                            types
-                                            results-ptr
-                                            i)))
+          (when-let ((point (convert-trace-point names
+                                                 types
+                                                 results-ptr
+                                                 i)))
             (when (or (not filter)
                       (apply filter
                              (cdr (assoc :f point))
