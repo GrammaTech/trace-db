@@ -48,10 +48,18 @@ void run_test(void (*test_fun)(), const char *name)
     }
 }
 
-const char *test_names[] = { "fixed_blob", "var_blob", "int", "var" };
+const char *test_names[] = { "fixed_blob", "var_blob", "int", "var",
+                             "x", "y", "z", "unsigned int",
+                             "big_positive", "big_negative",
+                             "int64_t", "uint64_t", "big_unsigned",
+                             "*void"};
 type_description test_types[] = { {2, SIGNED, sizeof(int)},
                                   {0, BLOB, 10},
-                                  {1, BLOB, 0} };
+                                  {1, BLOB, 0},
+                                  {7, UNSIGNED, sizeof(unsigned int)},
+                                  {10, SIGNED, sizeof(int64_t)},
+                                  {11, UNSIGNED, sizeof(uint64_t)},
+                                  {13, POINTER, sizeof(void *)}};
 
 FILE *write_test_header()
 {
@@ -69,6 +77,24 @@ FILE *write_trace_with_variable(uint32_t name_index, uint32_t type_index)
     fwrite(&type_index, sizeof(type_index), 1, out);
 
     return out;
+}
+
+uint16_t namei(const char *name)
+{
+    for (int i = 0; i < N_ELTS(test_names); i++) {
+        if (!strcmp(name, test_names[i]))
+            return i;
+    }
+    assert(0);
+}
+
+uint16_t typei(const char *name)
+{
+    for (int i = 0; i < N_ELTS(test_types); i++) {
+        if (!strcmp(name, test_names[test_types[i].name_index]))
+            return i;
+    }
+    assert(0);
 }
 
 void test_eof_in_header()
@@ -127,8 +153,8 @@ void test_good_header()
 
     trace_read_state *state = start_reading(TRACE_FILE);
     ASSERT(state);
-    ASSERT(state->n_names == 4);
-    ASSERT(state->n_types == 3);
+    ASSERT(state->n_names == N_ELTS(test_names));
+    ASSERT(state->n_types == N_ELTS(test_types));
     ASSERT(read_tag(state) == END_ENTRY);
     ASSERT(state->error_code == TRACE_OK);
 
@@ -277,7 +303,7 @@ void test_bad_index_in_variable()
     ASSERT(state->error_code == TRACE_ERROR);
 
     /* Bad type index */
-    out = write_trace_with_variable(0, 3);
+    out = write_trace_with_variable(0, N_ELTS(test_types));
     fwrite(&value, sizeof(value), 1, out);
     fclose(out);
 
@@ -422,6 +448,340 @@ void test_memory_map()
     free_memory_map(memory_map);
 }
 
+trace_db *create_test_db()
+{
+    FILE *out = write_test_header();
+    write_trace_id(out, 1);
+    unsigned int x = 0, y = 1;
+    int z = -2;
+    int64_t big_positive = INT64_MAX;
+    int64_t big_negative = INT64_MIN;
+    uint64_t big_unsigned = UINT64_MAX;
+    void *voidptr = (void*)0x1234;
+    write_trace_variables(out, 7,
+                          namei("x"), typei("unsigned int"),
+                          sizeof(x), UNSIGNED, x,
+                          namei("y"), typei("unsigned int"),
+                          sizeof(y), UNSIGNED, y,
+                          namei("z"), typei("int"),
+                          sizeof(z), SIGNED, z,
+                          namei("big_positive"), typei("int64_t"),
+                          sizeof(big_positive), SIGNED, big_positive,
+                          namei("big_negative"), typei("int64_t"),
+                          sizeof(big_negative), SIGNED, big_negative,
+                          namei("big_unsigned"), typei("uint64_t"),
+                          sizeof(big_unsigned), SIGNED, big_unsigned,
+                          namei("var"), typei("*void"),
+                          sizeof(voidptr), POINTER, voidptr);
+    write_buffer_size(out, voidptr, 4);
+    write_end_entry(out);
+    fclose(out);
+
+    trace_db *db = create_db();
+    add_trace(db, start_reading(TRACE_FILE), 0);
+
+    return db;
+}
+
+void test_query_variable_binding()
+{
+    trace_db *db = create_test_db();
+
+    trace_point *results;
+    uint64_t n_results;
+    uint32_t type_a = typei("unsigned int");
+    uint32_t type_b = typei("int");
+    free_variable vars[] = { { 1, &type_a }, { 1, &type_b } };
+    query_trace(db, 0, N_ELTS(vars), vars,
+                NULL, 0, 0, 0,
+                &results, &n_results);
+
+    ASSERT(n_results == 2);
+    ASSERT(results[0].n_vars == 2);
+    ASSERT(results[0].vars[0].name_index = namei("x"));
+    ASSERT(results[0].vars[0].value.u == 0);
+    ASSERT(results[0].vars[1].name_index == namei("z"));
+    ASSERT(results[0].vars[1].value.s == -2);
+
+    ASSERT(results[1].n_vars == 2);
+    ASSERT(results[1].vars[0].name_index = namei("y"));
+    ASSERT(results[1].vars[0].value.u == 1);
+    ASSERT(results[1].vars[1].name_index == namei("z"));
+    ASSERT(results[1].vars[1].value.s == -2);
+
+    free_query_result(results, n_results);
+    free_db(db);
+}
+
+void test_query_predicates()
+{
+    trace_db *db = create_test_db();
+
+    trace_point *results;
+    uint64_t n_results;
+    uint32_t type_a = typei("unsigned int");
+    uint32_t type_b = typei("int");
+    uint32_t type_i64 = typei("int64_t");
+
+    predicate var1 = { VAR_REFERENCE, {0} };
+    predicate var2 = { VAR_REFERENCE, {1} };
+    predicate var1_val = { VAR_VALUE, {1}, &var1 };
+    predicate var2_val = { VAR_VALUE, {1}, &var2 };
+    predicate vars[] = { var1, var2 };
+    predicate var_values[] = { var1_val, var2_val };
+    predicate distinct_vars = { DISTINCT_VARS, {2}, vars };
+
+    uint32_t int_types[] = { type_a, type_b };
+    free_variable int_vars[] = { { 2, int_types }, { 2, int_types } };
+
+
+    /* Distinct variables */
+    {
+        free_variable vars[] = { { 1, &type_a }, { 1, &type_a } };
+
+        /* Unrestricted query should return 4 results, two bindings for each
+         * variable */
+        query_trace(db, 0, N_ELTS(vars), vars,
+                    NULL, 0, 0, 0,
+                    &results, &n_results);
+
+        ASSERT(n_results == 4);
+        free_query_result(results, n_results);
+
+        /* With DISTINCT_VARS predicate, only two results are valid */
+        query_trace(db, 0, N_ELTS(vars), vars,
+                    &distinct_vars, 0, 0, 0,
+                    &results, &n_results);
+
+        ASSERT(n_results == 2);
+        free_query_result(results, n_results);
+    }
+
+    /* Greater than, unsigned constant */
+    {
+        free_variable vars[] = { { 2, int_types } };
+
+        /* a > 0 */
+        predicate p0[] = { var1_val, { UNSIGNED_INTEGER, {0} }};
+        predicate p = { GREATER_THAN, {2}, p0 };
+
+        query_trace(db, 0, N_ELTS(vars), vars,
+                    &p, 0, 0, 0,
+                    &results, &n_results);
+        ASSERT(n_results == 1);
+        free_query_result(results, n_results);
+    }
+
+    /* Less than, signed constant */
+    {
+        free_variable vars[] = { { 2, int_types } };
+
+        /* a < -1 */
+        predicate p0[] = { var1_val, { SIGNED_INTEGER, {-1} }};
+        predicate p = { LESS_THAN, {2}, p0 };
+
+        query_trace(db, 0, N_ELTS(vars), vars,
+                    &p, 0, 0, 0,
+                    &results, &n_results);
+        ASSERT(n_results == 1);
+        free_query_result(results, n_results);
+    }
+
+    /* Addition */
+    {
+        /* a + b == -1 */
+        predicate p0[] = { { ADD, {2}, var_values }, { SIGNED_INTEGER, {-1} }};
+        predicate p = { EQUAL, {2}, p0 };
+
+        query_trace(db, 0, N_ELTS(int_vars), int_vars,
+                    &p, 0, 0, 0,
+                    &results, &n_results);
+        ASSERT(n_results == 2);
+        ASSERT(results[0].vars[0].name_index == namei("z"));
+        ASSERT(results[0].vars[1].name_index == namei("y"));
+        free_query_result(results, n_results);
+    }
+
+    /* Subtraction */
+    {
+        /* a - b == 3 */
+        predicate p0[] = { { SUBTRACT, {2}, var_values },
+                           { SIGNED_INTEGER, {3} }};
+        predicate p = { EQUAL, {2}, p0 };
+
+        query_trace(db, 0, N_ELTS(int_vars), int_vars,
+                    &p, 0, 0, 0,
+                    &results, &n_results);
+        ASSERT(n_results == 1);
+        ASSERT(results[0].vars[0].name_index == namei("y"));
+        ASSERT(results[0].vars[1].name_index == namei("z"));
+        free_query_result(results, n_results);
+    }
+
+    /* Multiplication */
+    {
+        /* a * b == 0 */
+        predicate p0[] = { { MULTIPLY, {2}, var_values },
+                           { SIGNED_INTEGER, {0} }};
+        predicate p = { EQUAL, {2}, p0 };
+
+        query_trace(db, 0, N_ELTS(int_vars), int_vars,
+                    &p, 0, 0, 0,
+                    &results, &n_results);
+        ASSERT(n_results == 5);
+        for (int i = 0; i < 5; i++)
+            ASSERT(results[i].vars[0].name_index == namei("x") ||
+                   results[i].vars[1].name_index == namei("x"));
+        free_query_result(results, n_results);
+    }
+
+    /* Division */
+    {
+        /* a / b == 0 */
+        predicate p0[] = { { DIVIDE, {2}, var_values },
+                           { SIGNED_INTEGER, {0} }};
+        predicate p = { EQUAL, {2}, p0 };
+
+        query_trace(db, 0, N_ELTS(int_vars), int_vars,
+                    &p, 0, 0, 0,
+                    &results, &n_results);
+        ASSERT(n_results == 3);
+        ASSERT(results[0].vars[0].name_index == namei("x"));
+        free_query_result(results, n_results);
+    }
+
+    /* And, or */
+    {
+        free_variable vars[] = { { 2, int_types } };
+
+        /* a > -1 */
+        predicate p0[] = { var1_val, { SIGNED_INTEGER, {0} }};
+        predicate gt = { GREATER_THAN, {2}, p0 };
+
+        /* a < 3 */
+        predicate p1[] = { var1_val, { SIGNED_INTEGER, {3} }};
+        predicate lt = { LESS_THAN, {2}, p1 };
+
+        /* a == -1 */
+        predicate p2[] = { var1_val, { SIGNED_INTEGER, {-2} }};
+        predicate eq = { EQUAL, {2}, p2 };
+
+        predicate p3[] = { gt, lt };
+        predicate and = { AND, {2}, p3 };
+
+        predicate p4[] = { and, eq };
+        predicate or = { OR, {2}, p4 };
+
+        query_trace(db, 0, N_ELTS(vars), vars,
+                    &or, 0, 0, 0,
+                    &results, &n_results);
+        ASSERT(n_results == 2);
+        ASSERT(results[0].vars[0].name_index == namei("y"));
+        ASSERT(results[1].vars[0].name_index == namei("z"));
+        free_query_result(results, n_results);
+    }
+
+    /* Overflow check */
+    {
+        /* a + b > INT64_MAX */
+        predicate p0[] = { { ADD, {2}, var_values },
+                           { SIGNED_INTEGER, {INT64_MAX} }};
+        predicate p = { GREATER_THAN, {2}, p0 };
+        free_variable vars[] = { { 1, &type_i64 }, { 1, &type_i64 } };
+
+        query_trace(db, 0, N_ELTS(vars), vars,
+                    &p, 0, 0, 0,
+                    &results, &n_results);
+        ASSERT(n_results == 1);
+        ASSERT(results[0].vars[0].name_index == namei("big_positive"));
+        free_query_result(results, n_results);
+    }
+
+    /* Underflow check */
+    {
+        /* a + b < INT64_MIN */
+        predicate p0[] = { { ADD, {2}, var_values },
+                           { SIGNED_INTEGER, {INT64_MIN} }};
+        predicate p = { LESS_THAN, {2}, p0 };
+        free_variable vars[] = { { 1, &type_i64 }, { 1, &type_i64 } };
+
+        query_trace(db, 0, N_ELTS(vars), vars,
+                    &p, 0, 0, 0,
+                    &results, &n_results);
+        ASSERT(n_results == 1);
+        ASSERT(results[0].vars[0].name_index == namei("big_negative"));
+        free_query_result(results, n_results);
+    }
+
+    /* Signed overflow check */
+    {
+        /* a + b > UINT64_MAX */
+        predicate p0[] = { { ADD, {2}, var_values },
+                           { UNSIGNED_INTEGER, {UINT64_MAX} }};
+        predicate p = { GREATER_THAN, {2}, p0 };
+        uint32_t type_u64 = typei("uint64_t");
+        free_variable vars[] = { { 1, &type_u64 }, { 1, &type_u64 } };
+
+        query_trace(db, 0, N_ELTS(vars), vars,
+                    &p, 0, 0, 0,
+                    &results, &n_results);
+        ASSERT(n_results == 1);
+        ASSERT(results[0].vars[0].name_index == namei("big_unsigned"));
+        free_query_result(results, n_results);
+    }
+
+    free_db(db);
+}
+
+void test_query_var_sizes()
+{
+    trace_db *db = create_test_db();
+
+    trace_point *results;
+    uint64_t n_results;
+    uint32_t type_a = typei("*void");
+
+    predicate var = { VAR_REFERENCE, {0} };
+
+    free_variable vars[] = { { 1, &type_a } };
+
+    /* Unrestricted query should return 1 result */
+    {
+        query_trace(db, 0, N_ELTS(vars), vars,
+                    NULL, 0, 0, 0,
+                    &results, &n_results);
+
+        ASSERT(n_results == 1);
+        free_query_result(results, n_results);
+    }
+
+    /* size == 4, one result */
+    {
+        predicate p0[] = { { VAR_SIZE, {1}, &var }, { UNSIGNED_INTEGER, {4} } };
+        predicate p = { EQUAL, {2}, p0 };
+        query_trace(db, 0, N_ELTS(vars), vars,
+                    &p, 0, 0, 0,
+                    &results, &n_results);
+
+        ASSERT(n_results == 1);
+        free_query_result(results, n_results);
+    }
+
+    /* size == 5, no results */
+    {
+        predicate p0[] = { { VAR_SIZE, {1}, &var }, { UNSIGNED_INTEGER, {5} } };
+        predicate p = { EQUAL, {2}, p0 };
+        query_trace(db, 0, N_ELTS(vars), vars,
+                    &p, 0, 0, 0,
+                    &results, &n_results);
+
+        ASSERT(n_results == 0);
+        free_query_result(results, n_results);
+    }
+
+    free_db(db);
+}
+
 int main(int argc, char **argv)
 {
     failure_count = 0;
@@ -437,6 +797,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_eof_in_buffer_size);
     RUN_TEST(test_read_from_fifo);
     RUN_TEST(test_memory_map);
+    RUN_TEST(test_query_variable_binding);
+    RUN_TEST(test_query_predicates);
+    RUN_TEST(test_query_var_sizes);
 
     unlink(TRACE_FILE);
 
