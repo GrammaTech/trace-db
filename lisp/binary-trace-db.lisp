@@ -424,7 +424,7 @@
                     (v/value :var-value)
                     (> :greater-than)
                     (< :less-than)
-                    (= :equal)
+                    (equal :equal)
                     (+ :add)
                     (- :subtract)
                     (* :multiply)
