@@ -131,12 +131,12 @@
                      (store-as-byte-array ()
                        :report "Store as a byte array"
                        (iter (for i below size)
-                         (collecting (mem-ref data :char i)
-                           result-type 'vector))))
+                             (collecting (mem-ref data :char i)
+                                         result-type 'vector))))
                  (foreign-free data))
 
-             ;; Primitive type
-             data)))
+               ;; Primitive type
+               data)))
        (read-vars (vars count)
          (iter (for i below count)
                (destructuring-bind (name-index type-index size buffer-size)
@@ -171,7 +171,7 @@
                                        (ash statement
                                             (* -1 +trace-id-statement-bits+))))
                          result))
-         (push (cons :c statement) result)))))
+            (push (cons :c statement) result)))))
   result)
 
 (defun read-binary-trace (file &key timeout (predicate #'identity) max
@@ -438,12 +438,12 @@
            ((numberp tree) (build-number tree))
            (t (build-var-reference tree)))))
 
-      (if predicate
-       (let ((result (foreign-alloc '(:struct predicate))))
-         (setf (mem-aref result '(:struct predicate))
-               (helper predicate))
-         result)
-       (null-pointer))))
+    (if predicate
+        (let ((result (foreign-alloc '(:struct predicate))))
+          (setf (mem-aref result '(:struct predicate))
+                (helper predicate))
+          result)
+        (null-pointer))))
 
 (defmethod query-trace ((db binary-trace-db) index var-names var-types
                         &key pick file-id predicate soft-predicates filter)
@@ -516,15 +516,15 @@
                                   (nth index (trace-metadata db))
                                   :convert-args
                                   (convert-results-setup db index))))
-         (progn
-           (free-predicate predicate-ptr)
-           (map 'vector #'free-predicate soft-predicate-ptrs)
-           (foreign-free soft-predicate-array)
-           (iter (for i below n-vars)
-                 (foreign-free (getf (mem-aref free-vars
-                                               '(:struct free-variable) i)
-                                     'allowed-types)))
-           (foreign-free free-vars)))))))
+          (progn
+            (free-predicate predicate-ptr)
+            (map 'vector #'free-predicate soft-predicate-ptrs)
+            (foreign-free soft-predicate-array)
+            (iter (for i below n-vars)
+                  (foreign-free (getf (mem-aref free-vars
+                                                '(:struct free-variable) i)
+                                      'allowed-types)))
+            (foreign-free free-vars)))))))
 
 (defcfun ("set_trace" c-set-trace) :void
   (db :pointer)
