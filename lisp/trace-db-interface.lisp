@@ -75,3 +75,11 @@ FILE-ID."))
 
 (defmethod get-all-results ((results trace-db-results))
   (mapcar {get-result results} (iota (result-count results))))
+
+(defun get-statement-and-bindings (pt)
+  "Return the file/statement counters and variable bindings for the given PT."
+  (list (cdr (assoc :f pt))
+        (cdr (assoc :c pt))
+        (map 'list (lambda (var)
+                     (cons (elt var 0) (elt var 1)))
+                   (cdr (assoc :scopes pt)))))

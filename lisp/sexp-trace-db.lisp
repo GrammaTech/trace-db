@@ -137,17 +137,21 @@ KWARGS are passed on to the OPEN call."
        (nth index (trace-metadata db))
        :results
        (coerce (if pick
-                   (->> (random-elt trace)
-                        (satisfying-assignments-at-point)
-                        (remove-if-not (lambda (pt)
-                                         (apply filter (cdr (assoc :f pt))
-                                                (cdr (assoc :c pt))
-                                                (cdr (assoc :scopes pt))))))
-                   (->> (mappend #'satisfying-assignments-at-point trace)
-                        (remove-if-not (lambda (pt)
-                                         (apply filter (cdr (assoc :f pt))
-                                                (cdr (assoc :c pt))
-                                                (cdr (assoc :scopes pt)))))))
+                   (-<>> (random-elt trace)
+                         (satisfying-assignments-at-point)
+                         (remove-if-not (lambda (pt)
+                                          (apply filter (cdr (assoc :f pt))
+                                                 (cdr (assoc :c pt))
+                                                 (cdr (assoc :scopes pt)))))
+                         (remove-duplicates <> :key #'get-statement-and-bindings
+                                               :test #'equalp))
+                   (-<>> (mappend #'satisfying-assignments-at-point trace)
+                         (remove-if-not (lambda (pt)
+                                          (apply filter (cdr (assoc :f pt))
+                                                 (cdr (assoc :c pt))
+                                                 (cdr (assoc :scopes pt)))))
+                         (remove-duplicates <> :key #'get-statement-and-bindings
+                                               :test #'equalp))
                'vector)))))
 
 (defmethod restrict-to-file ((db sexp-trace-db) file-id)

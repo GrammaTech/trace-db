@@ -479,7 +479,7 @@
       (with-foreign-object (n-results-ptr ':uint64)
         (setf (mem-aref n-results-ptr ':uint64) 0)
         (unwind-protect
-             (progn
+             (prog2
                (c-query-trace (db-pointer db) index
                               n-vars free-vars predicate-ptr
                               soft-predicate-array
@@ -493,31 +493,24 @@
                                   (ash file-id +trace-id-statement-bits+)
                                   0)
                               results-ptr n-results-ptr)
-               (if filter
-                   (prog1
-                       ;; Convert all results and filter them
-                       (make-instance 'sexp-trace-results
-                                      :results
-                                      (coerce
-                                       (convert-results db index
-                                                        (mem-ref n-results-ptr
-                                                                 :uint64)
-                                                        (mem-ref results-ptr
-                                                                 :pointer)
-                                                        :filter filter)
-                                       'vector)
-                                      :trace-metadata
-                                      (nth index (trace-metadata db)))
-                     (free-query-result (mem-ref results-ptr :pointer)
-                                        (mem-ref n-results-ptr :uint64)))
-                   ;; Save results array for later conversion
-                   (make-instance 'binary-trace-results
-                                  :results-ptr (mem-ref results-ptr :pointer)
-                                  :result-count (mem-ref n-results-ptr :uint64)
-                                  :trace-metadata
-                                  (nth index (trace-metadata db))
-                                  :convert-args
-                                  (convert-results-setup db index))))
+               ;; Convert all results and filter them
+               (make-instance 'sexp-trace-results
+                              :results
+                              (coerce
+                               (remove-duplicates
+                                 (convert-results db index
+                                                  (mem-ref n-results-ptr
+                                                           :uint64)
+                                                  (mem-ref results-ptr
+                                                           :pointer)
+                                                  :filter filter)
+                                 :key #'get-statement-and-bindings
+                                 :test #'equalp)
+                               'vector)
+                              :trace-metadata
+                              (nth index (trace-metadata db)))
+               (free-query-result (mem-ref results-ptr :pointer)
+                                  (mem-ref n-results-ptr :uint64)))
           (progn
             (free-predicate predicate-ptr)
             (map 'vector #'free-predicate soft-predicate-ptrs)

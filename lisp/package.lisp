@@ -32,4 +32,5 @@
            :result-count
            :get-result
            :get-all-results
+           :get-statement-and-bindings
            :sexp-trace-results))
