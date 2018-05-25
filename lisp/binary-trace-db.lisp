@@ -494,21 +494,17 @@
                                   0)
                               results-ptr n-results-ptr)
                ;; Convert all results and filter them
-               (make-instance 'sexp-trace-results
-                              :results
-                              (coerce
-                               (remove-duplicates
-                                 (convert-results db index
-                                                  (mem-ref n-results-ptr
-                                                           :uint64)
-                                                  (mem-ref results-ptr
-                                                           :pointer)
-                                                  :filter filter)
-                                 :key #'get-statement-and-bindings
-                                 :test #'equalp)
-                               'vector)
-                              :trace-metadata
-                              (nth index (trace-metadata db)))
+               (cons (cons :results
+                           (remove-duplicates
+                             (convert-results db index
+                                              (mem-ref n-results-ptr
+                                                       :uint64)
+                                              (mem-ref results-ptr
+                                                       :pointer)
+                                              :filter filter)
+                             :key #'get-statement-and-bindings
+                             :test #'equalp))
+                     (nth index (trace-metadata db)))
                (free-query-result (mem-ref results-ptr :pointer)
                                   (mem-ref n-results-ptr :uint64)))
           (progn
@@ -648,22 +644,3 @@ project."))
 
 (defmethod trace-metadata ((db single-file-binary-trace-db))
   (or (slot-value db 'trace-metadata) (trace-metadata (parent-db db))))
-
-
-(defclass binary-trace-results (trace-db-results)
-  ((results-ptr :accessor results-ptr :initarg :results-ptr)
-   (result-count :accessor result-count :initarg :result-count)
-   (convert-args :accessor convert-args :initarg :convert-args)
-   (trace-metadata :accessor trace-metadata :initarg :trace-metadata))
-  (:documentation "Results of a trace-db query."))
-
-(defmethod initialize-instance :after ((instance binary-trace-results)
-                                       &key results-ptr result-count)
-  (finalize instance
-            (lambda ()
-              (free-query-result results-ptr result-count))))
-
-(defmethod get-result ((results binary-trace-results) (index integer))
-  (destructuring-bind (names types)
-      (convert-args results)
-    (convert-trace-point names types (results-ptr results) index)))

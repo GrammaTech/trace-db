@@ -29,8 +29,4 @@
            :v/size
            :set-trace
            :restrict-to-file
-           :result-count
-           :get-result
-           :get-all-results
-           :get-statement-and-bindings
-           :sexp-trace-results))
+           :get-statement-and-bindings))

@@ -59,23 +59,6 @@ FILTER ----------- A function taking (FILE LOCATION VARS...) as arguments.
   (:documentation "Return a wrapper around DB which restricts results by
 FILE-ID."))
 
-(defclass trace-db-results ()
-  ((trace-metadata :accessor trace-metadata :initarg :trace-metadata
-                   :initform nil))
-  (:documentation "Results of a single trace-db query."))
-
-(defgeneric result-count (results)
-  (:documentation "The number of individual results stored in RESULTS."))
-
-(defgeneric get-result (results index)
-  (:documentation "Retrieve the result at INDEX in RESULTS."))
-
-(defgeneric get-all-results (results)
-  (:documentation "Retrieve all query results from RESULTS."))
-
-(defmethod get-all-results ((results trace-db-results))
-  (mapcar {get-result results} (iota (result-count results))))
-
 (defun get-statement-and-bindings (pt)
   "Return the file/statement counters and variable bindings for the given PT."
   (list (cdr (assoc :f pt))
