@@ -29,12 +29,14 @@ install: libtrace-db.so README.html
 # This target builds an Arch package from the current state of the
 # repository by first rsync'ing it into the makepkg source directory
 # then running makepkg to build a package.
-src/trace-db_pkg:
-	mkdir -p $@
-
-local-makepkg: src/trace-db_pkg
-	rsync --exclude .git -aruv ./ src/trace-db_pkg
-	make -C src/trace-db_pkg clean
+local-makepkg:
+	rm -rf /tmp/trace-db_pkg
+	mkdir -p /tmp/trace-db_pkg
+	rsync --exclude .git --exclude src -aruv ./ /tmp/trace-db_pkg
+	rm -rf trace-db-git/src/
+	mkdir -p trace-db-git/src/
+	mv /tmp/trace-db_pkg trace-db-git/src/
+	make -C trace-db-git/src/trace-db_pkg clean
 	makepkg -ef
 
 sample: libtrace-db.so sample.o

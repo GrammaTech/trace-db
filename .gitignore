@@ -1,5 +1,4 @@
-src/
-pkg/
+trace-db-git/
 
 /libtrace-db.so
 /unit-test
