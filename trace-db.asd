@@ -4,7 +4,7 @@
   :depends-on (alexandria
                bordeaux-threads
                iterate
-               cl-arrowz
+               arrow-macros
                cl-store
                cffi
                cffi-libffi
