@@ -11,6 +11,7 @@ FILE *open_with_timeout(const char *filename, int timeout_seconds)
     /* Open in non-blocking mode. Returns immediately even if file is a FIFO
        with no writer yet. */
     int fd = open(filename, O_RDONLY | O_NONBLOCK);
+    int result;
 
     /* Now use select() to wait until there is data to read. For a regular
        file, this should return immediately. For a FIFO, it will block until
@@ -19,11 +20,16 @@ FILE *open_with_timeout(const char *filename, int timeout_seconds)
     FD_ZERO(&set);
     FD_SET(fd, &set);
 
-    struct timeval timeout;
-    timeout.tv_sec = timeout_seconds;
-    timeout.tv_usec = 0;
+    if (timeout_seconds) {
+        struct timeval timeout;
+        timeout.tv_sec = timeout_seconds;
+        timeout.tv_usec = 0;
 
-    int result = select(fd + 1, &set, NULL, NULL, &timeout);
+        result = select(fd + 1, &set, NULL, NULL, &timeout);
+    }
+    else {
+        result = select(fd + 1, &set, NULL, NULL, NULL);
+    }
 
     if (result == 1) {
         /* Switch back to block mode */
