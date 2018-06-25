@@ -96,7 +96,8 @@
                               :size size))))
 
 (defcfun start-reading (:pointer (:struct trace-read-state))
-  (filename :string))
+  (filename :string)
+  (timeout :int))
 
 (defcfun end-reading :void
   (state :pointer))
@@ -174,12 +175,11 @@
             (push (cons :c statement) result)))))
   result)
 
-(defun read-binary-trace (file &key timeout (predicate #'identity) max
+(defun read-binary-trace (file &key (timeout 0) (predicate #'identity) max
                           &aux (collected 0))
   "Read a trace and convert to a list."
-  (declare (ignorable timeout))
   (load-libtrace-db)
-  (let ((state-ptr (start-reading file)))
+  (let ((state-ptr (start-reading file timeout)))
     (unless (null-pointer-p state-ptr)
       (let* ((state (mem-aref state-ptr '(:struct trace-read-state)))
              (names (ignore-errors
@@ -275,12 +275,10 @@
 
 (defmethod add-trace ((db binary-trace-db) filename timeout
                       metadata &key max)
-  (declare (ignorable timeout))
-  (let ((state-pointer (start-reading (namestring filename))))
-    (assert (not (null-pointer-p state-pointer)))
-    (c-add-trace (db-pointer db) state-pointer
-                 (or max 0))
-    (push metadata (trace-metadata db))))
+  (let ((state-pointer (start-reading (namestring filename) timeout)))
+    (unless (null-pointer-p state-pointer)
+      (c-add-trace (db-pointer db) state-pointer (or max 0))
+      (push metadata (trace-metadata db)))))
 
 (defmethod trace-types ((db binary-trace-db) index)
   "Return the type names from the header of the trace at INDEX in DB."
