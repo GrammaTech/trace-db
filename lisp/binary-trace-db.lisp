@@ -403,7 +403,8 @@
            (list 'kind :var-reference
                  'data index
                  'children (null-pointer))
-           (error "undefined variable in predicate: ~a" var)))
+           (error "undefined variable ~s in var-names ~s:"
+                  var var-names)))
        (build-number (number)
          (list 'kind (if (negative-integer-p number)
                          :signed-integer
