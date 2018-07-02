@@ -3,7 +3,7 @@ ifneq ("$(wildcard local.mk)","")
 include local.mk
 endif
 
-CCFLAGS = -O0 -Wall -g -I. -Ithird-party/ -fPIC
+CCFLAGS = -O0 -Wall -g -I. -fPIC
 CFLAGS = $(CCFLAGS) -std=gnu11
 CXXFLAGS = $(CCFLAGS) -std=c++11
 
