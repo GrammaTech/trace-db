@@ -1,9 +1,9 @@
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -82,7 +82,7 @@ FILE *write_trace_with_variable(uint32_t name_index, uint32_t type_index)
 
 uint16_t namei(const char *name)
 {
-    for (int i = 0; i < N_ELTS(test_names); i++) {
+    for (unsigned i = 0; i < N_ELTS(test_names); i++) {
         if (!strcmp(name, test_names[i]))
             return i;
     }
@@ -91,7 +91,7 @@ uint16_t namei(const char *name)
 
 uint16_t typei(const char *name)
 {
-    for (int i = 0; i < N_ELTS(test_types); i++) {
+    for (unsigned i = 0; i < N_ELTS(test_types); i++) {
         if (!strcmp(name, test_names[test_types[i].name_index]))
             return i;
     }
@@ -320,7 +320,11 @@ void test_bad_type()
     /* Invalid format */
     {
         FILE *out = fopen(TRACE_FILE, "w");
-        type_description types[] = { {2, 14, sizeof(int)} };
+        type_description types[1];
+
+        types[0].name_index = 2;
+        types[0].format = (type_format) 14;
+        types[0].size = sizeof(int);
         write_trace_header(out, test_names, N_ELTS(test_names),
                            types, N_ELTS(types));
         fclose(out);
@@ -385,16 +389,21 @@ void test_timeout_from_fifo()
 void test_memory_map()
 {
     type_description type = {0, POINTER, 8};
-    trace_read_state state = { .n_types = 1,
-                               .types = &type };
+    trace_read_state state;
+    trace_point point;
+    trace_var_info var;
     skip_list *memory_map = create_memory_map();
     trace_buffer_size sizes[] = {{ 3, 10 }, { 100, 2}};
-    trace_point point = { .n_sizes = 2, .sizes = sizes };
+
+    state.n_types = 1;
+    state.types = &type;
+    point.n_sizes = 2;
+    point.sizes = sizes;
+    var.type_index = 0;
     update_memory_map(memory_map, &point);
 
     /* Basic lookups */
-    trace_var_info var = { .type_index = 0,
-                           .value = { .ptr = (void *)3 }};
+    var.value.ptr = (void *)3;
     compute_buffer_size(memory_map, &state, &var);
     ASSERT(var.buffer_size == 10);
 
@@ -546,6 +555,35 @@ void test_query_predicates()
     free_variable int_vars[] = { { 2, int_types }, { 2, int_types } };
 
 
+    predicate negative_two;
+    negative_two.kind = SIGNED_INTEGER;
+    negative_two.data.signed_value = -2;
+
+    predicate negative_one;
+    negative_one.kind = SIGNED_INTEGER;
+    negative_one.data.signed_value = -1;
+
+    predicate zero;
+    zero.kind = SIGNED_INTEGER;
+    zero.data.signed_value = 0;
+
+    predicate three;
+    three.kind = SIGNED_INTEGER;
+    three.data.signed_value = 3;
+
+    predicate int64_max;
+    int64_max.kind = SIGNED_INTEGER;
+    int64_max.data.signed_value = INT64_MAX;
+
+    predicate uint64_max;
+    uint64_max.kind = UNSIGNED_INTEGER;
+    uint64_max.data.signed_value = UINT64_MAX;
+
+    predicate int64_min;
+    int64_min.kind = SIGNED_INTEGER;
+    int64_min.data.signed_value = INT64_MIN;
+
+
     /* Distinct variables */
     {
         free_variable vars[] = { { 1, &type_a }, { 1, &type_a } };
@@ -573,7 +611,7 @@ void test_query_predicates()
         free_variable vars[] = { { 2, int_types } };
 
         /* a > 0 */
-        predicate p0[] = { var1_val, { UNSIGNED_INTEGER, {0} }};
+        predicate p0[] = { var1_val, zero };
         predicate p = { GREATER_THAN, {2}, p0 };
 
         query_trace(db, 0, N_ELTS(vars), vars,
@@ -588,7 +626,7 @@ void test_query_predicates()
         free_variable vars[] = { { 2, int_types } };
 
         /* a < -1 */
-        predicate p0[] = { var1_val, { SIGNED_INTEGER, {-1} }};
+        predicate p0[] = { var1_val, negative_one };
         predicate p = { LESS_THAN, {2}, p0 };
 
         query_trace(db, 0, N_ELTS(vars), vars,
@@ -601,7 +639,7 @@ void test_query_predicates()
     /* Addition */
     {
         /* a + b == -1 */
-        predicate p0[] = { { ADD, {2}, var_values }, { SIGNED_INTEGER, {-1} }};
+        predicate p0[] = { { ADD, {2}, var_values }, negative_one };
         predicate p = { EQUAL, {2}, p0 };
 
         query_trace(db, 0, N_ELTS(int_vars), int_vars,
@@ -616,8 +654,7 @@ void test_query_predicates()
     /* Subtraction */
     {
         /* a - b == 3 */
-        predicate p0[] = { { SUBTRACT, {2}, var_values },
-                           { SIGNED_INTEGER, {3} }};
+        predicate p0[] = { { SUBTRACT, {2}, var_values }, three };
         predicate p = { EQUAL, {2}, p0 };
 
         query_trace(db, 0, N_ELTS(int_vars), int_vars,
@@ -631,9 +668,12 @@ void test_query_predicates()
 
     /* Multiplication */
     {
+        predicate zero;
+        zero.kind = SIGNED_INTEGER;
+        zero.data.signed_value = 0;
+
         /* a * b == 0 */
-        predicate p0[] = { { MULTIPLY, {2}, var_values },
-                           { SIGNED_INTEGER, {0} }};
+        predicate p0[] = { { MULTIPLY, {2}, var_values }, zero };
         predicate p = { EQUAL, {2}, p0 };
 
         query_trace(db, 0, N_ELTS(int_vars), int_vars,
@@ -649,8 +689,7 @@ void test_query_predicates()
     /* Division */
     {
         /* a / b == 0 */
-        predicate p0[] = { { DIVIDE, {2}, var_values },
-                           { SIGNED_INTEGER, {0} }};
+        predicate p0[] = { { DIVIDE, {2}, var_values }, zero };
         predicate p = { EQUAL, {2}, p0 };
 
         query_trace(db, 0, N_ELTS(int_vars), int_vars,
@@ -665,26 +704,26 @@ void test_query_predicates()
     {
         free_variable vars[] = { { 2, int_types } };
 
-        /* a > -1 */
-        predicate p0[] = { var1_val, { SIGNED_INTEGER, {0} }};
+        /* a > -0 */
+        predicate p0[] = { var1_val, zero };
         predicate gt = { GREATER_THAN, {2}, p0 };
 
         /* a < 3 */
-        predicate p1[] = { var1_val, { SIGNED_INTEGER, {3} }};
+        predicate p1[] = { var1_val, three };
         predicate lt = { LESS_THAN, {2}, p1 };
 
-        /* a == -1 */
-        predicate p2[] = { var1_val, { SIGNED_INTEGER, {-2} }};
+        /* a == -2 */
+        predicate p2[] = { var1_val, negative_two };
         predicate eq = { EQUAL, {2}, p2 };
 
         predicate p3[] = { gt, lt };
-        predicate and = { AND, {2}, p3 };
+        predicate pand = { AND, {2}, p3 };
 
-        predicate p4[] = { and, eq };
-        predicate or = { OR, {2}, p4 };
+        predicate p4[] = { pand, eq };
+        predicate por = { OR, {2}, p4 };
 
         query_trace(db, 0, N_ELTS(vars), vars,
-                    &or, NULL, 0, 0, 0, 0,
+                    &por, NULL, 0, 0, 0, 0,
                     &results, &n_results);
         ASSERT(n_results == 2);
         ASSERT(results[0].vars[0].name_index == namei("y"));
@@ -695,8 +734,7 @@ void test_query_predicates()
     /* Overflow check */
     {
         /* a + b > INT64_MAX */
-        predicate p0[] = { { ADD, {2}, var_values },
-                           { SIGNED_INTEGER, {INT64_MAX} }};
+        predicate p0[] = { { ADD, {2}, var_values }, int64_max };
         predicate p = { GREATER_THAN, {2}, p0 };
         free_variable vars[] = { { 1, &type_i64 }, { 1, &type_i64 } };
 
@@ -711,8 +749,7 @@ void test_query_predicates()
     /* Underflow check */
     {
         /* a + b < INT64_MIN */
-        predicate p0[] = { { ADD, {2}, var_values },
-                           { SIGNED_INTEGER, {INT64_MIN} }};
+        predicate p0[] = { { ADD, {2}, var_values }, int64_min };
         predicate p = { LESS_THAN, {2}, p0 };
         free_variable vars[] = { { 1, &type_i64 }, { 1, &type_i64 } };
 
@@ -727,8 +764,7 @@ void test_query_predicates()
     /* Signed overflow check */
     {
         /* a + b > UINT64_MAX */
-        predicate p0[] = { { ADD, {2}, var_values },
-                           { UNSIGNED_INTEGER, {UINT64_MAX} }};
+        predicate p0[] = { { ADD, {2}, var_values }, uint64_max };
         predicate p = { GREATER_THAN, {2}, p0 };
         uint32_t type_u64 = typei("uint64_t");
         free_variable vars[] = { { 1, &type_u64 }, { 1, &type_u64 } };
@@ -756,6 +792,14 @@ void test_query_var_sizes()
 
     free_variable vars[] = { { 1, &type_a } };
 
+    predicate four;
+    four.kind = UNSIGNED_INTEGER;
+    four.data.unsigned_value = 4;
+
+    predicate five;
+    five.kind = UNSIGNED_INTEGER;
+    five.data.unsigned_value = 5;
+
     /* Unrestricted query should return 1 result */
     {
         query_trace(db, 0, N_ELTS(vars), vars,
@@ -768,7 +812,7 @@ void test_query_var_sizes()
 
     /* size == 4, one result */
     {
-        predicate p0[] = { { VAR_SIZE, {1}, &var }, { UNSIGNED_INTEGER, {4} } };
+        predicate p0[] = { { VAR_SIZE, {1}, &var }, four };
         predicate p = { EQUAL, {2}, p0 };
         query_trace(db, 0, N_ELTS(vars), vars,
                     &p, NULL, 0, 0, 0, 0,
@@ -780,7 +824,7 @@ void test_query_var_sizes()
 
     /* size == 5, no results */
     {
-        predicate p0[] = { { VAR_SIZE, {1}, &var }, { UNSIGNED_INTEGER, {5} } };
+        predicate p0[] = { { VAR_SIZE, {1}, &var }, five };
         predicate p = { EQUAL, {2}, p0 };
         query_trace(db, 0, N_ELTS(vars), vars,
                     &p, NULL, 0, 0, 0, 0,
@@ -806,6 +850,14 @@ void test_query_soft_predicates()
     predicate var1 = { VAR_REFERENCE, {0} };
     predicate var1_val = { VAR_VALUE, {1}, &var1 };
 
+    predicate negative_two;
+    negative_two.kind = SIGNED_INTEGER;
+    negative_two.data.signed_value = -2;
+
+    predicate one;
+    one.kind = SIGNED_INTEGER;
+    one.data.signed_value = 1;
+
     /* Unrestricted: 9 matches */
     {
         query_trace(db, 0, N_ELTS(vars), vars,
@@ -818,7 +870,7 @@ void test_query_soft_predicates()
 
     /* Single predicate: x and z both satisfy it */
     {
-        predicate p0[] = { var1_val, { UNSIGNED_INTEGER, {1} } };
+        predicate p0[] = { var1_val, one };
         predicate p = { LESS_THAN, {2}, p0 };
         const predicate *soft[] = { &p };
 
@@ -835,9 +887,9 @@ void test_query_soft_predicates()
 
     /* Two predicates: only z satisfies both */
     {
-        predicate p0[] = { var1_val, { UNSIGNED_INTEGER, {1} } };
+        predicate p0[] = { var1_val, one };
         predicate s0 = { LESS_THAN, {2}, p0 };
-        predicate p1[] = { var1_val, { SIGNED_INTEGER, {-2} } };
+        predicate p1[] = { var1_val, negative_two };
         predicate s1 = { EQUAL, {2}, p1 };
         const predicate *soft[] = { &s0, &s1 };
 

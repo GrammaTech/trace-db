@@ -14,11 +14,11 @@ If reading and writing are working correctly, both invocations of sample
 will produce the same output.
 */
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cstdarg>
 
 #include "read-trace.h"
 #include "write-trace.h"
@@ -57,9 +57,9 @@ void write_test_trace(const char *filename)
                names[type.name_index], type.format, type.size);
     }
 
-    char *chars = "hello, world";
+    char const *chars = "hello, world";
     for (int i = 0; i < 10; i++) {
-        char *ptr = chars + i;
+        char const *ptr = chars + i;
         char c = *ptr;
         float f = 0.1 * i;
         double d = 0.2 * i;

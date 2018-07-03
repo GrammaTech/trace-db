@@ -1,16 +1,21 @@
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
+#ifndef __UTILS_H
+#define __UTILS_H
+
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+
+extern "C" {
 
 /* Ensure the buffer will hold at least needed elements.
    Reallocates if necessary.
  */
-#define ENSURE_BUFFER_SIZE(buffer, element_size, allocated, needed) \
-    do {                                                            \
-        if ((allocated) < (needed)) {                               \
-            (allocated) = ((allocated) == 0) ? 1024 : 2 * (allocated);  \
-            (buffer) = realloc((buffer), (allocated) * (element_size)); \
-        }                                                               \
+#define ENSURE_BUFFER_SIZE(buffer, type, element_size, allocated, needed)      \
+    do {                                                                       \
+        if ((allocated) < (needed)) {                                          \
+            (allocated) = ((allocated) == 0) ? 1024 : 2 * (allocated);         \
+            (buffer) = (type) realloc((buffer), (allocated) * (element_size)); \
+        }                                                                      \
 } while (0)
 
 /* Open a file and wait for it to have data available to read.
@@ -23,3 +28,7 @@ FILE *open_with_timeout(const char *filename, int timeout_seconds);
 
 /* Allocate memory and fill it with a copy of buffer. */
 void *malloc_copy(const void *buffer, size_t size);
+
+} // end extern "C"
+
+#endif

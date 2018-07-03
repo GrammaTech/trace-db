@@ -5,6 +5,8 @@
 
 #include <stdint.h>
 
+extern "C" {
+
 enum type_format {
     UNSIGNED,                   /* unsigned integer */
     SIGNED,                     /* signed integer */
@@ -39,5 +41,6 @@ typedef struct trace_buffer_size
     uint64_t size;
 } trace_buffer_size;
 
+} // end extern "C"
 
 #endif // __TYPES_H

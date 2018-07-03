@@ -1,6 +1,6 @@
-#include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <cassert>
+#include <cstdlib>
+#include <cstdio>
 
 #include "utils.h"
 
@@ -17,31 +17,36 @@
 trace_read_state *start_reading(const char *filename, int timeout_seconds)
 {
     trace_read_state *state = (trace_read_state *)calloc(1, sizeof(trace_read_state));
+    type_description *types = NULL;
+    uint64_t n_chars = 0;
+    uint32_t n_strings = 0;
+    uint32_t n_types = 0;
+    uint32_t i = 0;
+    char *buf = NULL;
+
     state->file = open_with_timeout(filename, timeout_seconds);
 
     if (!state->file)
         goto error;
 
     /* Read dictionary of names */
-    uint64_t n_chars;
     FREAD_CHECK(&n_chars, sizeof(n_chars), 1, state);
 
-    char *buf = (char*)malloc(n_chars);
+    buf = (char*)malloc(n_chars);
     if (fread(buf, 1, n_chars, state->file) != n_chars) {
         free(buf);
         goto error;
     }
 
     /* Scan once to count strings */
-    uint32_t n_strings = 0;
-    for (uint32_t i = 0; i < n_chars; i++) {
+    for (i = 0; i < n_chars; i++) {
         if (buf[i] == 0)
             n_strings++;
     }
     state->names = (const char**)malloc(sizeof(char*) * n_strings);
 
     /* Scan again to find starts of each string */
-    for (uint32_t i = 0; i < n_strings; i++) {
+    for (i = 0; i < n_strings; i++) {
         state->names[i] = buf; /* names[0] points to original buf */
         while (*buf != 0)
             buf++;
@@ -50,14 +55,13 @@ trace_read_state *start_reading(const char *filename, int timeout_seconds)
     state->n_names = n_strings;
 
     /* Read dictionary of types */
-    uint32_t n_types;
     FREAD_CHECK(&n_types, sizeof(n_types), 1, state);
-    type_description *types = malloc(sizeof(type_description) * n_types);
+    types = (type_description *) calloc(n_types, sizeof(type_description));
     FREAD_CHECK(types, sizeof(type_description), n_types, state);
     state->types = types;
     state->n_types = n_types;
 
-    for (uint32_t i = 0; i < n_types; i++) {
+    for (i = 0; i < n_types; i++) {
         if (types[i].format >= INVALID_FORMAT || types[i].name_index >= state->n_names)
             goto error;
     }
@@ -99,6 +103,7 @@ uint64_t read_id(trace_read_state *state)
 trace_var_info read_var_info(trace_read_state *state)
 {
     trace_var_info result;
+    type_description type;
     result.has_buffer_size = 0;
 
     FREAD_CHECK(&result.name_index, sizeof(result.name_index), 1, state);
@@ -110,7 +115,7 @@ trace_var_info read_var_info(trace_read_state *state)
         goto error;
     }
 
-    type_description type = state->types[result.type_index];
+    type = state->types[result.type_index];
 
     result.size = type.size;
     result.value.u = 0;
@@ -233,8 +238,11 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
                     goto error;
 
                 result.n_vars++;
-                ENSURE_BUFFER_SIZE(state->var_buffer, sizeof(trace_var_info),
-                                   state->n_vars, result.n_vars);
+                ENSURE_BUFFER_SIZE(state->var_buffer,
+                                   trace_var_info*,
+                                   sizeof(trace_var_info),
+                                   state->n_vars,
+                                   result.n_vars);
                 state->var_buffer[result.n_vars - 1] = info;
 
                 break;
@@ -247,8 +255,11 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
                     goto error;
 
                 result.n_sizes++;
-                ENSURE_BUFFER_SIZE(state->size_buffer, sizeof(trace_buffer_size),
-                                   state->n_sizes, result.n_sizes);
+                ENSURE_BUFFER_SIZE(state->size_buffer,
+                                   trace_buffer_size*,
+                                   sizeof(trace_buffer_size),
+                                   state->n_sizes,
+                                   result.n_sizes);
                 state->size_buffer[result.n_sizes - 1] = info;
                 break;
             }
@@ -258,8 +269,11 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
                 FREAD_CHECK(&value, sizeof(value), 1, state);
 
                 result.n_aux++;
-                ENSURE_BUFFER_SIZE(state->aux_buffer, sizeof(uint64_t),
-                                   state->n_aux, result.n_aux);
+                ENSURE_BUFFER_SIZE(state->aux_buffer,
+                                   uint64_t*,
+                                   sizeof(uint64_t),
+                                   state->n_aux,
+                                   result.n_aux);
                 state->aux_buffer[result.n_aux - 1] = value;
                 break;
             }

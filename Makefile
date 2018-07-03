@@ -3,11 +3,9 @@ ifneq ("$(wildcard local.mk)","")
 include local.mk
 endif
 
-CCFLAGS = -O0 -Wall -g -I. -fPIC
-CFLAGS = $(CCFLAGS) -std=gnu11
-CXXFLAGS = $(CCFLAGS) -std=c++11
+CXXFLAGS = -O0 -Wall -g -I. -fPIC -std=c++11
 
-SRCS = read-trace.c write-trace.c utils.c trace-db.cpp
+SRCS = read-trace.cpp write-trace.cpp utils.cpp trace-db.cpp
 OBJS := $(addsuffix .o,$(basename $(SRCS)))
 DEPS := $(addsuffix .d,$(basename $(SRCS)))
 TARGETS := libtrace-db.so sample
@@ -15,7 +13,7 @@ TARGETS := libtrace-db.so sample
 all: libtrace-db.so
 
 libtrace-db.so: $(OBJS)
-	$(CXX) $(CFLAGS) -o libtrace-db.so -fPIC -shared $(OBJS)  -Wl,-soname,libtrace-db.so
+	$(CXX) $(CXXFLAGS) -o libtrace-db.so -fPIC -shared $(OBJS)  -Wl,-soname,libtrace-db.so
 
 -include $(DEPS)
 

@@ -3,7 +3,7 @@
 #ifndef __WRITE_TRACE_H
 #define __WRITE_TRACE_H
 
-#include <stdint.h>
+#include <cstdint>
 #include "types.h"
 
 #ifdef __cplusplus
@@ -11,6 +11,8 @@
 #else
 # define AUTO __auto_type
 #endif
+
+extern "C" {
 
 /* Assigning to tmp here solves two problems:
    1. If var has the "register" storage class, we can't take its address,
@@ -54,5 +56,6 @@ void write_trace_variables(FILE *out, uint32_t n_vars, ...);
 */
 void write_trace_blobs(FILE *out, uint32_t n_vars, ...);
 
+} // end extern "C"
 
 #endif // __WRITE_TRACE_H

@@ -3,9 +3,11 @@
 #ifndef __READ_TRACE_H
 #define __READ_TRACE_H
 
-#include <stdint.h>
-#include <stdio.h>
+#include <cstdint>
+#include <cstdio>
 #include "types.h"
+
+extern "C" {
 
 typedef struct trace_var_info
 {
@@ -98,5 +100,7 @@ typedef struct trace_point
    only valid until the next call to read_trace_point.
 */
 enum trace_error read_trace_point(trace_read_state *state, trace_point *result_ptr);
+
+} // end extern "C"
 
 #endif // __READ_TRACE_H

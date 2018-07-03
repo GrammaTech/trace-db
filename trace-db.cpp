@@ -1,4 +1,4 @@
-#include <assert.h>
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -8,10 +8,8 @@
 
 #include <boost/multiprecision/cpp_int.hpp>
 
-extern "C" {
 #include "read-trace.h"
 #include "utils.h"
-}
 
 #include "trace-db.h"
 
@@ -222,7 +220,7 @@ void add_trace(trace_db *db, trace_read_state *state, uint64_t max)
                     malloc_copy(point.aux, point.n_aux * sizeof(*point.aux));
 
         void *tmp = new_trace.points;
-        ENSURE_BUFFER_SIZE(tmp, sizeof(trace_point),
+        ENSURE_BUFFER_SIZE(tmp, trace_point*, sizeof(trace_point),
                            new_trace.n_points_allocated, new_trace.n_points + 1);
         new_trace.points = (trace_point*)tmp;
         new_trace.points[new_trace.n_points++] = point;
@@ -273,7 +271,7 @@ void set_trace(trace_db *db, uint32_t index, trace *new_trace)
     else {
         uint32_t length = index + 1;
         void *tmp = db->traces;
-        ENSURE_BUFFER_SIZE(tmp, sizeof(trace),
+        ENSURE_BUFFER_SIZE(tmp, trace*, sizeof(trace),
                            db->n_traces_allocated, length);
         db->traces = (trace*) tmp;
         db->traces[index] = *new_trace;
