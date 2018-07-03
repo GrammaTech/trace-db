@@ -1,5 +1,3 @@
-trace-db-git/
-
 /libtrace-db.so
 /unit-test
 /sample
@@ -10,3 +8,5 @@ trace-db-git/
 *.o
 
 local.mk
+
+third-party/
