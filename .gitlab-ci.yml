@@ -8,22 +8,41 @@ before_script:
 stages:
   - build-test-tag
 
-build-test-tag:
+.run-template: &run
   stage: build-test-tag
   script:
     - docker pull $DOCKER_REGISTRY/synthesis/clang:latest
-    - docker build -f Dockerfile -t $LOCAL_IMAGE_NAME .
+    - docker build -f Dockerfile.${OS} -t ${LOCAL_IMAGE_NAME}-${OS} .
 
     # If on master branch, push test results to DataManager and push
     # up a new "latest" image, otherwise, run locally.
     - if [ "$CI_BUILD_REF_NAME" = "master" ];
       then
-          docker run -e LOCAL_USER=root $LOCAL_IMAGE_NAME /bin/bash -c "cd /gt/trace-db && make check";
-          docker tag $LOCAL_IMAGE_NAME $DOCKER_REGISTRY/$CI_PROJECT_PATH:latest;
-          docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH:latest;
+          docker run -e LOCAL_USER=root ${LOCAL_IMAGE_NAME}-${OS} /bin/bash -c "cd /gt/trace-db && make check";
+          if [ "$OS" = "ubuntu" ];
+          then
+              docker tag ${LOCAL_IMAGE_NAME}-${OS} $DOCKER_REGISTRY/$CI_PROJECT_PATH:latest;
+              docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH:latest;
+          elif [ "$OS" = "arch" ];
+          then
+              docker tag ${LOCAL_IMAGE_NAME}-${OS} $DOCKER_REGISTRY/$CI_PROJECT_PATH:arch;
+              docker push $DOCKER_REGISTRY/$CI_PROJECT_PATH:arch;
+          fi
       else
-          docker run -e LOCAL_USER=root $LOCAL_IMAGE_NAME /bin/bash -c "cd /gt/trace-db && make check";
+          docker run -e LOCAL_USER=root ${LOCAL_IMAGE_NAME}-${OS} /bin/bash -c "cd /gt/trace-db && make check";
       fi
 
     # Cleanup
-    - docker rmi -f $LOCAL_IMAGE_NAME
+    - docker rmi -f ${LOCAL_IMAGE_NAME}-${OS}
+
+run-ubuntu:
+  stage: build-test-and-tag
+  variables:
+    OS: 'ubuntu'
+  <<: *run
+
+run-arch:
+  stage: build-test-and-tag
+  variables:
+    OS: 'arch'
+  <<: *run
