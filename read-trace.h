@@ -3,8 +3,12 @@
 #ifndef __READ_TRACE_H
 #define __READ_TRACE_H
 
+#include <cassert>
 #include <cstdint>
 #include <cstdio>
+
+#include <boost/archive/basic_archive.hpp>
+
 #include "types.h"
 
 extern "C" {
@@ -34,9 +38,9 @@ enum trace_error {
 typedef struct trace_read_state
 {
     FILE *file;
-    const char **names;
+    char **names;
     uint32_t n_names;
-    const type_description *types;
+    type_description *types;
     uint32_t n_types;
 
     trace_buffer_size *size_buffer;
@@ -102,5 +106,95 @@ typedef struct trace_point
 enum trace_error read_trace_point(trace_read_state *state, trace_point *result_ptr);
 
 } // end extern "C"
+
+bool operator==(const trace_var_info &a,
+                const trace_var_info &b);
+bool operator==(const trace_point &a,
+                const trace_point &b);
+
+namespace boost {
+namespace serialization {
+
+template<class Archive>
+void serialize(Archive & ar,
+               trace_var_info & var_info,
+               const unsigned int version) {
+    ar & var_info.value.u;
+    ar & var_info.name_index;
+    ar & var_info.type_index;
+    ar & var_info.size;
+    ar & var_info.buffer_size;
+    ar & var_info.has_buffer_size;
+}
+
+template<class Archive>
+void save(Archive & ar,
+          const trace_point & trace_point,
+          const unsigned int version) {
+    ar & trace_point.statement;
+    ar & trace_point.n_sizes;
+    ar & trace_point.n_vars;
+    ar & trace_point.n_aux;
+
+    for (uint32_t i = 0; i < trace_point.n_sizes; i++)
+        ar & trace_point.sizes[i];
+
+    for (uint32_t i = 0; i < trace_point.n_vars; i++)
+        ar & trace_point.vars[i];
+
+    for (uint32_t i = 0; i < trace_point.n_aux; i++)
+        ar & trace_point.aux[i];
+}
+
+template<class Archive>
+void load(Archive & ar,
+          trace_point & trace_point,
+          unsigned int version) {
+    ar & trace_point.statement;
+    ar & trace_point.n_sizes;
+    ar & trace_point.n_vars;
+    ar & trace_point.n_aux;
+
+    assert(trace_point.n_sizes >= 0);
+    assert(trace_point.n_vars >= 0);
+    assert(trace_point.n_aux >= 0);
+
+    trace_point.sizes = NULL;
+    trace_point.vars = NULL;
+    trace_point.aux = NULL;
+
+    if (trace_point.n_sizes > 0)
+        trace_point.sizes =
+            (trace_buffer_size*) calloc(trace_point.n_sizes,
+                                        sizeof(trace_buffer_size));
+    if (trace_point.n_vars > 0)
+        trace_point.vars =
+            (trace_var_info*) calloc(trace_point.n_vars,
+                                     sizeof(trace_var_info));
+    if (trace_point.n_aux > 0)
+        trace_point.aux =
+            (uint64_t*) calloc(trace_point.n_aux,
+                               sizeof(uint64_t));
+
+    for (uint32_t i = 0; i < trace_point.n_sizes; i++)
+        ar & trace_point.sizes[i];
+
+    for (uint32_t i = 0; i < trace_point.n_vars; i++)
+        ar & trace_point.vars[i];
+
+    for (uint32_t i = 0; i < trace_point.n_aux; i++)
+        ar & trace_point.aux[i];
+}
+
+
+template<class Archive>
+void serialize(Archive & ar,
+               trace_point & trace_point,
+               const unsigned int file_version) {
+    split_free(ar, trace_point, file_version);
+}
+
+} // end namespace serialization
+} // end namespace boost
 
 #endif // __READ_TRACE_H

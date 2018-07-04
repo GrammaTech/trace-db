@@ -5,7 +5,7 @@ ifneq ("$(wildcard local.mk)","")
 include local.mk
 endif
 
-SRCS = read-trace.cpp write-trace.cpp utils.cpp trace-db.cpp
+SRCS = read-trace.cpp write-trace.cpp utils.cpp types.cpp trace-db.cpp
 OBJS := $(addsuffix .o,$(basename $(SRCS)))
 DEPS := $(addsuffix .d,$(basename $(SRCS)))
 

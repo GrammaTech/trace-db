@@ -4,8 +4,11 @@
 #include <vector>
 #include <map>
 #include <random>
+#include <sstream>
 #include <utility>
 
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 
 #include "read-trace.h"
@@ -277,6 +280,29 @@ void set_trace(trace_db *db, uint32_t index, trace *new_trace)
         db->traces[index] = *new_trace;
         db->n_traces = length;
     }
+}
+
+char* serialize_trace_db(trace_db *db) {
+    std::stringstream ss;
+    boost::archive::text_oarchive oa(ss);
+    oa << *db;
+
+    std::string t = ss.str();
+    char * ret = NULL;
+    ret = (char*) malloc(t.length() + 1);
+    memcpy(ret, t.c_str(), t.length() + 1);
+    return ret;
+}
+
+trace_db* deserialize_trace_db(const char* text) {
+    trace_db * db = create_db();
+
+    std::stringstream ss;
+    ss << std::string(text);
+    boost::archive::text_iarchive ia(ss);
+    ia >> *db;
+
+    return db;
 }
 
 void free_db(trace_db *db)
@@ -789,4 +815,42 @@ void free_predicate(predicate *predicate)
         free_predicate_helper(predicate);
         free(predicate);
     }
+}
+
+bool operator==(const trace & a, const trace & b) {
+    bool ret = (a.n_points == b.n_points &&
+                a.n_names == b.n_names &&
+                a.n_types == b.n_types);
+
+    if (ret) {
+        for (uint64_t i = 0; i < a.n_points && ret; i++) {
+            ret &= (a.points[i] == b.points[i]);
+        }
+    }
+
+    if (ret) {
+        for (uint32_t i = 0; i < a.n_names && ret; i++) {
+            ret &= (strcmp(a.names[i], b.names[i]) == 0);
+        }
+    }
+
+    if (ret) {
+        for (uint32_t i = 0; i < a.n_types && ret; i++) {
+            ret &= (a.types[i] == b.types[i]);
+        }
+    }
+
+    return ret;
+}
+
+bool operator==(const trace_db &a, const trace_db &b) {
+    bool ret = (a.n_traces == b.n_traces);
+
+    if (ret) {
+        for (uint64_t i = 0; i < a.n_traces && ret; i++) {
+            ret &= (a.traces[i] == b.traces[i]);
+        }
+    }
+
+    return ret;
 }

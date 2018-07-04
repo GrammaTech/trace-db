@@ -43,7 +43,7 @@ trace_read_state *start_reading(const char *filename, int timeout_seconds)
         if (buf[i] == 0)
             n_strings++;
     }
-    state->names = (const char**)malloc(sizeof(char*) * n_strings);
+    state->names = (char**)malloc(sizeof(char*) * n_strings);
 
     /* Scan again to find starts of each string */
     for (i = 0; i < n_strings; i++) {
@@ -289,4 +289,42 @@ enum trace_error read_trace_point(trace_read_state *state, trace_point *result_p
     *result_ptr = result;
  error:
     return state->error_code;
+}
+
+bool operator==(const trace_var_info &a,
+                const trace_var_info &b) {
+    return a.value.u == b.value.u &&
+           a.name_index == b.name_index &&
+           a.type_index == b.type_index &&
+           a.size == b.size &&
+           a.buffer_size == b.buffer_size &&
+           a.has_buffer_size == b.has_buffer_size;
+}
+
+bool operator==(const trace_point &a,
+                const trace_point &b) {
+    bool ret = (a.statement == b.statement &&
+                a.n_sizes == b.n_sizes &&
+                a.n_vars == b.n_vars &&
+                a.n_aux == b.n_aux);
+
+    if (ret) {
+        for (uint32_t i = 0; i < a.n_sizes && ret; i++) {
+            ret &= (a.sizes[i] == b.sizes[i]);
+        }
+    }
+
+    if (ret) {
+        for (uint32_t i = 0; i < a.n_vars && ret; i++) {
+            ret &= (a.vars[i] == b.vars[i]);
+        }
+    }
+
+    if (ret) {
+        for (uint32_t i = 0; i < a.n_aux && ret; i++) {
+            ret &= (a.vars[i] == b.vars[i]);
+        }
+    }
+
+    return ret;
 }

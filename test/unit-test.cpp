@@ -1,11 +1,17 @@
 #include <cassert>
+#include <cfloat>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
 
 #include "read-trace.h"
 #include "trace-db.h"
@@ -906,6 +912,203 @@ void test_query_soft_predicates()
     free_db(db);
 }
 
+void test_trace_buffer_size_serialization ()
+{
+    std::ostringstream oss;
+    boost::archive::text_oarchive oa(oss);
+
+    trace_buffer_size serialized;
+    trace_buffer_size deserialized;
+
+    serialized.address = 0x1000;
+    serialized.size = 10;
+    oa & serialized;
+
+    std::istringstream iss(oss.str());
+    boost::archive::text_iarchive ia(iss);
+
+    ia & deserialized;
+
+    ASSERT(serialized == deserialized);
+}
+
+void test_type_description_serialization ()
+{
+    std::ostringstream oss;
+    boost::archive::text_oarchive oa(oss);
+
+    type_description serialized;
+    type_description deserialized;
+
+    serialized.name_index = 1;
+    serialized.format = UNSIGNED;
+    serialized.size = 2;
+    oa & serialized;
+
+    std::istringstream iss(oss.str());
+    boost::archive::text_iarchive ia(iss);
+
+    ia & deserialized;
+
+    ASSERT(serialized == deserialized);
+}
+
+void test_trace_var_info_serialization ()
+{
+    std::ostringstream oss;
+    boost::archive::text_oarchive oa(oss);
+
+    trace_var_info serialized1;
+    trace_var_info serialized2;
+    trace_var_info serialized3;
+    trace_var_info serialized4;
+    trace_var_info serialized5;
+    trace_var_info deserialized1;
+    trace_var_info deserialized2;
+    trace_var_info deserialized3;
+    trace_var_info deserialized4;
+    trace_var_info deserialized5;
+
+    serialized1.value.u = UINT32_MAX;
+    serialized1.name_index = 2u;
+    serialized1.type_index = 3u;
+    serialized1.size = 4u;
+    serialized1.buffer_size = 5u;
+    serialized1.has_buffer_size = true;
+
+    serialized2 = serialized1;
+    serialized2.value.s = INT32_MAX;
+
+    serialized3 = serialized1;
+    serialized3.value.f = FLT_MIN;
+
+    serialized4 = serialized1;
+    serialized4.value.d = DBL_MIN;
+
+    serialized5 = serialized1;
+    serialized5.value.ptr = &serialized1;
+
+    oa & serialized1 & serialized2 & serialized3
+       & serialized4 & serialized5;
+
+    std::istringstream iss(oss.str());
+    boost::archive::text_iarchive ia(iss);
+    ia & deserialized1 & deserialized2 & deserialized3
+       & deserialized4 & deserialized5;
+
+    ASSERT(serialized1 == deserialized1);
+    ASSERT(serialized2 == deserialized2);
+    ASSERT(serialized3 == deserialized3);
+    ASSERT(serialized4 == deserialized4);
+    ASSERT(serialized5 == deserialized5);
+    ASSERT(deserialized1.value.u == UINT32_MAX);
+    ASSERT(deserialized2.value.s == INT32_MAX);
+    ASSERT(deserialized3.value.f == FLT_MIN);
+    ASSERT(deserialized4.value.d == DBL_MIN);
+    ASSERT(deserialized5.value.ptr == &serialized1);
+}
+
+void test_trace_point_serialization ()
+{
+    std::ostringstream oss;
+    boost::archive::text_oarchive oa(oss);
+
+    trace_point serialized;
+    trace_point deserialized;
+
+    serialized.statement = 1u;
+    serialized.n_sizes = 1u;
+    serialized.n_vars = 1u;
+    serialized.n_aux = 1u;
+    serialized.sizes = (trace_buffer_size*)malloc(sizeof(trace_buffer_size));
+    serialized.vars = (trace_var_info*)malloc(sizeof(trace_var_info));
+    serialized.aux = (uint64_t*)malloc(sizeof(uint64_t));
+
+    serialized.sizes[0].address = 1u;
+    serialized.sizes[0].size = 2u;
+    serialized.vars[0].value.u = 1u;
+    serialized.vars[0].name_index = 2u;
+    serialized.vars[0].type_index = 3u;
+    serialized.vars[0].size = 4u;
+    serialized.vars[0].buffer_size = 5u;
+    serialized.vars[0].has_buffer_size = true;
+    serialized.aux[0] = 32u;
+
+    oa & serialized;
+
+    std::istringstream iss(oss.str());
+    boost::archive::text_iarchive ia(iss);
+    ia & deserialized;
+
+    ASSERT(serialized == deserialized);
+}
+
+void test_trace_serialization ()
+{
+    std::ostringstream oss;
+    boost::archive::text_oarchive oa(oss);
+
+    trace serialized;
+    trace deserialized;
+
+    serialized.n_points = 512;
+    serialized.n_points_allocated = 1024;
+    serialized.points = (trace_point*) calloc(1024, sizeof(trace_point));
+    serialized.points[0].statement = 1u;
+    serialized.points[0].n_vars = 1u;
+    serialized.points[0].vars = (trace_var_info*)malloc(sizeof(trace_var_info));
+    serialized.points[0].vars[0].value.u = 1u;
+    serialized.points[0].vars[0].name_index = 1u;
+    serialized.points[0].vars[0].type_index = 1u;
+    serialized.points[0].vars[0].size = 4u;
+    serialized.points[0].vars[0].buffer_size = 5u;
+    serialized.points[0].vars[0].has_buffer_size = true;
+
+    serialized.n_names = 2;
+    serialized.names = (char**) calloc(2, sizeof(char*));
+    serialized.names[0] = (char*) "hello";
+    serialized.names[1] = (char*) "world";
+
+    serialized.n_types = 2;
+    serialized.types = (type_description *) calloc(2, sizeof(type_description));
+    serialized.types[0].name_index = 0;
+    serialized.types[0].format = POINTER;
+    serialized.types[0].size = 4;
+    serialized.types[1].name_index = 1;
+    serialized.types[1].format = FLOAT;
+    serialized.types[1].size = 4;
+
+    oa & serialized;
+
+    std::istringstream iss(oss.str());
+    boost::archive::text_iarchive ia(iss);
+    ia & deserialized;
+
+    ASSERT(serialized == deserialized);
+}
+
+void test_trace_db_serialization ()
+{
+    std::ostringstream oss;
+    boost::archive::text_oarchive oa(oss);
+
+    trace_db serialized;
+    trace_db deserialized;
+
+    serialized.n_traces = 4;
+    serialized.n_traces_allocated = 8;
+    serialized.traces = (trace*) calloc(8, sizeof(trace));
+    memset(serialized.traces, 0, serialized.n_traces_allocated * sizeof(trace));
+
+    oa & serialized;
+
+    std::istringstream iss(oss.str());
+    boost::archive::text_iarchive ia(iss);
+    ia & deserialized;
+
+    ASSERT(serialized == deserialized);
+}
+
 int main(int argc, char **argv)
 {
     failure_count = 0;
@@ -926,6 +1129,12 @@ int main(int argc, char **argv)
     RUN_TEST(test_query_predicates);
     RUN_TEST(test_query_var_sizes);
     RUN_TEST(test_query_soft_predicates);
+    RUN_TEST(test_trace_buffer_size_serialization);
+    RUN_TEST(test_type_description_serialization);
+    RUN_TEST(test_trace_var_info_serialization);
+    RUN_TEST(test_trace_point_serialization);
+    RUN_TEST(test_trace_serialization);
+    RUN_TEST(test_trace_db_serialization);
 
     unlink(TRACE_FILE);
 

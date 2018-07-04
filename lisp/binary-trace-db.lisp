@@ -214,6 +214,10 @@
 (defcfun create-db :pointer)
 (defcfun ("add_trace" c-add-trace) :void
   (db :pointer) (state :pointer) (max :uint64))
+(defcfun ("serialize_trace_db" c-serialize-trace-db) :string
+  (db :pointer))
+(defcfun ("deserialize_trace_db" c-deserialize-trace-db) :pointer
+  (text :string))
 (defcfun free-db :void (db :pointer))
 
 (defcstruct c-trace
@@ -232,7 +236,7 @@
   (n-traces-allocated :uint64))
 
 (defclass binary-trace-db (trace-db)
-  ((db-pointer :reader db-pointer)
+  ((db-pointer :reader db-pointer :accessor db-pointer)
    (trace-metadata :initform nil :accessor trace-metadata :type 'list)))
 
 (defmethod initialize-instance :after ((instance binary-trace-db) &key)
@@ -245,17 +249,21 @@
   "Object code for serialization of binary-trace-db software objects.")
 
 (defstore-cl-store (obj binary-trace-db stream)
-  (let ((trace-list (iter (for i from 0 to (1- (n-traces obj)))
-                          (collect (get-trace obj i)))))
-    (output-type-code *binary-trace-db-obj-code* stream)
-    (cl-store::store-object trace-list stream)))
+  (output-type-code *binary-trace-db-obj-code* stream)
+  (cl-store::store-object `((:db . ,(c-serialize-trace-db (db-pointer obj)))
+                            (:trace-metadata . ,(trace-metadata obj)))
+                          stream))
 
 (defrestore-cl-store (binary-trace-db stream)
   (let ((trace-db (make-instance 'binary-trace-db))
-        (trace-list (cl-store::restore-object stream)))
-    (iter (for (trace . metadata) in trace-list)
-          (for i upfrom 0)
-          (set-trace trace-db i (cdr trace) metadata))
+        (restore (cl-store::restore-object stream)))
+    (when (not (or (null (cdr (assoc :db restore)))
+                   (equal "" (cdr (assoc :db restore)))))
+      (setf (db-pointer trace-db)
+            (c-deserialize-trace-db (cdr (assoc :db restore)))))
+    (when (cdr (assoc :trace-metadata restore))
+      (setf (trace-metadata trace-db)
+            (cdr (assoc :trace-metadata restore))))
     trace-db))
 
 (defun get-trace-struct (db index)

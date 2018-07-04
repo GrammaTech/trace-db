@@ -4,6 +4,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include <cassert>
+
+#include <boost/archive/basic_archive.hpp>
+
 #include "read-trace.h"
 
 typedef struct trace
@@ -12,9 +16,9 @@ typedef struct trace
     uint64_t n_points;
     uint64_t n_points_allocated;
 
-    const char **names;
+    char **names;
     uint32_t n_names;
-    const type_description *types;
+    type_description *types;
     uint32_t n_types;
 } trace;
 
@@ -25,11 +29,17 @@ typedef struct trace_db
     uint64_t n_traces_allocated;
 } trace_db;
 
+/* Allocate a trace DB */
 trace_db *create_db();
 /* Read a trace into the DB */
 void add_trace(trace_db *db, trace_read_state *state, uint64_t max);
 /* Store an existing trace in the DB */
 void set_trace(trace_db *db, uint32_t index, trace *trace);
+/* Serialize a trace DB */
+char* serialize_trace_db(trace_db *db);
+/* Deserialize a trace DB */
+trace_db* deserialize_trace_db(const char* text);
+/* Deallocate a trace DB */
 void free_db(trace_db *db);
 
 typedef struct free_variable
@@ -134,5 +144,125 @@ void compute_buffer_size(const skip_list *memory_map,
 #ifdef __cplusplus
 } // end extern "C"
 #endif
+
+bool operator==(const trace & a, const trace & b);
+bool operator==(const trace_db & a, const trace_db & b);
+
+namespace boost {
+namespace serialization {
+
+template<class Archive>
+void save(Archive & ar,
+          const trace & trace,
+          const unsigned int version) {
+    ar & trace.n_points;
+    ar & trace.n_points_allocated;
+    ar & trace.n_names;
+    ar & trace.n_types;
+
+    for (uint64_t i = 0; i < trace.n_points; i++)
+        ar & trace.points[i];
+
+    for (uint32_t i = 0; i < trace.n_names; i++) {
+        size_t len = strlen(trace.names[i]) + 1;
+        ar & len;
+        for (size_t j = 0; j < len; j++) {
+            ar & trace.names[i][j];
+        }
+    }
+
+    for (uint32_t i = 0; i< trace.n_types; i++)
+        ar & trace.types[i];
+}
+
+template<class Archive>
+void load(Archive & ar,
+          trace & trace,
+          const unsigned int version) {
+    ar & trace.n_points;
+    ar & trace.n_points_allocated;
+    ar & trace.n_names;
+    ar & trace.n_types;
+
+    assert(trace.n_points >= 0);
+    assert(trace.n_points_allocated >= 0);
+    assert(trace.n_names >= 0);
+    assert(trace.n_types >= 0);
+
+    trace.points = NULL;
+    trace.names = NULL;
+    trace.types = NULL;
+
+    if (trace.n_points_allocated > 0)
+        trace.points = (trace_point*) calloc(trace.n_points_allocated,
+                                             sizeof(trace_point));
+    if (trace.n_names > 0)
+        trace.names = (char **) calloc(trace.n_names,
+                                       sizeof(char*));
+    if (trace.n_types > 0)
+        trace.types = (type_description *) calloc(trace.n_types,
+                                                  sizeof(type_description));
+
+    for (uint64_t i = 0; i < trace.n_points; i++)
+        ar & trace.points[i];
+
+    for (uint32_t i = 0; i < trace.n_names; i++) {
+        size_t len;
+        ar & len;
+        trace.names[i] = (char*) calloc(len, sizeof(char));
+        for (size_t j = 0; j < len; j++) {
+            ar & trace.names[i][j];
+        }
+    }
+
+    for (uint32_t i = 0; i < trace.n_types; i++)
+        ar & trace.types[i];
+}
+
+template<class Archive>
+void serialize(Archive & ar,
+               trace & trace,
+               const unsigned int file_version) {
+    split_free(ar, trace, file_version);
+}
+
+template<class Archive>
+void save(Archive & ar,
+          const trace_db & trace_db,
+          const unsigned int version) {
+    ar & trace_db.n_traces;
+    ar & trace_db.n_traces_allocated;
+
+    for (uint64_t i = 0; i < trace_db.n_traces; i++)
+        ar & trace_db.traces[i];
+}
+
+template<class Archive>
+void load(Archive & ar,
+          trace_db & trace_db,
+          const unsigned int version) {
+    ar & trace_db.n_traces;
+    ar & trace_db.n_traces_allocated;
+
+    assert(trace_db.n_traces >= 0);
+    assert(trace_db.n_traces_allocated >= 0);
+
+    trace_db.traces = NULL;
+    if (trace_db.n_traces_allocated > 0)
+        trace_db.traces = (trace*) calloc(trace_db.n_traces, sizeof(trace));
+
+    for (uint64_t i = 0; i < trace_db.n_traces; i++)
+        ar & trace_db.traces[i];
+}
+
+template<class Archive>
+void serialize(Archive & ar,
+               trace_db & trace_db,
+               const unsigned int file_version) {
+    split_free(ar, trace_db, file_version);
+}
+
+} // end namespace serialization
+} // end namespace boost
 
 #endif // __TRACE_DB_H

@@ -5,6 +5,8 @@
 
 #include <stdint.h>
 
+#include <boost/archive/basic_archive.hpp>
+
 extern "C" {
 
 enum type_format {
@@ -42,5 +44,33 @@ typedef struct trace_buffer_size
 } trace_buffer_size;
 
 } // end extern "C"
+
+bool operator==(const type_description & a,
+                const type_description & b);
+bool operator==(const trace_buffer_size & a,
+                const trace_buffer_size & b);
+
+namespace boost {
+namespace serialization {
+
+template<class Archive>
+void serialize(Archive & ar,
+               type_description & type_description,
+               const unsigned int version) {
+    ar & type_description.name_index;
+    ar & type_description.format;
+    ar & type_description.size;
+}
+
+template<class Archive>
+void serialize(Archive & ar,
+               trace_buffer_size & buffer_size,
+               const unsigned int version) {
+    ar & buffer_size.address;
+    ar & buffer_size.size;
+}
+
+} // end namespace serialization
+} // end namespace boost
 
 #endif // __TYPES_H
