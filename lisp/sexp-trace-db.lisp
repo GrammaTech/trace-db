@@ -16,7 +16,26 @@
                    :type list
                    :initform nil)))
 
-(defclass single-file-sexp-trace-db (sexp-trace-db) ())
+(defclass single-file-sexp-trace-db (sexp-trace-db)
+  ((file-id :initarg :file-id
+            :reader file-id
+            :type number)
+   (parent-db :initarg :parent-db
+              :reader parent-db
+              :type sexp-trace-db)))
+
+(defvar *single-file-sexp-trace-db-obj-code*
+  (register-code 254 'single-file-sexp-trace-db)
+  "Object code for serialization of single-file-sexp-trace-db
+software objects.")
+
+(defstore-cl-store (obj single-file-sexp-trace-db stream)
+  ;; Do not serialize single file trace databases
+  (output-type-code *single-file-sexp-trace-db-obj-code* stream)
+  (cl-store::store-object nil stream))
+
+(defrestore-cl-store (single-file-sexp-trace-db stream)
+  (cl-store::restore-object stream))
 
 (defun read-sexp-trace (file &key timeout (predicate #'identity) max)
   "Read a trace from FILE-NAME with `read-trace-stream'."
@@ -153,11 +172,18 @@ KWARGS are passed on to the OPEN call."
             (nth index (trace-metadata db))))))
 
 (defmethod restrict-to-file ((db sexp-trace-db) file-id)
-  (make-instance 'single-file-sexp-trace-db
-    :traces (mapcar (lambda (trace)
-                      (remove-if-not [{eq file-id} #'cdr {assoc :f}] trace))
-                    (traces db))
-    :trace-metadata (trace-metadata db)))
+  (make-instance 'single-file-sexp-trace-db :parent-db db :file-id file-id))
+
+(defmethod traces ((db single-file-sexp-trace-db))
+  (if (slot-value db 'traces)
+      (slot-value db 'traces)
+      (setf (slot-value db 'traces)
+            (mapcar (lambda (trace)
+                      (remove-if-not [{eq (file-id db)} #'cdr {assoc :f}] trace))
+                    (traces (parent-db db))))))
+
+(defmethod trace-metadata ((db single-file-sexp-trace-db))
+  (trace-metadata (parent-db db)))
 
 (defun cartesian-without-duplicates (lists &key (test #'equalp))
   "Cartesian product of a set of lists, without sets containing duplicates.

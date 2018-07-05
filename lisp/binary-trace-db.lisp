@@ -236,8 +236,12 @@
   (n-traces-allocated :uint64))
 
 (defclass binary-trace-db (trace-db)
-  ((db-pointer :reader db-pointer :accessor db-pointer)
-   (trace-metadata :initform nil :accessor trace-metadata :type 'list)))
+  ((db-pointer     :initarg :db-pointer
+                   :accessor db-pointer)
+   (trace-metadata :initarg :trace-metadata
+                   :accessor trace-metadata
+                   :type 'list
+                   :initform nil)))
 
 (defmethod initialize-instance :after ((instance binary-trace-db) &key)
   (load-libtrace-db)
@@ -250,7 +254,8 @@
 
 (defstore-cl-store (obj binary-trace-db stream)
   (output-type-code *binary-trace-db-obj-code* stream)
-  (cl-store::store-object `((:db . ,(c-serialize-trace-db (db-pointer obj)))
+  (cl-store::store-object `((:db . ,(when (db-pointer obj)
+                                      (c-serialize-trace-db (db-pointer obj))))
                             (:trace-metadata . ,(trace-metadata obj)))
                           stream))
 
@@ -605,15 +610,20 @@
         (appendf (trace-metadata db) (list metadata)))))
 
 (defclass single-file-binary-trace-db (binary-trace-db)
-  ((file-id :reader file-id :type number)
-   (parent-db :initarg :parent-db :type binary-trace-db :accessor parent-db))
+  ((file-id :initarg :file-id
+            :reader file-id
+            :type number)
+   (parent-db :initarg :parent-db
+              :reader parent-db
+              :type binary-trace-db))
   (:documentation
    "Wrapper around binary-trace-db which restricts queries to one file of a
 project."))
 
 (defvar *single-file-binary-trace-db-obj-code*
   (register-code 256 'single-file-binary-trace-db)
-  "Object code for serialization of single-file-trace-db software objects.")
+  "Object code for serialization of single-file-binary-trace-db
+software objects.")
 
 (defstore-cl-store (obj single-file-binary-trace-db stream)
   ;; Do not serialize single file trace databases
@@ -629,8 +639,8 @@ project."))
   ;; create a finalizer. The original DB is still the owner of the
   ;; database and will free it.
   (let ((result (make-instance 'single-file-binary-trace-db
-                               :parent-db db)))
-    (setf (slot-value result 'file-id) file-id)
+                  :parent-db db
+                  :file-id file-id)))
     (setf (slot-value result 'db-pointer) (db-pointer db))
     result))
 
