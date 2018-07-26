@@ -37,11 +37,11 @@ software objects.")
 (defrestore-cl-store (single-file-sexp-trace-db stream)
   (cl-store::restore-object stream))
 
-(defun read-sexp-trace (file &key timeout (predicate #'identity) max)
+(defun read-sexp-trace (file &key timeout max)
   "Read a trace from FILE-NAME with `read-trace-stream'."
   (when-let ((in (open-file-timeout file timeout)))
     (unwind-protect
-        (read-trace-stream in :max max :predicate predicate)
+        (read-trace-stream in :max max)
       (close in))))
 
 (defun read-trace-stream
@@ -96,14 +96,10 @@ KWARGS are passed on to the OPEN call."
     (push trace (traces db))
     (push metadata (trace-metadata db))))
 
-(defmethod set-trace ((db sexp-trace-db) index trace &optional metadata)
-  (if (< index (n-traces db))
-      (progn
-        (setf (nth index (traces db)) trace)
-        (setf (nth index (trace-metadata db)) metadata))
-      (progn
-        (appendf (traces db) trace)
-        (appendf (trace-metadata db) metadata))))
+(defmethod add-trace-points ((db sexp-trace-db) (trace list)
+                             &optional metadata)
+  (push trace (traces db))
+  (push metadata (trace-metadata db)))
 
 (defmethod get-trace ((db sexp-trace-db) index &key file-id)
   (cons (cons :trace (if file-id
@@ -130,7 +126,8 @@ KWARGS are passed on to the OPEN call."
                      :test #'string=))
 
 (defmethod query-trace ((db sexp-trace-db) index var-names var-types
-                         &key pick file-id predicate soft-predicates filter)
+                         &key pick file-id predicate soft-predicates
+                           (filter (constantly t)))
   (declare (ignorable file-id var-names predicate))
   (assert (null soft-predicates)
           nil "SOFT-PREDICATES are not supported by SEXP-TRACE-DB")
@@ -155,7 +152,8 @@ KWARGS are passed on to the OPEN call."
                       (-<>> (random-elt trace)
                             (satisfying-assignments-at-point)
                             (remove-if-not (lambda (pt)
-                                             (apply filter (cdr (assoc :f pt))
+                                             (apply filter
+                                                    (cdr (assoc :f pt))
                                                     (cdr (assoc :c pt))
                                                     (cdr (assoc :scopes pt)))))
                             (remove-duplicates <>
@@ -163,7 +161,8 @@ KWARGS are passed on to the OPEN call."
                                                :test #'equalp))
                       (-<>> (mappend #'satisfying-assignments-at-point trace)
                             (remove-if-not (lambda (pt)
-                                             (apply filter (cdr (assoc :f pt))
+                                             (apply filter
+                                                    (cdr (assoc :f pt))
                                                     (cdr (assoc :c pt))
                                                     (cdr (assoc :scopes pt)))))
                             (remove-duplicates <>

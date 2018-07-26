@@ -5,10 +5,10 @@
 (in-readtable :curry-compose-reader-macros)
 
 (define-constant +lib-dir+
-    (make-pathname :directory (butlast (pathname-directory
-                                        #.(or *compile-file-truename*
-                                              *load-truename*
-                                              *default-pathname-defaults*))))
+    (make-pathname :directory (pathname-directory
+                               #.(or *compile-file-truename*
+                                     *load-truename*
+                                     *default-pathname-defaults*)))
   :test #'equalp
   :documentation "Path to directory holding shared library.")
 
@@ -30,214 +30,203 @@
   :signed
   :float
   :pointer
-  :blob)
+  :blob
+  :invalid-format)
 
-(defcstruct (buffer-size :class c-buffer-size)
-  (address :uint64)
-  (size :uint64))
-
-(defcstruct (type-description :class c-type-description)
-  (name-index :uint32)
-  (format type-format)
-  (size :uint32))
-
-(defstruct (type-description (:conc-name type-))
-  (name-index nil :type fixnum)
-  (format nil :type symbol)
-  (size nil :type (unsigned-byte 32)))
-
-(defcstruct (var-info :class c-var-info)
+(defcstruct (var-info :class c-trace-var-info-struct)
   ;; CFFI's handling of the union here seems to be broken.
   ;; Use an integer here to get the correct layout, and figure out the
   ;; real type when we dereference.
   (value :uint64)
-  (name-index :uint32)
-  (type-index :uint32)
+  (format type-format)
+  (var-name-index :uint32)
+  (type-name-index :uint32)
   (size :uint32)
   (buffer-size :uint64)
   (has-buffer-size :uint8))
 
-(defcstruct trace-read-state
-  (file :pointer)
-  (names (:pointer :string))
-  (n-names :uint32)
-  (types (:pointer (:struct type-description)))
-  (n-types :uint32))
-
-(defcstruct (trace-point :class c-trace-point)
+(defcstruct (trace-point :class c-trace-point-struct)
   (statement :uint64)
-  (sizes (:pointer (:struct buffer-size)))
-  (n-sizes :uint32)
   (vars (:pointer (:struct var-info)))
   (n-vars :uint32)
   (aux (:pointer :uint64))
   (n-aux :uint32))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defmethod expand-from-foreign (info (type c-buffer-size))
-    `(with-foreign-slots ((address size) ,info (:struct buffer-size))
-       (cons address size)))
-  (defmethod expand-from-foreign (info (type c-var-info))
-    `(with-foreign-slots ((name-index type-index size
+  (defmethod expand-from-foreign (info (type c-trace-var-info-struct))
+    `(with-foreign-slots ((format var-name-index type-name-index size
                            has-buffer-size buffer-size)
                           ,info
                           (:struct var-info))
-       `(,name-index ,type-index ,size ,(unless (zerop has-buffer-size)
-                                                buffer-size))))
-  (defmethod expand-from-foreign (point (type c-trace-point))
-    `(with-foreign-slots ((statement sizes n-sizes vars n-vars aux n-aux)
-                          ,point (:struct trace-point))
-       (list statement sizes n-sizes vars n-vars aux n-aux)))
-  (defmethod expand-from-foreign (type-struct (type c-type-description))
-    `(with-foreign-slots ((name-index format size)
-                          ,type-struct (:struct type-description))
-       (make-type-description :name-index name-index
-                              :format format
-                              :size size))))
+       (make-array 4 :initial-contents
+         (list var-name-index
+               type-name-index
+               (let* ((value (mem-ref ,info
+                                      (ecase format
+                                        (:unsigned :uint64)
+                                        (:signed :int64)
+                                        (:float
+                                         (if (= 4 size) :float :double))
+                                        (:pointer :uint64)
+                                        (:blob :pointer))
+                                      0)))
+                 (if (eq :blob format)
+                     ;; Blob: convert to string, or collect into byte array.
+                     (restart-case
+                         (foreign-string-to-lisp value :count size)
+                       (store-as-byte-array ()
+                         :report "Store as a byte array"
+                         (iter (for i below size)
+                               (collecting (mem-ref value :char i)
+                                           result-type 'vector))))
+                     ;; Primitive type
+                     value))
+               (unless (zerop has-buffer-size)
+                 buffer-size)))))
+  (defmethod expand-from-foreign (point (type c-trace-point-struct))
+    `(with-foreign-slots ((statement vars n-vars aux n-aux)
+                          ,point
+                          (:struct trace-point))
+       (list ;; SEL clang-project instrumentation packs file and AST
+             ;; indices into the trace ID, with the top bits used as a flag
+             ;; to indicate the presence of the file ID.
+             ;; Since SEL is likely to be the only Lisp client, it's
+             ;; convenient to handle this here.
+             (cons :c
+                   (if (> (logand statement (ash 1 63)) 0)
+                       (logand (1- (ash 1 +trace-id-statement-bits+))
+                               statement)
+                       statement))
+             (cons :f
+                   (when (> (logand statement (ash 1 63)) 0)
+                     (logand (1- (ash 1 +trace-id-file-bits+))
+                             (ash statement
+                                  (* -1 +trace-id-statement-bits+)))))
+             (cons :scopes
+                   (when (> n-vars 0)
+                     (iter (for i below n-vars)
+                           (collect (mem-aref vars
+                                              '(:struct var-info)
+                                              i)))))
+             (cons :aux
+                   (when (> n-aux 0)
+                     (foreign-array-to-lisp aux `(:array :uint64 ,n-aux))))))))
 
-(defcfun start-reading (:pointer (:struct trace-read-state))
-  (filename :string)
-  (timeout :int))
-
-(defcfun end-reading :void
-  (state :pointer))
-
-(defcfun read-trace-point :int
-  (state :pointer) (results :pointer))
 
 (defconstant +trace-id-file-bits+ 23
   "Number of bits in trace ID used to identify the file.")
 (defconstant +trace-id-statement-bits+ 40
   "Number of bits in trace ID used to identify the statement within a file.")
 
-(defun convert-trace-point (names types point &optional (index 0) &aux result)
-  "Convert a trace point to an alist."
-  (labels
-      ((get-value (vars type size index)
-         (let* ((offset (* index (foreign-type-size '(:struct var-info))))
-                (data (mem-ref vars
-                               (ecase (type-format type)
-                                 (:unsigned :uint64)
-                                 (:signed :int64)
-                                 (:float
-                                  (if (= 4 (type-size type)) :float :double))
-                                 (:pointer :uint64)
-                                 (:blob :pointer))
-                               offset)))
-           (if (eq :blob (type-format type))
-               ;; Blob: convert to string, or collect into byte array.
+(defcfun ("read_trace" c-read-trace) :pointer
+  (filename :string)
+  (timeout :uint32)
+  (max-points :uint64))
+
+(defcfun ("trace_size" c-trace-size) :uint64
+  (trace :pointer))
+
+(defcfun ("get_points" c-get-points) :pointer
+  (trace :pointer))
+
+(defcfun ("n_types" c-n-types) :uint32
+  (trace :pointer))
+
+(defcfun ("get_types" c-get-types) (:pointer :string)
+  (trace :pointer))
+
+(defcfun ("n_names" c-n-names) :uint32
+  (trace :pointer))
+
+(defcfun ("get_names" c-get-names) (:pointer :string)
+  (trace :pointer))
+
+(defcfun ("free_trace" c-free-trace) :void
+  (trace-ptr :pointer))
+
+(defcfun ("free_trace_points" c-free-trace-points) :void
+  (points :pointer)
+  (n_points :uint64))
+
+(defun convert-trace-points (trace-ptr trace-points-ptr n-points
+                             &key (filter (constantly t)))
+  "Convert the given list of foreign trace points (TRACE-POINTS-PTR) to
+common lisp.  A FILTER may be given to exclude some trace points from
+the results."
+  (labels ((get-names (trace-ptr)
+             (let ((n-names (c-n-names trace-ptr))
+                   (names-ptr (c-get-names trace-ptr)))
                (prog1
-                   (restart-case
-                       (foreign-string-to-lisp data :count size)
-                     (store-as-byte-array ()
-                       :report "Store as a byte array"
-                       (iter (for i below size)
-                             (collecting (mem-ref data :char i)
-                                         result-type 'vector))))
-                 (foreign-free data))
+                 (let ((names (iter (for i below n-names)
+                                    (collect (mem-aref names-ptr :string i)))))
+                   (make-array (length names) :initial-contents names))
+                 (foreign-free names-ptr))))
+           (convert-trace-point (point names)
+             (iter (for var in (cdr (assoc :scopes point)))
+                   (setf (elt var 0) (aref names (elt var 0))
+                         (elt var 1) (aref names (elt var 1))))
+             point))
+    (prog1
+      (iter (with names = (get-names trace-ptr))
+            (for i below n-points)
+            (when-let* ((point (convert-trace-point
+                                 (mem-aref trace-points-ptr
+                                           '(:struct trace-point)
+                                           i)
+                                 names))
+                        (_ (apply filter
+                                  (cdr (assoc :f point))
+                                  (cdr (assoc :c point))
+                                  (cdr (assoc :scopes point)))))
+              (collect point)))
+      (c-free-trace-points trace-points-ptr n-points))))
 
-               ;; Primitive type
-               data)))
-       (read-vars (vars count)
-         (iter (for i below count)
-               (destructuring-bind (name-index type-index size buffer-size)
-                   (mem-aref vars '(:struct var-info) i)
-                 (let ((type (aref types type-index)))
-                   (collect `#(,(aref names name-index)
-                               ,(aref names (type-name-index type))
-                               ,(get-value vars type size i)
-                               ,buffer-size)))))))
-    (destructuring-bind (statement sizes n-sizes vars n-vars aux n-aux)
-        (mem-aref point '(:struct trace-point) index)
-      (declare (ignorable sizes n-sizes))
-      (when (> n-vars 0)
-        (push (cons :scopes (read-vars vars n-vars))
-              result))
-      (when (> n-aux 0)
-        (push (cons :aux
-                    (foreign-array-to-lisp aux `(:array :uint64 ,n-aux)))
-              result))
-      (when (> statement 0)
-        ;; SEL clang-project instrumentation packs file and AST
-        ;; indices into the trace ID, with the top bits used as a flag
-        ;; to indicate the presence of the file ID.
-        ;; Since SEL is likely to be the only Lisp client, it's
-        ;; convenient to handle this here.
-        (if (> (logand statement (ash 1 63)) 0)
-            (progn (push (cons :c (logand (1- (ash 1 +trace-id-statement-bits+))
-                                          statement))
-                         result)
-                   (push (cons :f
-                               (logand (1- (ash 1 +trace-id-file-bits+))
-                                       (ash statement
-                                            (* -1 +trace-id-statement-bits+))))
-                         result))
-            (push (cons :c statement) result)))))
-  result)
-
-(defun read-binary-trace (file &key (timeout 0) (predicate #'identity) max
-                          &aux (collected 0))
+(defun read-binary-trace (file &key (timeout 0) (max 0))
   "Read a trace and convert to a list."
-  (load-libtrace-db)
-  (let ((state-ptr (start-reading file timeout)))
-    (unless (null-pointer-p state-ptr)
-      (let* ((state (mem-aref state-ptr '(:struct trace-read-state)))
-             (names (ignore-errors
-                      (iter (with ptr = (getf state 'names))
-                            (for i below (getf state 'n-names))
-                            (for str = (mem-aref ptr :string i))
-                            (while str)
-                            (collect str result-type 'vector))))
-             (types (ignore-errors
-                      (iter (with ptr = (getf state 'types))
-                            (for i below (getf state 'n-types))
-                            (for str =
-                                 (mem-aref ptr '(:struct type-description) i))
-                            (while str)
-                            (collect str result-type 'vector)))))
-        (unwind-protect
-             (when (and types names)
-               (with-foreign-object (point-struct '(:struct trace-point))
-                 (iter (while
-                           (and (eq 0 (read-trace-point state-ptr point-struct))
-                                (or (null max) (< collected max))))
-                       (for trace-point =
-                            (convert-trace-point names types point-struct))
-                       (when (funcall predicate trace-point)
-                         (incf collected)
-                         (collect trace-point)))))
-          (end-reading state-ptr))))))
+  (assert (and (integerp timeout) (not (negative-integer-p timeout)))
+          (timeout)
+          "TIMEOUT must be a non-negative integer value.")
+  (assert (and (integerp max) (not (negative-integer-p max)))
+          (max)
+          "MAX must be a non-negative integer value.")
 
+  (load-libtrace-db)
+  (let ((trace-ptr (c-read-trace file timeout max)))
+    (unless (null-pointer-p trace-ptr)
+      (convert-trace-points trace-ptr
+                            (c-get-points trace-ptr)
+                            (c-trace-size trace-ptr)))))
 
 
 ;;; Trace DB interface
-(defcfun create-db :pointer)
-(defcfun ("add_trace" c-add-trace) :void
-  (db :pointer) (state :pointer) (max :uint64))
+(defcfun ("create_db" c-create-db) :pointer)
+(defcfun ("add_trace" c-add-trace) :int
+  (db :pointer)
+  (filename :string)
+  (timeout :int)
+  (max :uint64))
+(defcfun ("add_trace_points" c-add-trace-points) :int
+  (db :pointer)
+  (points :pointer)
+  (n-points :uint64)
+  (names (:pointer :string))
+  (n-names :uint32))
+(defcfun ("get_trace" c-get-trace) :pointer
+  (db :pointer)
+  (index :uint32))
+(defcfun ("n_traces" c-n-traces) :uint32
+  (db :pointer))
 (defcfun ("serialize_trace_db" c-serialize-trace-db) :string
   (db :pointer))
 (defcfun ("deserialize_trace_db" c-deserialize-trace-db) :pointer
   (text :string))
-(defcfun free-db :void (db :pointer))
-
-(defcstruct c-trace
-  (points (:pointer (:struct trace-point)))
-  (n-points :uint64)
-  (n-points-allocated :uint64)
-
-  (names (:pointer :string))
-  (n-names :uint32)
-  (types (:pointer (:struct type-description)))
-  (n-types :uint32))
-
-(defcstruct trace-db
-  (traces (:pointer (:struct c-trace)))
-  (n-traces :uint64)
-  (n-traces-allocated :uint64))
+(defcfun ("free_db" c-free-db) :void
+  (db :pointer))
 
 (defclass binary-trace-db (trace-db)
   ((db-pointer     :initarg :db-pointer
-                   :accessor db-pointer)
+                   :accessor db-pointer
+                   :initform nil)
    (trace-metadata :initarg :trace-metadata
                    :accessor trace-metadata
                    :type 'list
@@ -245,9 +234,9 @@
 
 (defmethod initialize-instance :after ((instance binary-trace-db) &key)
   (load-libtrace-db)
-  (let ((db-pointer (create-db)))
-    (setf (slot-value instance 'db-pointer) db-pointer)
-    (finalize instance (lambda () (free-db db-pointer)))))
+  (when (null (db-pointer instance))
+    (setf (db-pointer instance) (c-create-db)))
+  (finalize instance (lambda () (c-free-db (db-pointer instance)))))
 
 (defvar *binary-trace-db-obj-code* (register-code 255 'binary-trace-db)
   "Object code for serialization of binary-trace-db software objects.")
@@ -260,90 +249,121 @@
                           stream))
 
 (defrestore-cl-store (binary-trace-db stream)
-  (let ((trace-db (make-instance 'binary-trace-db))
-        (restore (cl-store::restore-object stream)))
-    (when (not (or (null (cdr (assoc :db restore)))
-                   (equal "" (cdr (assoc :db restore)))))
-      (setf (db-pointer trace-db)
-            (c-deserialize-trace-db (cdr (assoc :db restore)))))
-    (when (cdr (assoc :trace-metadata restore))
-      (setf (trace-metadata trace-db)
-            (cdr (assoc :trace-metadata restore))))
-    trace-db))
-
-(defun get-trace-struct (db index)
-  "Return the C trace struct."
-  (let ((db-struct (mem-aref (db-pointer db) '(:struct trace-db))))
-    (assert (< index (getf db-struct 'n-traces)))
-    (mem-aref (getf db-struct 'traces) '(:struct c-trace) index)))
+  (load-libtrace-db)
+  (let* ((restore (cl-store::restore-object stream))
+         (db-pointer (when (not (emptyp (cdr (assoc :db restore))))
+                       (c-deserialize-trace-db (cdr (assoc :db restore)))))
+         (trace-metadata (cdr (assoc :trace-metadata restore))))
+    (make-instance 'binary-trace-db :db-pointer db-pointer
+                                    :trace-metadata trace-metadata)))
 
 (defmethod n-traces ((db binary-trace-db))
   "Return the number of traces stored in DB."
-  (getf (mem-aref (db-pointer db) '(:struct trace-db))
-        'n-traces))
+  (c-n-traces (db-pointer db)))
 
-(defmethod trace-size ((db binary-trace-db) index)
+(defmethod trace-size ((db binary-trace-db) (index integer))
   "Return the number of points in the trace at INDEX in DB."
-  (getf (get-trace-struct db index) 'n-points))
+  (assert (and (<= 0 index) (< index (n-traces db))) (index)
+          "INDEX must be in range [0, n-traces).")
+  (c-trace-size (c-get-trace (db-pointer db) index)))
 
-(defmethod add-trace ((db binary-trace-db) filename timeout
-                      metadata &key max)
-  (let ((state-pointer (start-reading (namestring filename) timeout)))
-    (unless (null-pointer-p state-pointer)
-      (c-add-trace (db-pointer db) state-pointer (or max 0))
-      (push metadata (trace-metadata db)))))
+(defmethod add-trace ((db binary-trace-db)
+                      (filename string)
+                      (timeout integer)
+                      (metadata list)
+                      &key max)
+  (assert (<= 0 timeout) (timeout)
+          "TIMEOUT must be a non-negative integer value.")
+  (assert (or (null max) (<= 0 max)) (max)
+          "MAX must be a non-negative integer value.")
 
-(defmethod trace-types ((db binary-trace-db) index)
+  (let ((success (c-add-trace (db-pointer db) filename timeout (or max 0))))
+    (unless (zerop success)
+      (push metadata (trace-metadata db))
+      t)))
+
+(defmethod add-trace-points ((db binary-trace-db) (trace list)
+                             &optional metadata)
+  "Directly add a list of trace points to the database.
+
+IMPORTANT: This method is for legacy testing purposes only.
+This method is not complete or efficient.
+DO NOT USE IN PRODUCTION OR NEW DEVELOPMENT."
+  (let ((names (remove-duplicates
+                 (mappend (lambda (point)
+                            (mappend (lambda (var)
+                                       (list (elt var 0) (elt var 1)))
+                                     (cdr (assoc :scopes point))))
+                          trace)
+                 :test #'string=)))
+    (c-add-trace-points
+      (db-pointer db)
+      (create-foreign-array
+        '(:struct trace-point)
+        (coerce
+          (mapcar
+            (lambda (point)
+              (let ((vars (mapcar
+                            (lambda (var-info)
+                              (let ((has-size (and (= 4 (length var-info))
+                                                   (elt var-info 3))))
+                                `(value ,(elt var-info 2)
+                                  format ,(if (< (elt var-info 2) 0)
+                                              :signed :unsigned)
+                                  var-name-index ,(position (elt var-info 0)
+                                                            names
+                                                            :test #'string=)
+                                  type-name-index ,(position (elt var-info 1)
+                                                             names
+                                                             :test #'string=)
+                                  size 8
+                                  has-buffer-size ,(if has-size 1 0)
+                                  buffer-size ,(if has-size
+                                                  (elt var-info 3)
+                                                  0))))
+                            (cdr (assoc :scopes point)))))
+                `(statement
+                  ,(if (cdr (assoc :f point))
+                       (logior (ash 1 63)                      ;flag bit
+                               (ash (cdr (assoc :f point))
+                                    +trace-id-statement-bits+) ;file ID
+                               (cdr (assoc :c point)))         ;AST ID
+                       (cdr (assoc :c point)))
+                  vars ,(create-foreign-array
+                           '(:struct var-info)
+                           (coerce vars 'vector))
+                  n-vars ,(length vars)
+                  aux ,(null-pointer)
+                  n-aux 0)))
+            trace)
+          'vector))
+      (length trace)
+      (create-foreign-array :string (coerce names 'vector))
+      (length names))
+    (push metadata (trace-metadata db))))
+
+(defmethod trace-types ((db binary-trace-db) (index integer))
   "Return the type names from the header of the trace at INDEX in DB."
-  (let* ((trace (get-trace-struct db index))
-         (names (iter (with ptr = (getf trace 'names))
-                      (for i below (getf trace 'n-names))
-                      (for str = (mem-aref ptr :string i))
-                      (collect str result-type 'vector))))
-    (iter (with ptr = (getf trace 'types))
-          (for i below (getf trace 'n-types))
-          (collect
-              (aref names
-                    (type-name-index (mem-aref ptr
-                                               '(:struct type-description)
-                                               i)))))))
+  (assert (and (<= 0 index) (< index (n-traces db))) (index)
+          "INDEX must be in range [0, n-traces).")
 
-(defun convert-results-setup (db index)
-  (let* ((trace (get-trace-struct db index))
-         (names (iter (with ptr = (getf trace 'names))
-                      (for i below (getf trace 'n-names))
-                      (for str = (mem-aref ptr :string i))
-                      (while str)
-                      (collect str result-type 'vector)))
-         (types (iter (with ptr = (getf trace 'types))
-                      (for i below (getf trace 'n-types))
-                      (for str =
-                           (mem-aref ptr '(:struct type-description) i))
-                      (while str)
-                      (collect str result-type 'vector))))
-    (list names types)))
+  (let* ((trace-ptr (c-get-trace (db-pointer db) index))
+         (n-types (c-n-types trace-ptr))
+         (types-ptr (c-get-types trace-ptr)))
+    (prog1
+      (iter (for i below n-types)
+            (collect (mem-aref types-ptr :string i)))
+      (foreign-free types-ptr))))
 
-(defun convert-results (db index n-results results-ptr
-                        &key filter)
-  (destructuring-bind (names types)
-      (convert-results-setup db index)
-    (iter (for i below n-results)
-          (when-let ((point (convert-trace-point names
-                                                 types
-                                                 results-ptr
-                                                 i)))
-            (when (or (not filter)
-                      (apply filter
-                             (cdr (assoc :f point))
-                             (cdr (assoc :c point))
-                             (cdr (assoc :scopes point))))
-              (collect point))))))
+(defmethod get-trace ((db binary-trace-db) (index integer) &key file-id)
+  "Return the trace points in the trace at INDEX in DB."
+  (assert (and (<= 0 index) (< index (n-traces db))) (index)
+          "INDEX must be in range [0, n-traces).")
 
-(defmethod get-trace ((db binary-trace-db) index &key file-id)
-  (let* ((struct (get-trace-struct db index))
-         (points (convert-results db index
-                                  (getf struct 'n-points)
-                                  (getf struct 'points))))
+  (let* ((trace-ptr (c-get-trace (db-pointer db) index))
+         (points (convert-trace-points trace-ptr
+                                       (c-get-points trace-ptr)
+                                       (c-trace-size trace-ptr))))
     (cons (cons :trace (if file-id
                            (remove-if-not [{eq file-id} #'cdr {assoc :f}]
                                           points)
@@ -352,52 +372,61 @@
 
 
 ;;; Database queries
-(defcstruct free-variable
-  (n-allowed-types :uint32)
-  (allowed-types (:pointer :uint32)))
-
 (defcenum predicate-kind
+  :null-predicate
   :var-reference
   :var-size
   :var-value
   :distinct-vars
-  :signed-integer
-  :unsigned-integer
+  :signed-value
+  :unsigned-value
+  :float-value
   :and
   :or
   :not
   :greater-than
+  :greater-than-or-equal
   :less-than
+  :less-than-or-equal
   :equal
   :add
   :subtract
   :multiply
   :divide)
 
-(defcstruct predicate
+(defcstruct c-predicate
   (kind predicate-kind)
-  (data :uint64)
-  (children (:pointer (:struct predicate))))
+  (n-children :uint64)
+  (var-index :uint64)
+  ;; CFFI does not handle union types properly so
+  ;; we have a separate variable for each type
+  ;; and use the appropriate value based on the
+  ;; predicate kind.
+  (unsigned-value :uint64)
+  (signed-value :int64)
+  (float-value :double)
+  (children (:pointer (:struct c-predicate))))
+
+(defcstruct c-free-variable
+  (n-allowed-types :uint32)
+  (allowed-types (:pointer :uint32)))
 
 (defcfun ("query_trace" c-query-trace) :void
-  (db (:pointer (:struct trace-db)))
+  (db :pointer)
   (index :uint64)
+  (variables (:pointer (:struct c-free-variable)))
   (n-variables :uint32)
-  (variables (:pointer (:struct free-variable)))
-  (predicate (:pointer (:struct predicate)))
+  (predicate (:pointer (:struct c-predicate)))
   (soft-predicates :pointer)
   (n-soft-predicates :uint32)
   (seed :uint32)
+  (keep-duplicate-bindings :uint8)
   (statement-mask :uint64)
   (statement :uint64)
   (results-out :pointer)
   (n-results :pointer))
 
-(defcfun free-query-result :void
-  (results-out :pointer)
-  (n-results :uint64))
-
-(defcfun free-predicate :void
+(defcfun ("free_c_predicate" c-free-c-predicate) :void
   (predicate :pointer))
 
 (defun create-foreign-array (type contents)
@@ -414,18 +443,29 @@
       ((build-var-reference (var)
          (if-let ((index (position var var-names)))
            (list 'kind :var-reference
-                 'data index
+                 'n-children 0
+                 'var-index index
+                 'unsigned-value 0
+                 'signed-value 0
+                 'float-value 0.0D0
                  'children (null-pointer))
            (error "undefined variable ~s in var-names ~s:"
                   var var-names)))
        (build-number (number)
-         (list 'kind (if (negative-integer-p number)
-                         :signed-integer
-                         :unsigned-integer)
-               'data (if (negative-integer-p number)
-                         (+ (expt 2 64) number)
-                         number)
-               'children (null-pointer)))
+         (let ((kind (cond ((or (positive-integer-p number)
+                                (and (integerp number) (zerop number)))
+                            :unsigned-value)
+                           ((negative-integer-p number)
+                            :signed-value)
+                           (t :float-value))))
+           (list 'kind kind
+                 'n-children 0
+                 'var-index 0
+                 'unsigned-value (if (eq :unsigned-value kind) number 0)
+                 'signed-value   (if (eq :signed-value kind) number 0)
+                 'float-value    (if (eq :float-value kind)
+                                     (coerce number 'double-float) 0.0D0)
+                 'children (null-pointer))))
        (build-operator (expr)
          (destructuring-bind (op . args) expr
            (list
@@ -437,14 +477,21 @@
                     (v/size :var-size)
                     (v/value :var-value)
                     (> :greater-than)
+                    (>= :greater-than-or-equal)
                     (< :less-than)
-                    ((= equal) :equal)
+                    (<= :less-than-or-equal)
+                    (equal :equal)
+                    (= :equal)
                     (+ :add)
                     (- :subtract)
                     (* :multiply)
                     (/ :divide))
-            'data (length args)
-            'children (create-foreign-array '(:struct predicate)
+            'n-children (length args)
+            'var-index 0
+            'unsigned-value 0
+            'signed-value 0
+            'float-value 0.0D0
+            'children (create-foreign-array '(:struct c-predicate)
                                             (map 'vector #'helper args)))))
        (helper (tree)
          (cond
@@ -453,33 +500,38 @@
            (t (build-var-reference tree)))))
 
     (if predicate
-        (let ((result (foreign-alloc '(:struct predicate))))
-          (setf (mem-aref result '(:struct predicate))
+        (let ((result (foreign-alloc '(:struct c-predicate))))
+          (setf (mem-aref result '(:struct c-predicate))
                 (helper predicate))
           result)
         (null-pointer))))
 
 (defmethod query-trace ((db binary-trace-db) index var-names var-types
                         &key pick file-id predicate soft-predicates filter)
-  (assert (< index (n-traces db)))
-  (when (or predicate soft-predicates) (assert var-names))
-  (let* ((n-vars (length var-types))
+  (assert (and (<= 0 index) (< index (n-traces db))) (index)
+          "INDEX must be in range [0, n-traces).")
+  (when (or predicate soft-predicates)
+    (assert var-names))
+
+  (let* ((trace-ptr (c-get-trace (db-pointer db) index))
+         (n-vars (length var-types))
          (trace-types (trace-types db index))
          ;; Convert type names to indices
          (type-indices
           (mapcar {map 'vector {position _ trace-types :test #'string=}}
                   var-types))
-         ;; Create an array of free_variable structs
+         ;; Create an array of c_free_variable structs
          (free-vars
-          (let ((var-array (foreign-alloc '(:struct free-variable)
+          (let ((var-array (foreign-alloc '(:struct c-free-variable)
                                           :count n-vars)))
             (iter (for types in type-indices)
                   (for i upfrom 0)
                   (for type-array = (create-foreign-array :uint32 types))
-                  (setf (mem-aref var-array '(:struct free-variable) i)
+                  (setf (mem-aref var-array '(:struct c-free-variable) i)
                         `(n-allowed-types ,(length types)
                           allowed-types ,type-array)))
             var-array))
+         ;; Create c_predicate structs
          (predicate-ptr (build-predicate var-names predicate))
          (soft-predicate-ptrs (map 'vector {build-predicate var-names}
                                    soft-predicates))
@@ -492,11 +544,15 @@
         (setf (mem-aref n-results-ptr ':uint64) 0)
         (unwind-protect
              (prog2
-               (c-query-trace (db-pointer db) index
-                              n-vars free-vars predicate-ptr
+               (c-query-trace (db-pointer db)
+                              index
+                              free-vars
+                              n-vars
+                              predicate-ptr
                               soft-predicate-array
                               (length soft-predicate-ptrs)
                               (if pick (random (expt 2 32)) 0)
+                              (if filter 1 0)
                               (if file-id
                                   (ash (1- (ash 1 +trace-id-file-bits+))
                                        +trace-id-statement-bits+)
@@ -504,111 +560,45 @@
                               (if file-id
                                   (ash file-id +trace-id-statement-bits+)
                                   0)
-                              results-ptr n-results-ptr)
+                              results-ptr
+                              n-results-ptr)
                ;; Convert all results and filter them
                (cons (cons :results
-                           (remove-duplicates
-                             (convert-results db index
-                                              (mem-ref n-results-ptr
-                                                       :uint64)
-                                              (mem-ref results-ptr
-                                                       :pointer)
-                                              :filter filter)
-                             :key #'get-statement-and-bindings
-                             :test #'equalp))
-                     (nth index (trace-metadata db)))
-               (free-query-result (mem-ref results-ptr :pointer)
-                                  (mem-ref n-results-ptr :uint64)))
+                           (if filter
+                               ;; Deduplicate results with the same statement
+                               ;; and variable bindings on the Common LISP
+                               ;; side when a filter is given so that
+                               ;; each point may go thru the filter.
+                               (remove-duplicates
+                                 (convert-trace-points trace-ptr
+                                                       (mem-ref results-ptr
+                                                                :pointer)
+                                                       (mem-ref n-results-ptr
+                                                                :uint64)
+                                                       :filter filter)
+                                 :key #'get-statement-and-bindings
+                                 :test #'equalp)
+                               ;; No filter, results are deduplicated
+                               ;; on the C-side of the query interface.
+                               (convert-trace-points trace-ptr
+                                                     (mem-ref results-ptr
+                                                              :pointer)
+                                                     (mem-ref n-results-ptr
+                                                              :uint64))))
+                     (nth index (trace-metadata db))))
           (progn
-            (free-predicate predicate-ptr)
-            (map 'vector #'free-predicate soft-predicate-ptrs)
+            (c-free-c-predicate predicate-ptr)
+            (iter (for i below (length soft-predicate-ptrs))
+                  (c-free-c-predicate (aref soft-predicate-ptrs i)))
             (foreign-free soft-predicate-array)
             (iter (for i below n-vars)
                   (foreign-free (getf (mem-aref free-vars
-                                                '(:struct free-variable) i)
+                                                '(:struct c-free-variable) i)
                                       'allowed-types)))
             (foreign-free free-vars)))))))
 
-(defcfun ("set_trace" c-set-trace) :void
-  (db :pointer)
-  (index :uint32)
-  (trace :pointer))
-
-
-(defmethod set-trace ((db binary-trace-db) index trace &optional metadata)
-  ;; This is intended primarily for testing. It does not handle blobs and
-  ;; may not be particularly efficient
-  (assert (<= index (n-traces db)))
-
-  (let* ((type-hash (make-hash-table :test #'equal))
-         (var-names (mappend (lambda (point)
-                               (mapcar (lambda (var-info)
-                                         (let ((type (elt var-info 1)))
-                                           (setf (gethash type type-hash)
-                                                 (or (< (elt var-info 2) 0)
-                                                     (gethash type type-hash))))
-                                         (elt var-info 0))
-                                       (cdr (assoc :scopes point))))
-                             trace))
-         (type-names (hash-table-keys type-hash))
-         (all-names (append type-names
-                            (remove-duplicates var-names :test #'string=)))
-         (name-hash (iter (with ht = (make-hash-table :test #'equal))
-                          (for name in all-names)
-                          (for i upfrom 0)
-                          (setf (gethash name ht) i)
-                          (finally (return ht))))
-         (types
-          (iter (for name in type-names)
-                (collect
-                    `(name-index ,(gethash name name-hash)
-                      format ,(if (gethash name type-hash) :signed :unsigned)
-                      size 8)
-                  result-type 'vector)))
-         (points
-          (mapcar
-           (lambda (point)
-             (let ((vars (mapcar
-                          (lambda (var-info)
-                            (let ((has-size (and (= 4 (length var-info))
-                                                 (elt var-info 3))))
-                              `(value ,(elt var-info 2)
-                                      name-index ,(gethash (elt var-info 0)
-                                                           name-hash)
-                                      type-index ,(gethash (elt var-info 1)
-                                                           name-hash)
-                                      has-buffer-size ,(if has-size 1 0)
-                                      buffer-size ,(if has-size
-                                                       (elt var-info 3) 0))))
-                          (cdr (assoc :scopes point)))))
-
-               `(statement ,(if (cdr (assoc :f point))
-                                (logior (ash 1 63)                      ;flag bit
-                                        (ash (cdr (assoc :f point))
-                                             +trace-id-statement-bits+) ;file ID
-                                        (cdr (assoc :c point)))         ;AST ID
-                                (cdr (assoc :c point)))
-                           n-sizes 0 sizes ,(null-pointer)
-                           n-aux 0 aux ,(null-pointer)
-                           n-vars ,(length vars)
-                           vars ,(create-foreign-array '(:struct var-info)
-                                                       (coerce vars 'vector)))))
-           trace))
-         (trace-struct (foreign-alloc '(:struct c-trace))))
-    (setf (mem-ref trace-struct '(:struct c-trace))
-          `(points ,(create-foreign-array '(:struct trace-point)
-                                          (coerce points 'vector))
-            n-points ,(length points)
-            n-points-allocated ,(length points)
-            names ,(create-foreign-array :string (coerce all-names 'vector))
-            n-names ,(length all-names)
-            types ,(create-foreign-array '(:struct type-description) types)
-            n-types ,(length types)))
-    (c-set-trace (db-pointer db) index trace-struct)
-    (if (< index (length (trace-metadata db)))
-        (setf (nth index (trace-metadata db)) metadata)
-        (appendf (trace-metadata db) (list metadata)))))
-
+
+;;; Single-file binary trace database
 (defclass single-file-binary-trace-db (binary-trace-db)
   ((file-id :initarg :file-id
             :reader file-id

@@ -9,12 +9,6 @@
 (defgeneric add-trace (db filename timeout metadata &key max)
   (:documentation "Read a trace from FILENAME into DB."))
 
-(defgeneric set-trace (db index trace &optional metadata)
-  (:documentation "Store TRACE in DB at INDEX.
-
-If INDEX is equal to the current N-TRACES, extend traces by
-one. Otherwise replace an existing trace."))
-
 (defgeneric get-trace (db index &key file-id)
   (:documentation "Retrieve the trace at INDEX in DB.
 
@@ -64,5 +58,5 @@ FILE-ID."))
   (list (cdr (assoc :f pt))
         (cdr (assoc :c pt))
         (map 'list (lambda (var)
-                     (cons (elt var 0) (elt var 1)))
+                     (elt var 0) (elt var 1))
                    (cdr (assoc :scopes pt)))))

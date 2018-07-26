@@ -27,6 +27,5 @@
            :distinct
            :v/value
            :v/size
-           :set-trace
            :restrict-to-file
            :get-statement-and-bindings))
