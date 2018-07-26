@@ -19,66 +19,107 @@ will produce the same output.
 #include <cstdlib>
 #include <cstring>
 #include <cstdarg>
+#include <fstream>
 
-#include "read-trace.h"
-#include "write-trace.h"
+#include "TypeDescription.hpp"
+#include "TraceBufferSize.hpp"
+#include "TraceVarInfo.hpp"
+#include "TracePoint.hpp"
+#include "Trace.hpp"
 
 void write_test_trace(const char *filename)
 {
-    FILE *out = fopen(filename, "w");
-
-    const char *names[] = {
-        "int", "*char", "char", "float", "double", "unsigned int", "string",
-        "i", "ptr", "c", "f", "d", "u"
+    Names names = {
+        "int",
+        "*char",
+        "char",
+        "float",
+        "double",
+        "unsigned int",
+        "string",
+        "i",
+        "ptr",
+        "c",
+        "f",
+        "d",
+        "u",
     };
 
-    type_description types[] = {
-        { 0, SIGNED, sizeof(int) },            /* int */
-        { 1, POINTER, sizeof(char *)},         /* *char */
-        { 2, SIGNED, sizeof(char) },           /* char */
-        { 3, FLOAT, sizeof(float) },           /* float */
-        { 4, FLOAT, sizeof(double) },          /* double */
-        { 5, UNSIGNED, sizeof(unsigned int) }, /* unsigned int */
-        { 6, BLOB, 0 }, /* unsigned int */
+    TypeDescriptions types = {
+        TypeDescription(0, SIGNED, sizeof(int)),
+        TypeDescription(1, POINTER, sizeof(char *)),
+        TypeDescription(2, SIGNED, sizeof(char)),
+        TypeDescription(3, FLOAT, sizeof(float)),
+        TypeDescription(4, FLOAT, sizeof(double)),
+        TypeDescription(5, UNSIGNED, sizeof(unsigned int)),
+        TypeDescription(6, BLOB, 0),
     };
 
-    size_t n_names = sizeof(names) / sizeof(*names);
-    size_t n_types = sizeof(types) / sizeof(*types);
-    write_trace_header(out, names, n_names, types, n_types);
+    std::vector<TracePoint> points;
 
     printf("names:\n");
-    for (uint32_t i = 0; i < n_names; i++) {
-        printf("  %s\n", names[i]);
+    for (uint32_t i = 0; i < names.size(); i++) {
+        printf("  %s\n", names[i].c_str());
     }
     printf("\ntypes:\n");
-    for (uint32_t i = 0; i < n_types; i++) {
-        type_description type = types[i];
+    for (uint32_t i = 0; i < types.size(); i++) {
+        const TypeDescription & type = types[i];
         printf("  %s: %u, %u bytes\n",
-               names[type.name_index], type.format, type.size);
+               names[type.getNameIndex()].c_str(),
+               type.getTypeFormat(),
+               type.getSize());
     }
+    printf("\n");
 
-    char const *chars = "hello, world";
+    const char *chars = "hello, world";
     for (int i = 0; i < 10; i++) {
-        char const *ptr = chars + i;
+        VarValue val;
+        const char *ptr = chars + i;
         char c = *ptr;
         float f = 0.1 * i;
         double d = 0.2 * i;
         unsigned int u = 2 * i;
+        uint64_t aux = i * 100;
+        TraceBufferSize bufferSize(0xff + i, 10 * i);
 
-        write_trace_id(out, 100 + i);
-        write_trace_variables(out, 6,
-                              7, 0, sizeof(i), SIGNED, i,
-                              8, 1, sizeof(ptr), POINTER, ptr,
-                              9, 2, sizeof(c), UNSIGNED, c,
-                              10, 3, sizeof(f), FLOAT, f,
-                              11, 4, sizeof(d), FLOAT, d,
-                              12, 5, sizeof(u), UNSIGNED, u);
-        write_trace_blobs(out, 1, 8, 6, strlen(ptr), ptr);
-        /* Fake buffer size */
-        write_buffer_size(out, (void *)(size_t)(0xff + i), 10 * i);
-        uint64_t uint = 100 * i;
-        write_trace_aux(out, uint);
-        write_end_entry(out);
+        TraceBufferSizes bufferSizes;
+        FlyweightTraceVarInfos vars;
+        Aux auxs;
+
+        bufferSizes.push_back(bufferSize);
+
+        val.s = i;
+        vars.push_back(FlyweightTraceVarInfo(val, 7, 0,
+                                             types[0].getTypeFormat(),
+                                             sizeof(i), 0, 0));
+        val.ptr = (void*) ptr;
+        vars.push_back(FlyweightTraceVarInfo(val, 8, 1,
+                                             types[1].getTypeFormat(),
+                                             sizeof(ptr), 0, 0));
+        val.s = c;
+        vars.push_back(FlyweightTraceVarInfo(val, 9, 2,
+                                             types[2].getTypeFormat(),
+                                             sizeof(c), 0, 0));
+        val.f = f;
+        vars.push_back(FlyweightTraceVarInfo(val, 10, 3,
+                                             types[3].getTypeFormat(),
+                                             sizeof(f), 0, 0));
+        val.d = d;
+        vars.push_back(FlyweightTraceVarInfo(val, 11, 4,
+                                             types[4].getTypeFormat(),
+                                             sizeof(d), 0, 0));
+        val.u = u;
+        vars.push_back(FlyweightTraceVarInfo(val, 12, 5,
+                                             types[5].getTypeFormat(),
+                                             sizeof(u), 0, 0));
+        val.ptr = (void*) ptr;
+        vars.push_back(FlyweightTraceVarInfo(val, 8, 6,
+                                             types[6].getTypeFormat(),
+                                             strlen(ptr), 0, 0));
+
+        auxs.push_back(aux);
+
+        points.push_back(TracePoint(i, 100 + i, bufferSizes, vars, auxs));
 
         printf("ID: %d\n", 100 + i);
         printf("i: int, %lu bytes = %d\n", sizeof(i), i);
@@ -89,192 +130,91 @@ void write_test_trace(const char *filename)
         printf("u: unsigned int, %lu bytes = %u\n", sizeof(u), u);
         printf("ptr: string, %lu bytes = blob: '%s'\n", strlen(ptr), ptr);
         printf("buffer size: %x . %u\n", (0xff + i), 10 * i);
-        printf("uint: %lu bytes = %lu\n", sizeof(uint), uint);
+        printf("uint: %lu bytes = %lu\n", sizeof(aux), aux);
         printf("\n");
     }
-    printf("read 10 trace points\n");
 
-    fclose(out);
+    Trace trace(names, types, points);
+    std::ofstream out(filename, std::ios::out | std::ios::binary);
+    out << trace;
+    out.close();
 }
 
 void read_trace(const char *filename)
 {
-    trace_read_state *state = start_reading(filename, 10);
-    assert(state);
+    std::ifstream in(filename, std::ios::out | std::ios::binary);
+    Trace trace(in);
 
     printf("names:\n");
-    for (uint32_t i = 0; i < state->n_names; i++) {
-        printf("  %s\n", state->names[i]);
+    for (auto & name : trace.getNames()) {
+        printf("  %s\n", name.c_str());
     }
     printf("\ntypes:\n");
-    for (uint32_t i = 0; i < state->n_types; i++) {
-        type_description type = state->types[i];
+    for (auto & type : trace.getTypes()) {
         printf("  %s: %u, %u bytes\n",
-               state->names[type.name_index], type.format, type.size);
+               trace.getNames()[type.getNameIndex()].c_str(),
+               type.getTypeFormat(),
+               type.getSize());
     }
+    printf("\n");
 
-    int count = 0;
-    while (1) {
-        enum trace_entry_tag tag = read_tag(state);
-        assert(state->error_code != TRACE_ERROR);
-        if (state->error_code == TRACE_EOF)
-            break;
+    for (auto & tracePoint : trace.getPoints()) {
+        printf("ID: %lu\n", tracePoint.getStatement());
 
-        switch (tag) {
-        case END_ENTRY:
-            printf("\n");
-            count++;
-            break;
-        case STATEMENT_ID:
-            {
-                uint64_t id = read_id(state);
-                assert(state->error_code != TRACE_ERROR);
-                printf("ID: %lu\n", id);
-                break;
-            }
-        case VARIABLE:
-            {
-                trace_var_info info = read_var_info(state);
-                assert(state->error_code != TRACE_ERROR);
+        for (auto & var : tracePoint.getVars()) {
+            const TypeDescription & type =
+                trace.getTypes()[var.get().getTypeIndex()];
 
-                type_description type = state->types[info.type_index];
-                printf("%s: %s, %u bytes = ", state->names[info.name_index],
-                       state->names[type.name_index], info.size);
-                switch (type.format) {
-                case UNSIGNED:
-                    printf("%lu", info.value.u);
-                    if (type.size == 1)
-                        printf(" '%c'", (unsigned char)info.value.u);
-                    break;
-                case SIGNED:
-                    printf("%ld", info.value.s);
-                    if (type.size == 1)
-                        printf(" '%c'", (char)info.value.u);
-                    break;
-                case POINTER:
-                    printf("%lx", info.value.u);
-                    break;
-                case FLOAT:
-                    if (type.size == 4)
-                        printf("%g", info.value.f);
-                    else
-                        printf("%g", info.value.d);
-                    break;
-                case BLOB:
-                    printf("blob: '%.*s'", info.size, (const char *)info.value.ptr);
-                    free(info.value.ptr);
-                    break;
-                default:
-                    printf("<unrecognized format %u>", type.format);
-                }
-                printf("\n");
-            }
+            printf("%s: %s, %u bytes = ",
+                   trace.getNames()[var.get().getNameIndex()].c_str(),
+                   trace.getNames()[type.getNameIndex()].c_str(),
+                   var.get().getSize());
 
-          break;
-        case BUFFER_SIZE:
-            {
-                trace_buffer_size info = read_buffer_size(state);
-                assert(state->error_code != TRACE_ERROR);
-
-                printf("buffer size: %lx . %lu\n", info.address, info.size);
-                break;
-            }
-        case AUXILIARY:
-            {
-                uint64_t value;
-                assert(fread(&value, sizeof(value), 1, state->file) == 1);
-
-                printf("uint: %lu bytes = %lu\n", sizeof(value), value);
-                break;
-            }
-        default:
-            fprintf(stderr, "ERROR: unknown trace tag %u\n", tag);
-            exit(1);
-        }
-    }
-
-    end_reading(state);
-
-    printf("read %d trace points\n", count);
-}
-
-void read_trace_2(const char *filename)
-{
-    trace_read_state *state = start_reading(filename, 10);
-    assert(state);
-
-    printf("names:\n");
-    for (uint32_t i = 0; i < state->n_names; i++) {
-        printf("  %s\n", state->names[i]);
-    }
-    printf("\ntypes:\n");
-    for (uint32_t i = 0; i < state->n_types; i++) {
-        type_description type = state->types[i];
-        printf("  %s: %u, %u bytes\n",
-               state->names[type.name_index], type.format, type.size);
-    }
-
-    int count = 0;
-    trace_point point;
-
-    while (read_trace_point(state, &point) == 0) {
-        count++;
-        printf("ID: %lu\n", point.statement);
-        for (uint32_t i = 0; i < point.n_vars; i++) {
-            trace_var_info info = point.vars[i];
-            assert(state->error_code != TRACE_ERROR);
-
-            type_description type = state->types[info.type_index];
-            printf("%s: %s, %u bytes = ", state->names[info.name_index],
-                   state->names[type.name_index], info.size);
-            switch (type.format) {
+            switch (var.get().getTypeFormat()) {
             case UNSIGNED:
-                printf("%lu", info.value.u);
-                if (type.size == 1)
-                    printf(" '%c'", (unsigned char)info.value.u);
+                printf("%lu", var.get().getValue().u);
+                if (var.get().getSize() == 1)
+                    printf(" '%c'", (unsigned char)var.get().getValue().u);
                 break;
             case SIGNED:
-                printf("%ld", info.value.s);
-                if (type.size == 1)
-                    printf(" '%c'", (char)info.value.u);
+                printf("%ld", var.get().getValue().s);
+                if (var.get().getSize() == 1)
+                    printf(" '%c'", (char)var.get().getValue().u);
                 break;
             case POINTER:
-                printf("%lx", info.value.u);
+                printf("%lx", var.get().getValue().u);
                 break;
             case FLOAT:
-                if (type.size == 4)
-                    printf("%g", info.value.f);
+                if (var.get().getSize() == 4)
+                    printf("%g", var.get().getValue().f);
                 else
-                    printf("%g", info.value.d);
+                    printf("%g", var.get().getValue().d);
                 break;
             case BLOB:
-                printf("blob: '%.*s'", info.size, (const char *)info.value.ptr);
-                free(info.value.ptr);
+                printf("blob: '%.*s'",
+                       var.get().getSize(),
+                       (const char *)var.get().getValue().ptr);
                 break;
             default:
-                printf("<unrecognized format %u>", type.format);
+                printf("<unrecognized format %u>",
+                       var.get().getTypeFormat());
+                break;
             }
+
             printf("\n");
         }
-        for (uint32_t i = 0; i < point.n_sizes; i++) {
-            trace_buffer_size info = point.sizes[i];
-            assert(state->error_code != TRACE_ERROR);
 
-            printf("buffer size: %lx . %lu\n", info.address, info.size);
-            break;
+        for (auto & bufferSize : tracePoint.getBufferSizes()) {
+            printf("buffer size: %lx . %lu\n",
+                   bufferSize.getAddress(), bufferSize.getSize());
         }
-        for (uint32_t i = 0; i < point.n_aux; i++) {
-            uint64_t val = point.aux[i];
 
-            printf("uint: %lu bytes = %lu\n", sizeof(val), val);
-            break;
+        for (auto & aux : tracePoint.getAux()) {
+            printf("uint: %lu bytes = %lu\n", sizeof(aux), aux);
         }
+
         printf("\n");
     }
-
-    end_reading(state);
-
-    printf("read %d trace points\n", count);
 }
 
 int main(int argc, char **argv)
@@ -283,7 +223,7 @@ int main(int argc, char **argv)
         write_test_trace(argv[2]);
     }
     else {
-        read_trace_2(argv[1]);
+        read_trace(argv[1]);
     }
 
     return 0;
