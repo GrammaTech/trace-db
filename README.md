@@ -3,12 +3,13 @@
 Writing, reading, storing, and searching of program traces (source and binary)
 
 ## Trace Format
+
 A trace consists of a header followed by a series of trace points.
 
 The header contains a name dictionary and a type dictionary. The string
 dictionary consists of a character count (a 16-bit integer), followed by a
 series of null-terminated strings. The type dictionary consists of a record
-count (16 bits), followed by a series of `type_description` structs.
+count (16 bits), followed by a series of `TypeDescription` objects.
 
 A trace point is a sequence of trace entries, each representing a single item
 such as a variable, buffer size, etc. Each entry begins with a one-byte tag,
@@ -47,28 +48,53 @@ by that many bytes of data.
 ### Types
 A type description consists of a name (represented by an index into the
 dictionary), a format (e.g. signed integer, float, blob), and a size. For
-more details, see the `type_description` struct in [types.h](types.h)
+more details, see the `TypeDescription` class in
+[TypeDescription.hpp](TypeDescription.hpp)
+
+## Internal representation
+
+The trace database is a header-only library defined in the hpp files found
+at the top-level of the project.  The existing sample.cpp file, useful for
+debugging, remains at the top level and leverages this C++ library.
+The hope is that this header-only library may be easily utilized by clients
+looking to bring the trace database into other projects.
+
+The main `Trace` class may be utilized to read and write and single
+binary trace.  The `TraceDB` class is utilized to store a collection of these
+traces.  Additionally classes are provided to represent the sub-elements
+of the trace (e.g. TracePoints, TraceVarInfo, etc.).  For more information,
+please consult the documentation in these files.  All objects are immutable.
+
+The trace database leverages the boost flyweight library to reduce
+memory usage and improve query performance.  The flyweight library implements
+the flyweight design pattern in which objects are allocated within a pool
+and shared by multiple references.  For more information, consult
+"Design Patterns: Elements of Reusable Object-Oriented Software."
+In this case, we mark trace point information (e.g. variables) as
+flyweights to ensure sharing across multiple points when this
+information does not change.  Additionally, when performing queries,
+results are cached on the flyweight object to improve query performance
+across duplicate points.
+
+Beyond the header-only library, within the lisp/ directory exists an
+additional C wrapper around the C++ library exposing a CFFI interface
+to the trace database which is leveraged by additional common lisp code.
+The trace database was originally designed for projects using common lisp,
+necessitating this wrapper.
 
 ## Storing Traces
-The `trace_db` type and its associated functions can be used to store
-and retrieve traces. Traces are stored in memory, in a format that is
-convenient for queries. Clients using the C API may access stored
-traces directly, but the representation of traces may change over
-time. The recommended method for accessing traces is through queries.
+
+The `TraceDB` type and its associated methods can be used to store
+and retrieve traces.  Traces may be written and read in a proprietary
+binary format or using boost serialization.
 
 ## Queries
 
-The `query_trace` function searches a trace. A query consists of a set
+The `query` method searches a trace. A query consists of a set
 of free variables, associated type constraints, and a predicate over
 the free variables. At each trace point, the database finds all
 combinations of valid assignments for the free variables, and collects
 those assignments which satisfy the predicate.
 
-The result is returned as a set of trace points, which each point
-contains only a statement ID and the information for the bound
-variables.
-
-Queries can also be restricted by statement ID.
-
-Finally, query trace has a `pick` mode which randomly selects one
-trace point to query.
+For more information, please consult the documentation on the method
+directly.
