@@ -10,3 +10,7 @@ sample
 local.mk
 
 third-party/
+
+pkg/
+
+README.html
