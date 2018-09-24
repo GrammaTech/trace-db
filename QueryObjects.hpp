@@ -10,10 +10,12 @@
 
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <ostream>
 
 #include <boost/functional/hash.hpp>
-#include <boost/multiprecision/cpp_bin_float.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/cpp_dec_float.hpp>
 
 class Predicate;
 class FreeVariable;
@@ -365,73 +367,200 @@ namespace std {
 class PredicateValue
 {
 private:
-    bool m_is_valid;
-    boost::multiprecision::cpp_bin_float_50 m_value;
+    enum PredicateValueKind
+    {
+        CPP_INT,
+        CPP_FLOAT
+    };
 
-    static const boost::multiprecision::cpp_bin_float_50& EPSILON() {
-        static const boost::multiprecision::cpp_bin_float_50 EPS("0.0001");
-        return EPS;
+    union PredicateValueData
+    {
+        boost::multiprecision::cpp_int* cpp_int;
+        boost::multiprecision::cpp_dec_float_50* cpp_float;
+
+        PredicateValueData() {
+            memset(this, 0, sizeof(PredicateValueData));
+        }
+
+        PredicateValueData(boost::multiprecision::cpp_int* val) {
+            cpp_int = val;
+        }
+
+        PredicateValueData(boost::multiprecision::cpp_dec_float_50* val) {
+            cpp_float = val;
+        }
+    };
+
+    bool m_is_valid;
+    PredicateValueKind m_kind;
+    PredicateValueData m_value;
+
+    template<class ReturnType, template <class T> class Operation>
+    ReturnType operation(const PredicateValue & other) const {
+        if (!(m_is_valid && other.m_is_valid)) {
+            return ReturnType();
+        }
+        else if (m_kind == CPP_INT && other.m_kind == CPP_INT) {
+            return integer_operation<ReturnType>(
+                       other,
+                       Operation<boost::multiprecision::cpp_int>());
+        }
+        else {
+            return float_operation<ReturnType>(
+                       other,
+                       Operation<boost::multiprecision::cpp_dec_float_50>());
+        }
+    }
+
+    template<class ReturnType, class Operation>
+    ReturnType integer_operation(const PredicateValue & other,
+                                 const Operation & op) const {
+        return ReturnType(op(*m_value.cpp_int,
+                             *other.m_value.cpp_int));
+    }
+
+    template<class ReturnType, class Operation>
+    ReturnType float_operation(const PredicateValue & other,
+                               const Operation & op) const {
+        boost::multiprecision::cpp_dec_float_50 lhs =
+            m_kind != CPP_FLOAT ?
+            m_value.cpp_int->convert_to<
+                boost::multiprecision::cpp_dec_float_50>() :
+            *m_value.cpp_float;
+        boost::multiprecision::cpp_dec_float_50 rhs =
+            other.m_kind != CPP_FLOAT ?
+            other.m_value.cpp_int->convert_to<
+                boost::multiprecision::cpp_dec_float_50>() :
+            *other.m_value.cpp_float;
+
+        return ReturnType(op(lhs, rhs));
     }
 
 public:
-    PredicateValue(const boost::multiprecision::cpp_bin_float_50 &val)
-        : m_is_valid(true),
-          m_value(val)
+    PredicateValue() :
+        m_is_valid(false),
+        m_kind(CPP_INT),
+        m_value()
     {}
 
-    PredicateValue() : m_is_valid(false)
+    PredicateValue(const PredicateValue & other) :
+        m_is_valid(other.m_is_valid),
+        m_kind(other.m_kind)
+    {
+        if (m_kind == CPP_INT) {
+            m_value.cpp_int =
+                new boost::multiprecision::cpp_int(
+                    *other.m_value.cpp_int);
+        }
+        else {
+            m_value.cpp_float =
+                new boost::multiprecision::cpp_dec_float_50(
+                    *other.m_value.cpp_float);
+        }
+    }
+
+    explicit PredicateValue(const boost::multiprecision::cpp_int & val) :
+        m_is_valid(true),
+        m_kind(CPP_INT),
+        m_value(new boost::multiprecision::cpp_int(val))
     {}
+
+    explicit PredicateValue(const boost::multiprecision::cpp_dec_float_50 & val) :
+        m_is_valid(true),
+        m_kind(CPP_FLOAT),
+        m_value(new boost::multiprecision::cpp_dec_float_50(val))
+    {}
+
+    explicit PredicateValue(uint64_t val) :
+        m_is_valid(true),
+        m_kind(CPP_INT),
+        m_value(new boost::multiprecision::cpp_int(val))
+    {}
+
+    explicit PredicateValue(int64_t val) :
+        m_is_valid(true),
+        m_kind(CPP_INT),
+        m_value(new boost::multiprecision::cpp_int(val))
+    {}
+
+    explicit PredicateValue(double val) :
+        m_is_valid(true),
+        m_kind(CPP_FLOAT),
+        m_value(new boost::multiprecision::cpp_dec_float_50(val))
+    {}
+
+    explicit PredicateValue(float val) :
+        m_is_valid(true),
+        m_kind(CPP_FLOAT),
+        m_value(new boost::multiprecision::cpp_dec_float_50(val))
+    {}
+
+    ~PredicateValue() {
+        if (m_kind == CPP_INT) {
+            delete m_value.cpp_int;
+        }
+        else {
+            delete m_value.cpp_float;
+        }
+    }
+
+    PredicateValue& operator=(const PredicateValue & other) = delete;
 
     bool operator<(const PredicateValue & other) const {
-        if (!(m_is_valid && other.m_is_valid))
-            return false;
-        return !(m_value == other.m_value) &&
-               m_value < other.m_value;
+        return operation<bool, std::less>(other);
     }
 
     bool operator<=(const PredicateValue & other) const {
-        return (*this < other) || (*this == other);
+        return operation<bool, std::less_equal>(other);
     }
 
     bool operator>(const PredicateValue & other) const {
-        if (!(m_is_valid && other.m_is_valid))
-            return false;
-        return !(m_value == other.m_value) &&
-               m_value > other.m_value;
+        return operation<bool, std::greater>(other);
     }
 
     bool operator>=(const PredicateValue & other) const {
-        return (*this > other) || (*this == other);
+        return operation<bool, std::greater_equal>(other);
     }
 
     bool operator==(const PredicateValue & other) const {
-        if (!(m_is_valid && other.m_is_valid))
-            return false;
-        return boost::multiprecision::abs(m_value - other.m_value) < EPSILON();
+        return operation<bool, std::equal_to>(other);
     }
 
     PredicateValue operator+(const PredicateValue & other) const {
-        if (!(m_is_valid && other.m_is_valid))
-            return PredicateValue();
-        return PredicateValue(m_value + other.m_value);
+        return operation<PredicateValue, std::plus>(other);
     }
 
     PredicateValue operator-(const PredicateValue & other) const {
-        if (!(m_is_valid && other.m_is_valid))
-            return PredicateValue();
-        return PredicateValue(m_value - other.m_value);
+        return operation<PredicateValue, std::minus>(other);
     }
 
     PredicateValue operator*(const PredicateValue & other) const {
-        if (!(m_is_valid && other.m_is_valid))
-            return PredicateValue();
-        return PredicateValue(m_value * other.m_value);
+        return operation<PredicateValue, std::multiplies>(other);
     }
 
     PredicateValue operator/(const PredicateValue & other) const {
-        if (!(m_is_valid && other.m_is_valid) || other.m_value == 0)
+        if (!(m_is_valid && other.m_is_valid) ||
+            (other.m_kind == CPP_INT &&
+             *other.m_value.cpp_int == 0) ||
+            (other.m_kind == CPP_FLOAT &&
+             *other.m_value.cpp_float == 0)) {
             return PredicateValue();
-        return PredicateValue(m_value / other.m_value);
+        }
+        else {
+            boost::multiprecision::cpp_dec_float_50 lhs =
+                m_kind != CPP_FLOAT ?
+                m_value.cpp_int->convert_to<
+                    boost::multiprecision::cpp_dec_float_50>() :
+                *m_value.cpp_float;
+            boost::multiprecision::cpp_dec_float_50 rhs =
+                other.m_kind != CPP_FLOAT ?
+                other.m_value.cpp_int->convert_to<
+                    boost::multiprecision::cpp_dec_float_50>() :
+                *other.m_value.cpp_float;
+            boost::multiprecision::cpp_dec_float_50 result(lhs/rhs);
+
+            return PredicateValue(result);
+        }
     }
 };
 

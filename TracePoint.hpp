@@ -12,6 +12,7 @@
 #define __TRACE_POINT_HPP
 
 #include <cstdint>
+#include <functional>
 #include <istream>
 #include <ostream>
 #include <vector>
@@ -65,6 +66,21 @@ private:
         return m_vars[bindings[var_index]].get();
     }
 
+    template <class ReturnType, class Operation>
+    ReturnType
+    evaluate_binary_op(const std::vector<Predicate> & children,
+                       const std::vector<uint32_t> & bindings,
+                       const Operation & op) const {
+        assert(children.size() == 2);
+
+        PredicateValue v0(evaluate(children[0],
+                                   bindings));
+        PredicateValue v1(evaluate(children[1],
+                                   bindings));
+
+        return op(v0, v1);
+    }
+
     PredicateValue evaluate(const Predicate & predicate,
                             const std::vector<uint32_t> & bindings) const {
         const std::vector<Predicate> & children = predicate.getChildren();
@@ -113,43 +129,31 @@ private:
             return PredicateValue(predicate.getData().float_value);
         case ADD:
             {
-                assert(children.size() == 2);
-
-                PredicateValue v0 = evaluate(children[0],
-                                             bindings);
-                PredicateValue v1 = evaluate(children[1],
-                                             bindings);
-                return v0 + v1;
+                return evaluate_binary_op<PredicateValue>(
+                           children,
+                           bindings,
+                           std::plus<PredicateValue>());
             }
         case SUBTRACT:
             {
-                assert(children.size() == 2);
-
-                PredicateValue v0 = evaluate(children[0],
-                                             bindings);
-                PredicateValue v1 = evaluate(children[1],
-                                             bindings);
-                return v0 - v1;
+                return evaluate_binary_op<PredicateValue>(
+                           children,
+                           bindings,
+                           std::minus<PredicateValue>());
             }
         case MULTIPLY:
             {
-                assert(children.size() == 2);
-
-                PredicateValue v0 = evaluate(children[0],
-                                             bindings);
-                PredicateValue v1 = evaluate(children[1],
-                                             bindings);
-                return v0 * v1;
+                return evaluate_binary_op<PredicateValue>(
+                           children,
+                           bindings,
+                           std::multiplies<PredicateValue>());
             }
         case DIVIDE:
             {
-                assert(children.size() == 2);
-
-                PredicateValue v0 = evaluate(children[0],
-                                             bindings);
-                PredicateValue v1 = evaluate(children[1],
-                                             bindings);
-                return v0 / v1;
+                return evaluate_binary_op<PredicateValue>(
+                           children,
+                           bindings,
+                           std::divides<PredicateValue>());
             }
         default:
             assert(false);
@@ -198,53 +202,38 @@ private:
             }
         case GREATER_THAN:
             {
-                assert(children.size() == 2);
-
-                PredicateValue v0 = evaluate(children[0],
-                                             bindings);
-                PredicateValue v1 = evaluate(children[1],
-                                             bindings);
-                return v0 > v1;
+                return evaluate_binary_op<bool>(
+                           children,
+                           bindings,
+                           std::greater<PredicateValue>());
             }
         case GREATER_THAN_OR_EQUAL:
             {
-                assert(children.size() == 2);
-
-                PredicateValue v0 = evaluate(children[0],
-                                             bindings);
-                PredicateValue v1 = evaluate(children[1],
-                                             bindings);
-                return v0 >= v1;
+                return evaluate_binary_op<bool>(
+                           children,
+                           bindings,
+                           std::greater_equal<PredicateValue>());
             }
         case LESS_THAN:
             {
-                assert(children.size() == 2);
-
-                PredicateValue v0 = evaluate(children[0],
-                                             bindings);
-                PredicateValue v1 = evaluate(children[1],
-                                             bindings);
-                return v0 < v1;
+                return evaluate_binary_op<bool>(
+                           children,
+                           bindings,
+                           std::less<PredicateValue>());
             }
         case LESS_THAN_OR_EQUAL:
             {
-                assert(children.size() == 2);
-
-                PredicateValue v0 = evaluate(children[0],
-                                             bindings);
-                PredicateValue v1 = evaluate(children[1],
-                                             bindings);
-                return v0 <= v1;
+                return evaluate_binary_op<bool>(
+                           children,
+                           bindings,
+                           std::less_equal<PredicateValue>());
             }
         case EQUAL:
             {
-                assert(children.size() == 2);
-
-                PredicateValue v0 = evaluate(children[0],
-                                             bindings);
-                PredicateValue v1 = evaluate(children[1],
-                                             bindings);
-                return v0 == v1;
+                return evaluate_binary_op<bool>(
+                           children,
+                           bindings,
+                           std::equal_to<PredicateValue>());
             }
         default:
             assert(false);
