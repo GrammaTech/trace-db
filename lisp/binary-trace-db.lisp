@@ -235,8 +235,8 @@ the results."
 (defmethod initialize-instance :after ((instance binary-trace-db) &key)
   (load-libtrace-db)
   (when (null (db-pointer instance))
-    (setf (db-pointer instance) (c-create-db)))
-  (finalize instance (lambda () (c-free-db (db-pointer instance)))))
+    (setf (db-pointer instance) (c-create-db))
+    (finalize instance (lambda () (c-free-db (db-pointer instance))))))
 
 (defvar *binary-trace-db-obj-code* (register-code 255 'binary-trace-db)
   "Object code for serialization of binary-trace-db software objects.")
@@ -625,14 +625,10 @@ software objects.")
 
 (defmethod restrict-to-file ((db binary-trace-db) file-id)
   "Return a wrapper around DB which restricts results by FILE-ID."
-  ;; New instance is created without a db-pointer, so it will not
-  ;; create a finalizer. The original DB is still the owner of the
-  ;; database and will free it.
-  (let ((result (make-instance 'single-file-binary-trace-db
-                  :parent-db db
-                  :file-id file-id)))
-    (setf (slot-value result 'db-pointer) (db-pointer db))
-    result))
+  (make-instance 'single-file-binary-trace-db
+    :parent-db db
+    :db-pointer (db-pointer db)
+    :file-id file-id))
 
 (defmethod query-trace :around ((db single-file-binary-trace-db) index
                                 var-names var-types
