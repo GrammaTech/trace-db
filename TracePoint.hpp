@@ -59,7 +59,6 @@ private:
     TraceBufferSizes m_sizes;
     FlyweightTraceVarInfos m_vars;
     Aux m_aux;
-    mutable std::unordered_map<PredicateAndBindings, bool> m_cache;
 
     const TraceVarInfo & varLookup(const std::vector<uint32_t> & bindings,
                                    uint64_t var_index) const {
@@ -243,8 +242,7 @@ public:
     TracePointData() :
         m_sizes(0),
         m_vars(0),
-        m_aux(0),
-        m_cache()
+        m_aux(0)
     {}
 
     TracePointData(const TraceBufferSizes & sizes,
@@ -252,15 +250,13 @@ public:
                    const Aux & aux) :
         m_sizes(sizes),
         m_vars(vars),
-        m_aux(aux),
-        m_cache()
+        m_aux(aux)
     {}
 
     TracePointData(const TracePointData & other) :
         m_sizes(other.m_sizes),
         m_vars(other.m_vars),
-        m_aux(other.m_aux),
-        m_cache(other.m_cache)
+        m_aux(other.m_aux)
     {}
 
     TracePointData& operator=(const TracePointData & other) = delete;
@@ -279,13 +275,7 @@ public:
 
     bool satisfiesPredicate(const Predicate & predicate,
                             const std::vector<uint32_t> & bindings) const {
-        PredicateAndBindings pb(predicate, bindings);
-
-        if (m_cache.find(pb) == m_cache.end()) {
-            m_cache[pb] = satisfiesPredicateHelper(predicate, bindings);
-        }
-
-        return m_cache[pb];
+        return satisfiesPredicateHelper(predicate, bindings);
     }
 
     inline bool operator<(const TracePointData & other) const {
