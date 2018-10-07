@@ -106,13 +106,14 @@ int add_trace_points(void /* TraceDB */ *db_ptr,
                                   }));
 
             vars.push_back(
-                FlyweightTraceVarInfo(c_points[i].vars[j].value,
-                                      c_points[i].vars[j].var_name_index,
-                                      type_index,
-                                      types[type_index].getTypeFormat(),
-                                      types[type_index].getSize(),
-                                      c_points[i].vars[j].buffer_size,
-                                      c_points[i].vars[j].has_buffer_size));
+                FlyweightTraceVarInfo(
+                    TraceVarValue(c_points[i].vars[j].value,
+                                  types[type_index].getTypeFormat(),
+                                  types[type_index].getSize()),
+                    c_points[i].vars[j].var_name_index,
+                    type_index,
+                    c_points[i].vars[j].buffer_size,
+                    c_points[i].vars[j].has_buffer_size));
 
         }
 
@@ -226,6 +227,7 @@ create_predicate_obj(const c_predicate *c_predicate)
             break;
         }
 
+        children.shrink_to_fit();
         return Predicate(c_predicate->kind,
                          data,
                          children);

@@ -172,67 +172,74 @@ Trace createTestTrace()
 
     value.u = x;
     vars.push_back(
-        FlyweightTraceVarInfo(value,
-                              namei("x"),
-                              typei("unsigned int"),
-                              test_types[typei("unsigned int")].getTypeFormat(),
-                              sizeof(x),
-                              0,
-                              0));
+        FlyweightTraceVarInfo(
+            TraceVarValue(value,
+                          test_types[typei("unsigned int")].getTypeFormat(),
+                          sizeof(x)),
+            namei("x"),
+            typei("unsigned int"),
+            0,
+            0));
     value.u = y;
     vars.push_back(
-        FlyweightTraceVarInfo(value,
-                              namei("y"),
-                              typei("unsigned int"),
-                              test_types[typei("unsigned int")].getTypeFormat(),
-                              sizeof(y),
-                              0,
-                              0));
+        FlyweightTraceVarInfo(
+            TraceVarValue(value,
+                          test_types[typei("unsigned int")].getTypeFormat(),
+                          sizeof(y)),
+            namei("y"),
+            typei("unsigned int"),
+            0,
+            0));
     value.s = z;
     vars.push_back(
-        FlyweightTraceVarInfo(value,
-                              namei("z"),
-                              typei("int"),
-                              test_types[typei("int")].getTypeFormat(),
-                              sizeof(y),
-                              0,
-                              0));
+        FlyweightTraceVarInfo(
+            TraceVarValue(value,
+                          test_types[typei("int")].getTypeFormat(),
+                          sizeof(y)),
+            namei("z"),
+            typei("int"),
+            0,
+            0));
     value.s = big_positive;
     vars.push_back(
-        FlyweightTraceVarInfo(value,
-                              namei("big_positive"),
-                              typei("int64_t"),
-                              test_types[typei("int64_t")].getTypeFormat(),
-                              sizeof(big_positive),
-                              0,
-                              0));
+        FlyweightTraceVarInfo(
+            TraceVarValue(value,
+                          test_types[typei("int64_t")].getTypeFormat(),
+                          sizeof(big_positive)),
+            namei("big_positive"),
+            typei("int64_t"),
+            0,
+            0));
     value.s = big_negative;
     vars.push_back(
-        FlyweightTraceVarInfo(value,
-                              namei("big_negative"),
-                              typei("int64_t"),
-                              test_types[typei("int64_t")].getTypeFormat(),
-                              sizeof(big_negative),
-                              0,
-                              0));
+        FlyweightTraceVarInfo(
+            TraceVarValue(value,
+                          test_types[typei("int64_t")].getTypeFormat(),
+                          sizeof(big_negative)),
+            namei("big_negative"),
+            typei("int64_t"),
+            0,
+            0));
     value.u = big_unsigned;
     vars.push_back(
-        FlyweightTraceVarInfo(value,
-                              namei("big_unsigned"),
-                              typei("uint64_t"),
-                              test_types[typei("uint64_t")].getTypeFormat(),
-                              sizeof(big_unsigned),
-                              0,
-                              0));
+        FlyweightTraceVarInfo(
+            TraceVarValue(value,
+                          test_types[typei("uint64_t")].getTypeFormat(),
+                          sizeof(big_unsigned)),
+            namei("big_unsigned"),
+            typei("uint64_t"),
+            0,
+            0));
     value.ptr = voidptr;
     vars.push_back(
-        FlyweightTraceVarInfo(value,
-                              namei("var"),
-                              typei("*void"),
-                              test_types[typei("*void")].getTypeFormat(),
-                              sizeof(voidptr),
-                              4,
-                              1));
+        FlyweightTraceVarInfo(
+            TraceVarValue(value,
+                          test_types[typei("*void")].getTypeFormat(),
+                          sizeof(voidptr)),
+            namei("var"),
+            typei("*void"),
+            4,
+            1));
 
     bufferSizes.push_back(TraceBufferSize(0x1234, 4));
 
@@ -623,15 +630,15 @@ void test_query_variable_binding()
 
     ASSERT(r1.getVars().size() == 2);
     ASSERT(r1.getVars()[0].get().getNameIndex() == namei("x"));
-    ASSERT(r1.getVars()[0].get().getValue().u == 0);
+    ASSERT(r1.getVars()[0].get().getTraceVarValue().getValue().u == 0);
     ASSERT(r1.getVars()[1].get().getNameIndex() == namei("z"));
-    ASSERT(r1.getVars()[1].get().getValue().s == -2);
+    ASSERT(r1.getVars()[1].get().getTraceVarValue().getValue().s == -2);
 
     ASSERT(r2.getVars().size() == 2);
     ASSERT(r2.getVars()[0].get().getNameIndex() == namei("y"));
-    ASSERT(r2.getVars()[0].get().getValue().u == 1);
+    ASSERT(r2.getVars()[0].get().getTraceVarValue().getValue().u == 1);
     ASSERT(r2.getVars()[1].get().getNameIndex() == namei("z"));
-    ASSERT(r2.getVars()[1].get().getValue().s == -2);
+    ASSERT(r2.getVars()[1].get().getTraceVarValue().getValue().s == -2);
 }
 
 void test_query_predicates()
@@ -1033,26 +1040,26 @@ void test_trace_var_info_input_output () {
         TypeDescription(8, FLOAT, sizeof(double)),
         TypeDescription(9, POINTER, sizeof(int*))
     });
-    TraceVarInfo var1(value1, 0, 0,
-                      types[0].getTypeFormat(),
-                      types[0].getSize(),
-                      0u, 0u);
-    TraceVarInfo var2(value2, 1, 1,
-                      types[1].getTypeFormat(),
-                      types[1].getSize(),
-                      0u, 0u);
-    TraceVarInfo var3(value3, 2, 2,
-                      types[2].getTypeFormat(),
-                      types[2].getSize(),
-                      0u, 0u);
-    TraceVarInfo var4(value4, 3, 3,
-                      types[3].getTypeFormat(),
-                      types[3].getSize(),
-                      0u, 0u);
-    TraceVarInfo var5(value5, 4, 4,
-                      types[4].getTypeFormat(),
-                      types[4].getSize(),
-                      0u, 0u);
+    TraceVarInfo var1(TraceVarValue(value1,
+                                    types[0].getTypeFormat(),
+                                    types[0].getSize()),
+                      0, 0, 0u, 0u);
+    TraceVarInfo var2(TraceVarValue(value2,
+                                    types[1].getTypeFormat(),
+                                    types[1].getSize()),
+                      1, 1, 0u, 0u);
+    TraceVarInfo var3(TraceVarValue(value3,
+                                    types[2].getTypeFormat(),
+                                    types[2].getSize()),
+                      2, 2, 0u, 0u);
+    TraceVarInfo var4(TraceVarValue(value4,
+                                    types[3].getTypeFormat(),
+                                    types[3].getSize()),
+                      3, 3, 0u, 0u);
+    TraceVarInfo var5(TraceVarValue(value5,
+                                    types[4].getTypeFormat(),
+                                    types[4].getSize()),
+                      4, 4, 0u, 0u);
 
     std::ofstream out(TRACE_FILE, std::ios::out | std::ios::binary);
     out << var1;
@@ -1080,11 +1087,11 @@ void test_trace_var_info_input_output () {
     ASSERT(hash_value(var3) == hash_value(var8));
     ASSERT(hash_value(var4) == hash_value(var9));
     ASSERT(hash_value(var5) == hash_value(var10));
-    ASSERT(var6.getValue().u == UINT32_MAX);
-    ASSERT(var7.getValue().s == INT32_MAX);
-    ASSERT(var8.getValue().f == FLT_MIN);
-    ASSERT(var9.getValue().d == DBL_MIN);
-    ASSERT(var10.getValue().ptr == &value1);
+    ASSERT(var6.getTraceVarValue().getValue().u == UINT32_MAX);
+    ASSERT(var7.getTraceVarValue().getValue().s == INT32_MAX);
+    ASSERT(var8.getTraceVarValue().getValue().f == FLT_MIN);
+    ASSERT(var9.getTraceVarValue().getValue().d == DBL_MIN);
+    ASSERT(var10.getTraceVarValue().getValue().ptr == &value1);
 }
 void test_trace_var_info_serialization ()
 {
@@ -1113,18 +1120,23 @@ void test_trace_var_info_serialization ()
     value5.ptr = &name_index;
     value6.ptr = (void*) "hello";
 
-    TraceVarInfo serialized1(value1, name_index, type_index, format, size,
+    TraceVarInfo serialized1(TraceVarValue(value1, format, size),
+                             name_index, type_index,
                              buffer_size, has_buffer_size);
-    TraceVarInfo serialized2(value2, name_index, type_index, format, size,
+    TraceVarInfo serialized2(TraceVarValue(value2, format, size),
+                             name_index, type_index,
                              buffer_size, has_buffer_size);
-    TraceVarInfo serialized3(value3, name_index, type_index, format, size,
+    TraceVarInfo serialized3(TraceVarValue(value3, format, size),
+                             name_index, type_index,
                              buffer_size, has_buffer_size);
-    TraceVarInfo serialized4(value4, name_index, type_index, format, size,
+    TraceVarInfo serialized4(TraceVarValue(value4, format, size),
+                             name_index, type_index,
                              buffer_size, has_buffer_size);
-    TraceVarInfo serialized5(value5, name_index, type_index, format, size,
+    TraceVarInfo serialized5(TraceVarValue(value5, format, size),
+                             name_index, type_index,
                              buffer_size, has_buffer_size);
-    TraceVarInfo serialized6(value6, name_index, type_index,
-                             BLOB, strlen("hello")+1,
+    TraceVarInfo serialized6(TraceVarValue(value6, BLOB, strlen("hello")+1),
+                             name_index, type_index,
                              buffer_size, has_buffer_size);
     TraceVarInfo deserialized1;
     TraceVarInfo deserialized2;
@@ -1153,12 +1165,14 @@ void test_trace_var_info_serialization ()
     ASSERT(hash_value(serialized4) == hash_value(deserialized4));
     ASSERT(hash_value(serialized5) == hash_value(deserialized5));
     ASSERT(hash_value(serialized6) == hash_value(deserialized6));
-    ASSERT(deserialized1.getValue().u == UINT32_MAX);
-    ASSERT(deserialized2.getValue().s == INT32_MAX);
-    ASSERT(deserialized3.getValue().f == FLT_MIN);
-    ASSERT(deserialized4.getValue().d == DBL_MIN);
-    ASSERT(deserialized5.getValue().ptr == &name_index);
-    ASSERT(memcmp(deserialized6.getValue().ptr, "hello", strlen("hello")) == 0);
+    ASSERT(deserialized1.getTraceVarValue().getValue().u == UINT32_MAX);
+    ASSERT(deserialized2.getTraceVarValue().getValue().s == INT32_MAX);
+    ASSERT(deserialized3.getTraceVarValue().getValue().f == FLT_MIN);
+    ASSERT(deserialized4.getTraceVarValue().getValue().d == DBL_MIN);
+    ASSERT(deserialized5.getTraceVarValue().getValue().ptr == &name_index);
+    ASSERT(memcmp(deserialized6.getTraceVarValue().getValue().ptr,
+                  "hello",
+                  strlen("hello")) == 0);
 }
 
 void test_trace_point_serialization ()
@@ -1181,10 +1195,11 @@ void test_trace_point_serialization ()
     VarValue value;
     value.u = 1u;
     sizes.push_back(TraceBufferSize(1u, 2u));
-    vars.push_back(FlyweightTraceVarInfo(value, 1u, 1u,
-                                         types[1u].getTypeFormat(),
-                                         types[1u].getSize(),
-                                         8u, 1u));
+    vars.push_back(FlyweightTraceVarInfo(
+                       TraceVarValue(value,
+                                     types[1u].getTypeFormat(),
+                                     types[1u].getSize()),
+                       1u, 1u, 8u, 1u));
     aux.push_back(32u);
 
     TracePoint serialized(1u, 2u, sizes, vars, aux);
@@ -1207,10 +1222,11 @@ void test_trace_input_output ()
         TraceBufferSize(16, 4)
     });
     FlyweightTraceVarInfos vars({
-        FlyweightTraceVarInfo(value, 5, 0,
-                              test_types[0].getTypeFormat(),
-                              test_types[0].getSize(),
-                              0, 0)
+        FlyweightTraceVarInfo(
+            TraceVarValue(value,
+                          test_types[0].getTypeFormat(),
+                          test_types[0].getSize()),
+            5, 0, 0, 0)
     });
     Aux aux({
         1, 2, 3, 4
@@ -1255,10 +1271,11 @@ void test_trace_serialization ()
 
     value.u = 1u;
     sizes.push_back(TraceBufferSize(1u, 1u));
-    vars.push_back(FlyweightTraceVarInfo(value, 1u, 1u,
-                                         types[1u].getTypeFormat(),
-                                         types[1u].getSize(),
-                                         5u, 1u));
+    vars.push_back(FlyweightTraceVarInfo(
+                       TraceVarValue(value,
+                                     types[1u].getTypeFormat(),
+                                     types[1u].getSize()),
+                       1u, 1u, 5u, 1u));
     aux.push_back(32u);
 
     points.push_back(TracePoint(1u, 1u, sizes, vars, aux));

@@ -122,9 +122,9 @@ c_trace_point_struct* points_to_array(const Trace & trace,
 
                 c_vars[j].var_name_index = var.get().getNameIndex();
                 c_vars[j].type_name_index = type.getNameIndex();
-                c_vars[j].value = var.get().getValue();
-                c_vars[j].format = var.get().getTypeFormat();
-                c_vars[j].size = var.get().getSize();
+                c_vars[j].value = var.get().getTraceVarValue().getValue();
+                c_vars[j].format = var.get().getTraceVarValue().getTypeFormat();
+                c_vars[j].size = var.get().getTraceVarValue().getSize();
                 c_vars[j].buffer_size = var.get().getBufferSize();
                 c_vars[j].has_buffer_size = var.get().hasBufferSize();
             }

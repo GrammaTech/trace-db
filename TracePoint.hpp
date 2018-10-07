@@ -51,6 +51,72 @@ enum trace_entry_tag {
     INVALID_TAG,
 };
 
+class PredicateAndVarValues
+{
+private:
+    const Predicate & m_predicate;
+    const std::vector<TraceVarValue> & m_values;
+    std::size_t m_hash;
+
+    std::size_t computeHash() const {
+        std::size_t seed = 0;
+
+        boost::hash_combine(seed, m_predicate);
+        boost::hash_combine(seed, m_values);
+
+        return seed;
+    }
+
+public:
+    PredicateAndVarValues(const Predicate & predicate,
+                          const std::vector<TraceVarValue> & values) :
+        m_predicate(predicate),
+        m_values(values),
+        m_hash(computeHash())
+    {}
+
+    PredicateAndVarValues(const PredicateAndVarValues & other) :
+        m_predicate(other.m_predicate),
+        m_values(other.m_values),
+        m_hash(other.m_hash)
+    {}
+
+    PredicateAndVarValues & operator=(const PredicateAndVarValues & oth) = delete;
+
+    inline const std::vector<TraceVarValue> & getValues() const {
+        return m_values;
+    }
+
+    inline const Predicate & getPredicate() const {
+        return m_predicate;
+    }
+
+    inline std::size_t getHash() const {
+        return m_hash;
+    }
+
+    inline bool operator==(const PredicateAndVarValues & other) const {
+        return m_predicate == other.m_predicate &&
+               m_values == other.m_values;
+    }
+
+    friend std::size_t
+    hash_value(const PredicateAndVarValues & predicateAndVarValues) {
+        return predicateAndVarValues.getHash();
+    }
+};
+
+namespace std {
+    template <>
+    struct hash<PredicateAndVarValues>
+    {
+        std::size_t
+        operator()(const PredicateAndVarValues & predicateAndVarValues) const {
+            return predicateAndVarValues.getHash();
+        }
+    };
+}
+
 class TracePointData
 {
 private:
@@ -59,11 +125,22 @@ private:
     TraceBufferSizes m_sizes;
     FlyweightTraceVarInfos m_vars;
     Aux m_aux;
-    mutable std::unordered_map<PredicateAndBindings, bool> m_cache;
 
     const TraceVarInfo & varLookup(const std::vector<uint32_t> & bindings,
                                    uint64_t var_index) const {
         return m_vars[bindings[var_index]].get();
+    }
+
+    const std::vector<TraceVarValue>
+    getVarValues(const std::vector<uint32_t> & bindings) const {
+        std::vector<TraceVarValue> values;
+
+        for (size_t i = 0; i < bindings.size(); i++) {
+            values.push_back(varLookup(bindings, i).getTraceVarValue());
+        }
+
+        values.shrink_to_fit();
+        return values;
     }
 
     template <class ReturnType, class Operation>
@@ -108,16 +185,16 @@ private:
                 const TraceVarInfo & var =
                     varLookup(bindings, c.getData().var_index);
                 enum type_format f =
-                    var.getTypeFormat();
+                    var.getTraceVarValue().getTypeFormat();
 
                 if (f == UNSIGNED)
-                    return PredicateValue(var.getValue().u);
+                    return PredicateValue(var.getTraceVarValue().getValue().u);
                 else if (f == SIGNED)
-                    return PredicateValue(var.getValue().s);
+                    return PredicateValue(var.getTraceVarValue().getValue().s);
                 else if (f == POINTER)
-                    return PredicateValue(var.getValue().u);
+                    return PredicateValue(var.getTraceVarValue().getValue().u);
                 else if (f == FLOAT)
-                    return PredicateValue(var.getValue().f);
+                    return PredicateValue(var.getTraceVarValue().getValue().f);
                 else
                     return PredicateValue();
             }
@@ -243,8 +320,7 @@ public:
     TracePointData() :
         m_sizes(0),
         m_vars(0),
-        m_aux(0),
-        m_cache()
+        m_aux(0)
     {}
 
     TracePointData(const TraceBufferSizes & sizes,
@@ -252,15 +328,13 @@ public:
                    const Aux & aux) :
         m_sizes(sizes),
         m_vars(vars),
-        m_aux(aux),
-        m_cache()
+        m_aux(aux)
     {}
 
     TracePointData(const TracePointData & other) :
         m_sizes(other.m_sizes),
         m_vars(other.m_vars),
-        m_aux(other.m_aux),
-        m_cache(other.m_cache)
+        m_aux(other.m_aux)
     {}
 
     TracePointData& operator=(const TracePointData & other) = delete;
@@ -279,7 +353,8 @@ public:
 
     bool satisfiesPredicate(const Predicate & predicate,
                             const std::vector<uint32_t> & bindings) const {
-        PredicateAndBindings pb(predicate, bindings);
+        static std::unordered_map<PredicateAndVarValues, bool> m_cache;
+        PredicateAndVarValues pb(predicate, getVarValues(bindings));
 
         if (m_cache.find(pb) == m_cache.end()) {
             m_cache[pb] = satisfiesPredicateHelper(predicate, bindings);

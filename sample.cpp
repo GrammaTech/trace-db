@@ -89,33 +89,47 @@ void write_test_trace(const char *filename)
         bufferSizes.push_back(bufferSize);
 
         val.s = i;
-        vars.push_back(FlyweightTraceVarInfo(val, 7, 0,
-                                             types[0].getTypeFormat(),
-                                             sizeof(i), 0, 0));
+        vars.push_back(FlyweightTraceVarInfo(
+                           TraceVarValue(val,
+                                         types[0].getTypeFormat(),
+                                         sizeof(i)),
+                           7, 0, 0, 0));
         val.ptr = (void*) ptr;
-        vars.push_back(FlyweightTraceVarInfo(val, 8, 1,
-                                             types[1].getTypeFormat(),
-                                             sizeof(ptr), 0, 0));
+        vars.push_back(FlyweightTraceVarInfo(
+                           TraceVarValue(val,
+                                         types[1].getTypeFormat(),
+                                         sizeof(ptr)),
+                           8, 1, 0, 0));
         val.s = c;
-        vars.push_back(FlyweightTraceVarInfo(val, 9, 2,
-                                             types[2].getTypeFormat(),
-                                             sizeof(c), 0, 0));
+        vars.push_back(FlyweightTraceVarInfo(
+                           TraceVarValue(val,
+                                         types[2].getTypeFormat(),
+                                         sizeof(c)),
+                           9, 2, 0, 0));
         val.f = f;
-        vars.push_back(FlyweightTraceVarInfo(val, 10, 3,
-                                             types[3].getTypeFormat(),
-                                             sizeof(f), 0, 0));
+        vars.push_back(FlyweightTraceVarInfo(
+                           TraceVarValue(val,
+                                         types[3].getTypeFormat(),
+                                         sizeof(f)),
+                           10, 3, 0, 0));
         val.d = d;
-        vars.push_back(FlyweightTraceVarInfo(val, 11, 4,
-                                             types[4].getTypeFormat(),
-                                             sizeof(d), 0, 0));
+        vars.push_back(FlyweightTraceVarInfo(
+                           TraceVarValue(val,
+                                         types[4].getTypeFormat(),
+                                         sizeof(d)),
+                           11, 4, 0, 0));
         val.u = u;
-        vars.push_back(FlyweightTraceVarInfo(val, 12, 5,
-                                             types[5].getTypeFormat(),
-                                             sizeof(u), 0, 0));
+        vars.push_back(FlyweightTraceVarInfo(
+                           TraceVarValue(val,
+                                         types[5].getTypeFormat(),
+                                         sizeof(u)),
+                           12, 5, 0, 0));
         val.ptr = (void*) ptr;
-        vars.push_back(FlyweightTraceVarInfo(val, 8, 6,
-                                             types[6].getTypeFormat(),
-                                             strlen(ptr), 0, 0));
+        vars.push_back(FlyweightTraceVarInfo(
+                           TraceVarValue(val,
+                                         types[6].getTypeFormat(),
+                                         strlen(ptr)),
+                           8, 6, 0, 0));
 
         auxs.push_back(aux);
 
@@ -164,40 +178,41 @@ void read_trace(const char *filename)
         for (auto & var : tracePoint.getVars()) {
             const TypeDescription & type =
                 trace.getTypes()[var.get().getTypeIndex()];
+            const TraceVarValue & traceVarValue = var.get().getTraceVarValue();
 
             printf("%s: %s, %u bytes = ",
                    trace.getNames()[var.get().getNameIndex()].c_str(),
                    trace.getNames()[type.getNameIndex()].c_str(),
-                   var.get().getSize());
+                   traceVarValue.getSize());
 
-            switch (var.get().getTypeFormat()) {
+            switch (traceVarValue.getTypeFormat()) {
             case UNSIGNED:
-                printf("%lu", var.get().getValue().u);
-                if (var.get().getSize() == 1)
-                    printf(" '%c'", (unsigned char)var.get().getValue().u);
+                printf("%lu", traceVarValue.getValue().u);
+                if (traceVarValue.getSize() == 1)
+                    printf(" '%c'", (unsigned char)traceVarValue.getValue().u);
                 break;
             case SIGNED:
-                printf("%ld", var.get().getValue().s);
-                if (var.get().getSize() == 1)
-                    printf(" '%c'", (char)var.get().getValue().u);
+                printf("%ld", traceVarValue.getValue().s);
+                if (traceVarValue.getSize() == 1)
+                    printf(" '%c'", (char)traceVarValue.getValue().u);
                 break;
             case POINTER:
-                printf("%lx", var.get().getValue().u);
+                printf("%lx", traceVarValue.getValue().u);
                 break;
             case FLOAT:
-                if (var.get().getSize() == 4)
-                    printf("%g", var.get().getValue().f);
+                if (traceVarValue.getSize() == 4)
+                    printf("%g", traceVarValue.getValue().f);
                 else
-                    printf("%g", var.get().getValue().d);
+                    printf("%g", traceVarValue.getValue().d);
                 break;
             case BLOB:
                 printf("blob: '%.*s'",
-                       var.get().getSize(),
-                       (const char *)var.get().getValue().ptr);
+                       traceVarValue.getSize(),
+                       (const char *)traceVarValue.getValue().ptr);
                 break;
             default:
                 printf("<unrecognized format %u>",
-                       var.get().getTypeFormat());
+                       traceVarValue.getTypeFormat());
                 break;
             }
 
