@@ -378,6 +378,7 @@ DO NOT USE IN PRODUCTION OR NEW DEVELOPMENT."
   :var-size
   :var-value
   :distinct-vars
+  :null-value
   :signed-value
   :unsigned-value
   :float-value

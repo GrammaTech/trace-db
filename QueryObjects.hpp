@@ -35,6 +35,7 @@ enum predicate_kind
     VAR_VALUE,
     DISTINCT_VARS,
     /* Numeric values */
+    NULL_VALUE,
     SIGNED_VALUE,
     UNSIGNED_VALUE,
     FLOAT_VALUE,
