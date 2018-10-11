@@ -207,6 +207,7 @@ create_predicate_obj(const c_predicate *c_predicate)
                 }
             }
         }
+        children.shrink_to_fit();
 
         switch (c_predicate->kind) {
         case VAR_REFERENCE:

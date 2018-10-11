@@ -59,192 +59,31 @@ private:
     TraceBufferSizes m_sizes;
     FlyweightTraceVarInfos m_vars;
     Aux m_aux;
-    mutable std::unordered_map<PredicateAndBindings, bool> m_cache;
 
-    const TraceVarInfo & varLookup(const std::vector<uint32_t> & bindings,
-                                   uint64_t var_index) const {
-        return m_vars[bindings[var_index]].get();
+    const FlyweightTraceVarInfo &
+    varLookup(const std::vector<uint32_t> & bindings,
+              uint64_t var_index) const {
+        return m_vars[bindings[var_index]];
     }
 
-    template <class ReturnType, class Operation>
-    ReturnType
-    evaluate_binary_op(const std::vector<Predicate> & children,
-                       const std::vector<uint32_t> & bindings,
-                       const Operation & op) const {
-        assert(children.size() == 2);
+    bool
+    cachedSatisfiesPredicate(const Predicate & predicate,
+                             const FlyweightTraceVarInfos & variables) const {
+        static std::unordered_map<EvaluatePredicate, bool> m_cache;
+        EvaluatePredicate functor(predicate, variables);
 
-        PredicateValue v0(evaluate(children[0],
-                                   bindings));
-        PredicateValue v1(evaluate(children[1],
-                                   bindings));
-
-        return op(v0, v1);
-    }
-
-    PredicateValue evaluate(const Predicate & predicate,
-                            const std::vector<uint32_t> & bindings) const {
-        const std::vector<Predicate> & children = predicate.getChildren();
-
-        switch (predicate.getKind()) {
-        case VAR_SIZE:
-            {
-                assert(children.size() == 1);
-                const Predicate & c = children[0];
-                assert(c.getKind() == VAR_REFERENCE);
-
-                const TraceVarInfo & var =
-                    varLookup(bindings, c.getData().var_index);
-                return var.hasBufferSize() ?
-                       PredicateValue(var.getBufferSize()) :
-                       PredicateValue();
-            }
-            break;
-        case VAR_VALUE:
-            {
-                assert(children.size() == 1);
-                const Predicate & c = children[0];
-                assert(c.getKind() == VAR_REFERENCE);
-
-                const TraceVarInfo & var =
-                    varLookup(bindings, c.getData().var_index);
-                enum type_format f =
-                    var.getTypeFormat();
-
-                if (f == UNSIGNED)
-                    return PredicateValue(var.getValue().u);
-                else if (f == SIGNED)
-                    return PredicateValue(var.getValue().s);
-                else if (f == POINTER)
-                    return PredicateValue(var.getValue().u);
-                else if (f == FLOAT)
-                    return PredicateValue(var.getValue().f);
-                else
-                    return PredicateValue();
-            }
-        case UNSIGNED_VALUE:
-            return PredicateValue(predicate.getData().unsigned_value);
-        case SIGNED_VALUE:
-            return PredicateValue(predicate.getData().signed_value);
-        case FLOAT_VALUE:
-            return PredicateValue(predicate.getData().float_value);
-        case ADD:
-            {
-                return evaluate_binary_op<PredicateValue>(
-                           children,
-                           bindings,
-                           std::plus<PredicateValue>());
-            }
-        case SUBTRACT:
-            {
-                return evaluate_binary_op<PredicateValue>(
-                           children,
-                           bindings,
-                           std::minus<PredicateValue>());
-            }
-        case MULTIPLY:
-            {
-                return evaluate_binary_op<PredicateValue>(
-                           children,
-                           bindings,
-                           std::multiplies<PredicateValue>());
-            }
-        case DIVIDE:
-            {
-                return evaluate_binary_op<PredicateValue>(
-                           children,
-                           bindings,
-                           std::divides<PredicateValue>());
-            }
-        default:
-            assert(false);
+        if (m_cache.find(functor) == m_cache.end()) {
+            m_cache[functor] = functor();
         }
+
+        return m_cache[functor];
     }
 
-    bool satisfiesPredicateHelper(const Predicate & predicate,
-                                  const std::vector<uint32_t> & bindings) const {
-        const std::vector<Predicate> & children = predicate.getChildren();
-
-        switch (predicate.getKind()) {
-        case NULL_PREDICATE:
-            return true;
-            break;
-        case AND:
-            for (auto & child : children) {
-                if (!satisfiesPredicateHelper(child,
-                                              bindings))
-                    return false;
-            }
-            return true;
-        case OR:
-            for (auto & child : children) {
-                if (satisfiesPredicateHelper(child,
-                                             bindings))
-                    return true;
-            }
-            return false;
-        case NOT:
-            {
-                assert(children.size() == 1);
-                return !satisfiesPredicateHelper(children[0],
-                                                 bindings);
-            }
-        case DISTINCT_VARS:
-            {
-                assert(children.size() == 2);
-
-                const Predicate & c0 = children[0];
-                const Predicate & c1 = children[1];
-
-                assert(c0.getKind() == VAR_REFERENCE);
-                assert(c1.getKind() == VAR_REFERENCE);
-                return bindings[c0.getData().var_index] !=
-                       bindings[c1.getData().var_index];
-            }
-        case GREATER_THAN:
-            {
-                return evaluate_binary_op<bool>(
-                           children,
-                           bindings,
-                           std::greater<PredicateValue>());
-            }
-        case GREATER_THAN_OR_EQUAL:
-            {
-                return evaluate_binary_op<bool>(
-                           children,
-                           bindings,
-                           std::greater_equal<PredicateValue>());
-            }
-        case LESS_THAN:
-            {
-                return evaluate_binary_op<bool>(
-                           children,
-                           bindings,
-                           std::less<PredicateValue>());
-            }
-        case LESS_THAN_OR_EQUAL:
-            {
-                return evaluate_binary_op<bool>(
-                           children,
-                           bindings,
-                           std::less_equal<PredicateValue>());
-            }
-        case EQUAL:
-            {
-                return evaluate_binary_op<bool>(
-                           children,
-                           bindings,
-                           std::equal_to<PredicateValue>());
-            }
-        default:
-            assert(false);
-        }
-    }
 public:
     TracePointData() :
         m_sizes(0),
         m_vars(0),
-        m_aux(0),
-        m_cache()
+        m_aux(0)
     {}
 
     TracePointData(const TraceBufferSizes & sizes,
@@ -252,15 +91,13 @@ public:
                    const Aux & aux) :
         m_sizes(sizes),
         m_vars(vars),
-        m_aux(aux),
-        m_cache()
+        m_aux(aux)
     {}
 
     TracePointData(const TracePointData & other) :
         m_sizes(other.m_sizes),
         m_vars(other.m_vars),
-        m_aux(other.m_aux),
-        m_cache(other.m_cache)
+        m_aux(other.m_aux)
     {}
 
     TracePointData& operator=(const TracePointData & other) = delete;
@@ -279,13 +116,13 @@ public:
 
     bool satisfiesPredicate(const Predicate & predicate,
                             const std::vector<uint32_t> & bindings) const {
-        PredicateAndBindings pb(predicate, bindings);
-
-        if (m_cache.find(pb) == m_cache.end()) {
-            m_cache[pb] = satisfiesPredicateHelper(predicate, bindings);
+        FlyweightTraceVarInfos variables;
+        for (size_t i = 0; i < bindings.size(); i++) {
+            variables.push_back(varLookup(bindings, i));
         }
+        variables.shrink_to_fit();
 
-        return m_cache[pb];
+        return cachedSatisfiesPredicate(predicate, variables);
     }
 
     inline bool operator<(const TracePointData & other) const {

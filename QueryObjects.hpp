@@ -17,8 +17,12 @@
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
+#include "TraceVarInfo.hpp"
+
 class Predicate;
 class FreeVariable;
+class PredicateValue;
+class EvaluatePredicate;
 
 typedef std::vector<Predicate>
         Predicates;
@@ -298,72 +302,6 @@ namespace std {
     };
 }
 
-class PredicateAndBindings
-{
-private:
-    const Predicate & m_predicate;
-    const std::vector<uint32_t> & m_bindings;
-    std::size_t m_hash;
-
-    std::size_t computeHash() const {
-        std::size_t seed = 0;
-
-        boost::hash_combine(seed, m_predicate);
-        boost::hash_combine(seed, m_bindings);
-
-        return seed;
-    }
-
-public:
-    PredicateAndBindings(const Predicate & predicate,
-                         const std::vector<uint32_t> & bindings) :
-        m_predicate(predicate),
-        m_bindings(bindings),
-        m_hash(computeHash())
-    {}
-
-    PredicateAndBindings(const PredicateAndBindings & other) :
-        m_predicate(other.m_predicate),
-        m_bindings(other.m_bindings),
-        m_hash(other.m_hash)
-    {}
-
-    PredicateAndBindings & operator=(const PredicateAndBindings & oth) = delete;
-
-    inline const std::vector<uint32_t> & getBindings() const {
-        return m_bindings;
-    }
-
-    inline const Predicate & getPredicate() const {
-        return m_predicate;
-    }
-
-    inline std::size_t getHash() const {
-        return m_hash;
-    }
-
-    inline bool operator==(const PredicateAndBindings & other) const {
-        return m_predicate == other.m_predicate &&
-               m_bindings == other.m_bindings;
-    }
-
-    friend std::size_t
-    hash_value(const PredicateAndBindings & predicateAndBindings) {
-        return predicateAndBindings.getHash();
-    }
-};
-
-namespace std {
-    template <>
-    struct hash<PredicateAndBindings>
-    {
-        std::size_t
-        operator()(const PredicateAndBindings & predicateAndBindings) const {
-            return predicateAndBindings.getHash();
-        }
-    };
-}
-
 class PredicateValue
 {
 private:
@@ -563,5 +501,233 @@ public:
         }
     }
 };
+
+class EvaluatePredicate
+{
+private:
+    const Predicate & m_predicate;
+    const FlyweightTraceVarInfos & m_variables;
+    std::size_t m_hash;
+
+    std::size_t computeHash() const {
+        std::size_t seed = 0;
+
+        boost::hash_combine(seed, m_predicate);
+        boost::hash_combine(seed, m_variables);
+
+        return seed;
+    }
+
+    template <class ReturnType, class Operation>
+    ReturnType
+    evaluate_binary_op(const std::vector<Predicate> & children,
+                       const Operation & op) const {
+        assert(children.size() == 2);
+
+        PredicateValue v0(evaluate(children[0]));
+        PredicateValue v1(evaluate(children[1]));
+
+        return op(v0, v1);
+    }
+
+    PredicateValue evaluate(const Predicate & predicate) const {
+        const std::vector<Predicate> & children = predicate.getChildren();
+
+        switch (predicate.getKind()) {
+        case VAR_SIZE:
+            {
+                assert(children.size() == 1);
+                const Predicate & c = children[0];
+                assert(c.getKind() == VAR_REFERENCE);
+
+                const TraceVarInfo & var =
+                    m_variables[c.getData().var_index].get();
+                return var.hasBufferSize() ?
+                       PredicateValue(var.getBufferSize()) :
+                       PredicateValue();
+            }
+            break;
+        case VAR_VALUE:
+            {
+                assert(children.size() == 1);
+                const Predicate & c = children[0];
+                assert(c.getKind() == VAR_REFERENCE);
+
+                const TraceVarInfo & var =
+                    m_variables[c.getData().var_index].get();
+                enum type_format f =
+                    var.getTypeFormat();
+
+                if (f == UNSIGNED)
+                    return PredicateValue(var.getValue().u);
+                else if (f == SIGNED)
+                    return PredicateValue(var.getValue().s);
+                else if (f == POINTER)
+                    return PredicateValue(var.getValue().u);
+                else if (f == FLOAT)
+                    return PredicateValue(var.getValue().f);
+                else
+                    return PredicateValue();
+            }
+        case UNSIGNED_VALUE:
+            return PredicateValue(predicate.getData().unsigned_value);
+        case SIGNED_VALUE:
+            return PredicateValue(predicate.getData().signed_value);
+        case FLOAT_VALUE:
+            return PredicateValue(predicate.getData().float_value);
+        case ADD:
+            {
+                return evaluate_binary_op<PredicateValue>(
+                           children,
+                           std::plus<PredicateValue>());
+            }
+        case SUBTRACT:
+            {
+                return evaluate_binary_op<PredicateValue>(
+                           children,
+                           std::minus<PredicateValue>());
+            }
+        case MULTIPLY:
+            {
+                return evaluate_binary_op<PredicateValue>(
+                           children,
+                           std::multiplies<PredicateValue>());
+            }
+        case DIVIDE:
+            {
+                return evaluate_binary_op<PredicateValue>(
+                           children,
+                           std::divides<PredicateValue>());
+            }
+        default:
+            assert(false);
+        }
+    }
+
+    bool predicateSatisfied(const Predicate & predicate) const {
+        const std::vector<Predicate> & children = predicate.getChildren();
+
+        switch (predicate.getKind()) {
+        case NULL_PREDICATE:
+            return true;
+            break;
+        case AND:
+            for (auto & child : children) {
+                if (!predicateSatisfied(child)) {
+                    return false;
+                }
+            }
+            return true;
+        case OR:
+            for (auto & child : children) {
+                if (predicateSatisfied(child)) {
+                    return true;
+                }
+            }
+            return false;
+        case NOT:
+            {
+                assert(children.size() == 1);
+                return !predicateSatisfied(children[0]);
+            }
+        case DISTINCT_VARS:
+            {
+                assert(children.size() == 2);
+
+                const Predicate & c0 = children[0];
+                const Predicate & c1 = children[1];
+
+                assert(c0.getKind() == VAR_REFERENCE);
+                assert(c1.getKind() == VAR_REFERENCE);
+                return m_variables[c0.getData().var_index] !=
+                       m_variables[c1.getData().var_index];
+            }
+        case GREATER_THAN:
+            {
+                return evaluate_binary_op<bool>(
+                           children,
+                           std::greater<PredicateValue>());
+            }
+        case GREATER_THAN_OR_EQUAL:
+            {
+                return evaluate_binary_op<bool>(
+                           children,
+                           std::greater_equal<PredicateValue>());
+            }
+        case LESS_THAN:
+            {
+                return evaluate_binary_op<bool>(
+                           children,
+                           std::less<PredicateValue>());
+            }
+        case LESS_THAN_OR_EQUAL:
+            {
+                return evaluate_binary_op<bool>(
+                           children,
+                           std::less_equal<PredicateValue>());
+            }
+        case EQUAL:
+            {
+                return evaluate_binary_op<bool>(
+                           children,
+                           std::equal_to<PredicateValue>());
+            }
+        default:
+            assert(false);
+        }
+    }
+public:
+    EvaluatePredicate(const Predicate & predicate,
+                      const FlyweightTraceVarInfos & variables) :
+        m_predicate(predicate),
+        m_variables(variables),
+        m_hash(computeHash())
+    {}
+
+    EvaluatePredicate(const EvaluatePredicate & other) :
+        m_predicate(other.m_predicate),
+        m_variables(other.m_variables),
+        m_hash(other.m_hash)
+    {}
+
+    EvaluatePredicate & operator=(const EvaluatePredicate & oth) = delete;
+
+    bool operator() () const {
+        return predicateSatisfied(m_predicate);
+    }
+
+    inline const Predicate & getPredicate() const {
+        return m_predicate;
+    }
+
+    inline const FlyweightTraceVarInfos & getVariables() const {
+        return m_variables;
+    }
+
+    inline std::size_t getHash() const {
+        return m_hash;
+    }
+
+    inline bool operator==(const EvaluatePredicate & other) const {
+        return m_predicate == other.m_predicate &&
+               m_variables == other.m_variables;
+    }
+
+    friend std::size_t
+    hash_value(const EvaluatePredicate & functor) {
+        return functor.getHash();
+    }
+};
+
+namespace std {
+    template <>
+    struct hash<EvaluatePredicate>
+    {
+        std::size_t
+        operator()(const EvaluatePredicate & functor) const {
+            return functor.getHash();
+        }
+    };
+}
 
 #endif // __QUERY_OBJECTS_HPP
