@@ -120,7 +120,7 @@ KWARGS are passed on to the OPEN call."
   (length (nth index (traces db))))
 
 (defmethod trace-types ((db sexp-trace-db) index)
-  (remove-duplicates (mapcar #'second
+  (remove-duplicates (mapcar {elt _ 1}
                              (mappend [#'cdr {assoc :scopes}]
                                       (nth index (traces db))))
                      :test #'string=))
@@ -137,7 +137,7 @@ KWARGS are passed on to the OPEN call."
                                              (member type type-spec
                                                      :test #'string=))
                                            (cdr (assoc :scopes pt))
-                                           :key #'second))
+                                           :key {elt _ 1}))
                           var-types)
                   (cartesian-without-duplicates)
                   (mapcar (lambda (vars)
