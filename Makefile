@@ -25,6 +25,9 @@ BOOST_BASIC_ARCHIVE_HEADER ?= boost/archive/basic_archive.hpp
 ifneq ($(wildcard /usr/local/include/$(BOOST_BASIC_ARCHIVE_HEADER)),)
 BOOST_INCLUDE_DIR ?= /usr/local/include/
 BOOST_LIB_DIR ?= /usr/local/lib/
+else ifneq ($(wildcard /usr/include/$(BOOST_BASIC_ARCHIVE_HEADER)),)
+BOOST_INCLUDE_DIR ?= /usr/include/
+BOOST_LIB_DIR ?= /usr/lib/
 else
 BOOST_INCLUDE_DIR ?= third-party/boost_1_67_0/include/
 BOOST_LIB_DIR ?= third-party/boost_1_67_0/lib/
