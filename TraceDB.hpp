@@ -98,7 +98,9 @@ public:
     template<typename Archive>
     void save(Archive & ar,
               const unsigned int version) const {
-        ar & m_traces.size();
+        size_t n_traces = m_traces.size();
+
+        ar & n_traces;
 
         for (auto & trace : m_traces) {
             ar & trace;

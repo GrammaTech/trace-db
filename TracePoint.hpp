@@ -191,9 +191,13 @@ public:
     template<typename Archive>
     void save(Archive & ar,
               const unsigned int version) const {
-        ar & m_sizes.size();
-        ar & m_vars.size();
-        ar & m_aux.size();
+        size_t n_sizes = m_sizes.size();
+        size_t n_vars = m_vars.size();
+        size_t n_aux = m_aux.size();
+
+        ar & n_sizes;
+        ar & n_vars;
+        ar & n_aux;
 
         for (auto & size : m_sizes) {
             ar & size;

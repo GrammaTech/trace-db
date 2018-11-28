@@ -416,9 +416,13 @@ public:
     template<typename Archive>
     void save(Archive & ar,
               const unsigned int version) const {
-        ar & m_points.size();
-        ar & m_names.size();
-        ar & m_types.size();
+        uint64_t n_points = m_points.size();
+        uint32_t n_names = m_names.size();
+        uint32_t n_types = m_types.size();
+
+        ar & n_points;
+        ar & n_names;
+        ar & n_types;
 
         for (auto & point : m_points) {
             ar & point;
