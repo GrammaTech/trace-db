@@ -59,9 +59,14 @@ install: $(LIBTRACEDB_SO) README.html
 	install -Dm755 $(LIBTRACEDB_SO) $(DESTDIR)lib/libtrace-db.so
 	install -Dm644 README.html $(DESTDIR)share/doc/trace-db/README.html
 
+src/trace-db_pkg:
+	mkdir -p src/
+	ln -s ../ $@
+
 # This target builds an Arch package from the current state of the repo.
-local-makepkg: PKGBUILD $(wildcard *.hpp) $(wildcard lisp/*.lisp) $(wildcard lisp/*.h) $(wildcard lisp/*.cpp)
+local-makepkg: PKGBUILD $(wildcard *.hpp) $(wildcard lisp/*.lisp) $(wildcard lisp/*.h) $(wildcard lisp/*.cpp) src/trace-db_pkg
 	makepkg -ef
+	rm -f src/trace-db_pkg; rmdir src/
 
 sample.o: $(HEADERS)
 
