@@ -1298,6 +1298,17 @@ void test_trace_db_serialization ()
     ASSERT(hash_value(serialized) == hash_value(deserialized));
 }
 
+void test_trace_point_data_equality ()
+{
+    TraceBufferSizes sizes;
+    FlyweightTraceVarInfos vars;
+    Aux aux1({1});
+    Aux aux2({2});
+
+    ASSERT(!(TracePointData(sizes, vars, aux1) ==
+             TracePointData(sizes, vars, aux2)));
+}
+
 int main(int argc, char **argv)
 {
     failure_count = 0;
@@ -1328,6 +1339,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_trace_input_output);
     RUN_TEST(test_trace_serialization);
     RUN_TEST(test_trace_db_serialization);
+    RUN_TEST(test_trace_point_data_equality);
 
     unlink(TRACE_FILE);
 

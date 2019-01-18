@@ -137,7 +137,7 @@ public:
     inline bool operator==(const TracePointData & other) const {
         return m_sizes == other.m_sizes &&
                m_vars == other.m_vars &&
-               m_aux == m_aux;
+               m_aux == other.m_aux;
     }
 
     friend std::size_t hash_value(const TracePointData & tracePoint) {
