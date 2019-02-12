@@ -279,7 +279,6 @@ the results."
 
   (let ((success (c-add-trace (db-pointer db) filename timeout (or max 0))))
     (unless (zerop success)
-      ;; (push metadata (trace-metadata db))
       (setf (trace-metadata db)
             (append (trace-metadata db) (list metadata)))
       t)))
