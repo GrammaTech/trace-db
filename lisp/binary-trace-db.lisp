@@ -121,7 +121,7 @@
 (defcfun ("read_trace" c-read-trace) :pointer
   (filename :string)
   (timeout :uint32)
-  (max-points :uint64))
+  (max-trace-points :uint64))
 
 (defcfun ("trace_size" c-trace-size) :uint64
   (trace :pointer))
@@ -181,17 +181,18 @@ the results."
               (collect point)))
       (c-free-trace-points trace-points-ptr n-points))))
 
-(defun read-binary-trace (file &key (timeout 0) (max 0))
+(defun read-binary-trace (file &key (timeout 0) (max-trace-points 0))
   "Read a trace and convert to a list."
   (assert (and (integerp timeout) (not (negative-integer-p timeout)))
           (timeout)
           "TIMEOUT must be a non-negative integer value.")
-  (assert (and (integerp max) (not (negative-integer-p max)))
-          (max)
-          "MAX must be a non-negative integer value.")
+  (assert (and (integerp max-trace-points)
+               (not (negative-integer-p max-trace-points)))
+          (max-trace-points)
+          "MAX-TRACE-POINTS must be a non-negative integer value.")
 
   (load-libtrace-db)
-  (let ((trace-ptr (c-read-trace file timeout max)))
+  (let ((trace-ptr (c-read-trace file timeout max-trace-points)))
     (unless (null-pointer-p trace-ptr)
       (convert-trace-points trace-ptr
                             (c-get-points trace-ptr)
@@ -204,7 +205,7 @@ the results."
   (db :pointer)
   (filename :string)
   (timeout :int)
-  (max :uint64))
+  (max-trace-points :uint64))
 (defcfun ("add_trace_points" c-add-trace-points) :int
   (db :pointer)
   (points :pointer)
@@ -271,13 +272,17 @@ the results."
                       (filename string)
                       (timeout integer)
                       (metadata list)
-                      &key max)
+                      &key max-trace-points)
   (assert (<= 0 timeout) (timeout)
           "TIMEOUT must be a non-negative integer value.")
-  (assert (or (null max) (<= 0 max)) (max)
-          "MAX must be a non-negative integer value.")
+  (assert (or (null max-trace-points) (<= 0 max-trace-points))
+          (max-trace-points)
+          "MAX-TRACE-POINTS must be a non-negative integer value.")
 
-  (let ((success (c-add-trace (db-pointer db) filename timeout (or max 0))))
+  (let ((success (c-add-trace (db-pointer db)
+                              filename
+                              timeout
+                              (or max-trace-points 0))))
     (unless (zerop success)
       (setf (trace-metadata db)
             (append (trace-metadata db) (list metadata)))

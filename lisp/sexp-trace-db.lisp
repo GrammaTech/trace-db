@@ -37,15 +37,15 @@ software objects.")
 (defrestore-cl-store (single-file-sexp-trace-db stream)
   (cl-store::restore-object stream))
 
-(defun read-sexp-trace (file &key timeout max)
+(defun read-sexp-trace (file &key timeout max-trace-points)
   "Read a trace from FILE-NAME with `read-trace-stream'."
   (when-let ((in (open-file-timeout file timeout)))
     (unwind-protect
-        (read-trace-stream in :max max)
+        (read-trace-stream in :max-trace-points max-trace-points)
       (close in))))
 
 (defun read-trace-stream
-    (in &key (predicate #'identity) max &aux (collected 0))
+    (in &key (predicate #'identity) max-trace-points &aux (collected 0))
   "Read a trace from the IN.
 Keyword argument PREDICATE limits collected trace points and MAX
 limits number of trace points to collect."
@@ -56,7 +56,8 @@ limits number of trace points to collect."
                  :eof)))
         (while (and (not (eq trace-point :eof))
                     (funcall predicate trace-point)
-                    (or (null max) (< collected max))))
+                    (or (null max-trace-points)
+                        (< collected max-trace-points))))
         (incf collected)
         (collect trace-point)))
 
@@ -91,8 +92,11 @@ KWARGS are passed on to the OPEN call."
                  (error result)
                  (return result)))))))
 
-(defmethod add-trace ((db sexp-trace-db) filename timeout metadata &key max)
-  (when-let ((trace (read-sexp-trace filename :timeout timeout :max max)))
+(defmethod add-trace ((db sexp-trace-db) filename timeout metadata
+                      &key max-trace-points)
+  (when-let ((trace (read-sexp-trace filename
+                                     :timeout timeout
+                                     :max-trace-points max-trace-points)))
     (push trace (traces db))
     (push metadata (trace-metadata db))))
 

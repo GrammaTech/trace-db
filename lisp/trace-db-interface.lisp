@@ -6,7 +6,7 @@
 (defclass trace-db () ()
   (:documentation "Database containing dynamic traces."))
 
-(defgeneric add-trace (db filename timeout metadata &key max)
+(defgeneric add-trace (db filename timeout metadata &key max-trace-points)
   (:documentation "Read a trace from FILENAME into DB."))
 
 (defgeneric get-trace (db index &key file-id)
