@@ -2,16 +2,16 @@
 # Maintainer: Eric Schulte <schulte.eric@gmail.com>
 pkgname=trace-db-git
 _srcdir=trace-db_pkg
-pkgver=r114.e317e19
+pkgver=r148.0e92c31
 pkgrel=1
 pkgdesc="Writing, reading, storing, and searching of program traces (source and binary)"
-url="https://git.grammatech.com/research/trace-db"
+url="https://github.com/grammatech/trace-db"
 arch=('i686' 'x86_64')
 license=('GPL3')
 depends=()
 makedepends=('git' 'pandoc')
 provides=('trace-db')
-source=("${_srcdir}::git+https://git.grammatech.com/research/trace-db")
+source=("${_srcdir}::git+https://github.com/grammatech/trace-db")
 sha256sums=('SKIP')
 
 pkgver() {
