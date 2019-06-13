@@ -8,13 +8,15 @@ void /* Trace */* read_trace(const char *filename,
                              uint32_t timeout_seconds,
                              uint64_t max)
 {
+    std::istream *in = 0;
     try {
-        std::istream *in = openWithTimeout(filename, timeout_seconds);
+        in = openWithTimeout(filename, timeout_seconds);
         Trace *trace = new Trace(*in, max);
         delete in;
         return trace;
     }
     catch (std::exception &ex) {
+        delete in;
         return NULL;
     }
 }

@@ -30,15 +30,17 @@ int add_trace(void /* TraceDB */ *db_ptr,
               uint32_t timeout_seconds,
               uint64_t max_points)
 {
+    std::istream *in = 0;
     try {
         TraceDB *db = (TraceDB *) db_ptr;
-        std::istream *in = openWithTimeout(filename, timeout_seconds);
+        in = openWithTimeout(filename, timeout_seconds);
         Trace trace(*in, max_points);
         db->addTrace(trace);
         delete in;
         return true;
     }
     catch (std::exception &ex) {
+        delete in;
         return false;
     }
 }
