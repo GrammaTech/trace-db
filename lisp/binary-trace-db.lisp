@@ -476,7 +476,7 @@ DO NOT USE IN PRODUCTION OR NEW DEVELOPMENT."
          (destructuring-bind (op . args) expr
            (list
             'kind (ecase op
-                    (distinct :distinct-vars)
+                    (distinct-vars :distinct-vars)
                     (and :and)
                     (or :or)
                     (not :not)

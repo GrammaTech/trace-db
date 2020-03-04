@@ -24,7 +24,7 @@
            :trace-types
            :query-trace
            :trace-metadata
-           :distinct
+           :distinct-vars
            :v/value
            :v/size
            :restrict-to-file
