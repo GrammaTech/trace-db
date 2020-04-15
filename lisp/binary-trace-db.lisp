@@ -230,7 +230,6 @@ the results."
                    :initform nil)
    (trace-metadata :initarg :trace-metadata
                    :accessor trace-metadata
-                   :type 'list
                    :initform nil)))
 
 (defmethod initialize-instance :after ((instance binary-trace-db) &key)
