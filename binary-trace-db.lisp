@@ -1,16 +1,30 @@
-;; binary-trace-db.lisp - Trace database which uses a proprietary trace
-;; format and C backend.
-
-(in-package :trace-db)
+;;; binary-trace-db.lisp --- Trace database which uses a proprietary
+;;; trace format and C backend.
+(defpackage :trace-db/binary-trace-db
+  (:use :gt/full
+        :uiop/run-program
+        :cl-store
+        :cffi
+        :trivial-garbage
+        :trace-db/core
+        :trace-db/trace-db)
+  (:export :read-binary-trace
+           :binary-trace-db
+           :+trace-id-file-bits+
+           :+trace-id-statement-bits+))
+(in-package :trace-db/binary-trace-db)
 (in-readtable :curry-compose-reader-macros)
 
 (define-constant +lib-dir+
-    (make-pathname :directory (pathname-directory
-                               #.(or *compile-file-truename*
-                                     *load-truename*
-                                     *default-pathname-defaults*)))
+    (make-pathname :directory (append +trace-db-dir+ (list "cffi-interface")))
   :test #'equalp
   :documentation "Path to directory holding shared library.")
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (unless (probe-file (merge-pathnames-as-file +lib-dir+ "libtrace-db.so"))
+    (run-program (list "make" "-C"
+                       (namestring (make-pathname :directory +trace-db-dir+))
+                       "libtrace-db.so"))))
 
 (defvar *trace-db-loaded* nil)
 (defun load-libtrace-db ()
@@ -167,18 +181,18 @@ the results."
                          (elt var 1) (aref names (elt var 1))))
              point))
     (prog1
-      (iter (with names = (get-names trace-ptr))
-            (for i below n-points)
-            (when-let* ((point (convert-trace-point
-                                 (mem-aref trace-points-ptr
-                                           '(:struct trace-point)
-                                           i)
-                                 names))
-                        (_ (apply filter
-                                  (cdr (assoc :f point))
-                                  (cdr (assoc :c point))
-                                  (cdr (assoc :scopes point)))))
-              (collect point)))
+      (let ((names (get-names trace-ptr)))
+        (iter (for i below n-points)
+              (when-let* ((point (convert-trace-point
+                                   (mem-aref trace-points-ptr
+                                             '(:struct trace-point)
+                                             i)
+                                   names))
+                          (_ (apply filter
+                                    (cdr (assoc :f point))
+                                    (cdr (assoc :c point))
+                                    (cdr (assoc :scopes point)))))
+                (collect point))))
       (c-free-trace-points trace-points-ptr n-points))))
 
 (defun read-binary-trace (file &key (timeout 0) (max-trace-points 0))
@@ -289,11 +303,6 @@ the results."
 
 (defmethod add-trace-points ((db binary-trace-db) (trace list)
                              &optional metadata)
-  "Directly add a list of trace points to the database.
-
-IMPORTANT: This method is for legacy testing purposes only.
-This method is not complete or efficient.
-DO NOT USE IN PRODUCTION OR NEW DEVELOPMENT."
   (let ((names (remove-duplicates
                  (mappend (lambda (point)
                             (mappend (lambda (var)
@@ -474,23 +483,23 @@ DO NOT USE IN PRODUCTION OR NEW DEVELOPMENT."
        (build-operator (expr)
          (destructuring-bind (op . args) expr
            (list
-            'kind (ecase op
-                    (distinct-vars :distinct-vars)
-                    (and :and)
-                    (or :or)
-                    (not :not)
-                    (v/size :var-size)
-                    (v/value :var-value)
-                    (> :greater-than)
-                    (>= :greater-than-or-equal)
-                    (< :less-than)
-                    (<= :less-than-or-equal)
-                    (equal :equal)
-                    (= :equal)
-                    (+ :add)
-                    (- :subtract)
-                    (* :multiply)
-                    (/ :divide))
+            'kind (ecase (make-keyword op)
+                    (:distinct-vars :distinct-vars)
+                    (:and :and)
+                    (:or :or)
+                    (:not :not)
+                    (:v/size :var-size)
+                    (:v/value :var-value)
+                    (:> :greater-than)
+                    (:>= :greater-than-or-equal)
+                    (:< :less-than)
+                    (:<= :less-than-or-equal)
+                    (:equal :equal)
+                    (:= :equal)
+                    (:+ :add)
+                    (:- :subtract)
+                    (:* :multiply)
+                    (:/ :divide))
             'n-children (length args)
             'var-index 0
             'unsigned-value 0

@@ -1,0 +1,59 @@
+@include include/sb-texinfo.texinfo
+
+@menu
+* Packages::                              API grouped by packages.
+@end menu
+
+@node Packages, , , API
+@section Packages
+
+The trace database is a collection of multiple Common Lisp @emph{packages}.  This
+appendix holds each individual package's API in turn.
+
+@menu
+* core::                                  trace-db/core Trace database core.
+* trace-db::                              trace-db/trace-db Trace database interface.
+* sexp-trace-db::                         trace-db/sexp-trace-db S-expression trace database.
+* binary-trace-db::                       trace-db/binary-trace-db Binary trace database.
+* traceable::                             trace-db/traceable Traceable mixin.
+* instrumentation-instrument::            trace-db/instrumentation/instrument Instrumentation interface.
+* instrumentation-cil-instrument::        trace-db/instrumentation/cil-instrument CIL instrumentation.
+* instrumentation-clang-instrument::      trace-db/instrumentation/clang-instrument Clang instrumentation.
+* instrumentation-javascript-instrument:: trace-db/instrumentation/javascriptinstrument Javascript Instrumentation.
+@end menu
+
+@node core, trace-db, Packages, Packages
+@subsection core
+@include trace-db-core-api.texi
+
+@node trace-db, sexp-trace-db, core, Packages
+@subsection trace-db
+@include trace-db-trace-db-api.texi
+
+@node sexp-trace-db, binary-trace-db, trace-db, Packages
+@subsection sexp-trace-db
+@include trace-db-sexp-trace-db-api.texi
+
+@node binary-trace-db, traceable, sexp-trace-db, Packages
+@subsection binary-trace-db
+@include trace-db-binary-trace-db-api.texi
+
+@node traceable, instrumentation-instrument, binary-trace-db, Packages
+@subsection traceable
+@include trace-db-traceable-api.texi
+
+@node instrumentation-instrument, instrumentation-cil-instrument, traceable, Packages
+@subsection instrumentation-instrument
+@include trace-db-instrumentation-instrument-api.texi
+
+@node instrumentation-cil-instrument, instrumentation-clang-instrument, instrumentation-instrument, Packages
+@subsection instrumentation-cil-instrument
+@include trace-db-instrumentation-cil-instrument-api.texi
+
+@node instrumentation-clang-instrument, instrumentation-javascript-instrument, instrumentation-cil-instrument, Packages
+@subsection instrumentation-clang-instrument
+@include trace-db-instrumentation-clang-instrument-api.texi
+
+@node instrumentation-javascript-instrument, Index, instrumentation-clang-instrument, Packages
+@subsection instrumentation-javascript-instrument
+@include trace-db-instrumentation-javascript-instrument-api.texi

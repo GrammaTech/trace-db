@@ -1,29 +1,5 @@
 (defsystem "trace-db"
   :description "Writing, reading, storing, and searching of program traces"
   :version "0.0.0"
-  :depends-on (alexandria
-               bordeaux-threads
-               iterate
-               arrow-macros
-               cl-store
-               cffi
-               cffi-libffi
-               trivial-garbage
-               named-readtables
-               curry-compose-reader-macros)
-  :components
-  ((:module lisp
-            :pathname "lisp"
-            :serial t
-            :components
-            ((:file "package")
-             (:file "trace-db-interface")
-             (:file "binary-trace-db")
-             (:file "sexp-trace-db"))))
-  :output-files (prepare-op (o c) (list "libtrace-db.so"))
-  :perform (prepare-op :before (o c)
-             (uiop::run-program
-              (list "make" "-C"
-                    (namestring
-                     (asdf:component-pathname
-                      (asdf:find-system :trace-db)))))))
+  :class :package-inferred-system
+  :defsystem-depends-on (:asdf-package-system))

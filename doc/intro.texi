@@ -1,0 +1,6 @@
+The trace database is a GrammaTech, Inc. library for reading, writing,
+storing, and searching traces.  It consists of three main interfaces;
+(1) a trace database interface for reading, storing, and searching traces,
+(2) a traceable interface for generating program traces, and (3)
+an instrumentation interface for modifying programs to print trace
+information.

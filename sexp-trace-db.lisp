@@ -1,9 +1,16 @@
-;; sexp-trace-db.lisp - Trace database which uses a simple s-expression trace
-;; format and LISP data structures.  This is a legacy trace format,
-;; primarily for JAVA.  New clients should use the binary trace database
-;; format.
+;;; sexp-trace-db.lisp --- Trace database which uses a simple
+;;; s-expression trace format and LISP data structures.
+;;;
+;;; This is a legacy trace format, primarily for JavaScript.
+;;; New clients should use the binary trace database format.
 
-(in-package :trace-db)
+(defpackage :trace-db/sexp-trace-db
+  (:use :gt/full
+        :cl-store
+        :trace-db/trace-db)
+  (:export :read-sexp-trace
+           :sexp-trace-db))
+(in-package :trace-db/sexp-trace-db)
 (in-readtable :curry-compose-reader-macros)
 
 (defclass sexp-trace-db (trace-db)
@@ -136,42 +143,41 @@ KWARGS are passed on to the OPEN call."
   (assert (null soft-predicates)
           nil "SOFT-PREDICATES are not supported by SEXP-TRACE-DB")
   (labels ((satisfying-assignments-at-point (pt)
-             (->> (mapcar (lambda (type-spec)
-                            (remove-if-not (lambda (type)
-                                             (member type type-spec
-                                                     :test #'string=))
-                                           (cdr (assoc :scopes pt))
-                                           :key {elt _ 1}))
-                          var-types)
-                  (cartesian-without-duplicates)
-                  (mapcar (lambda (vars)
-                            (->> (list (assoc :c pt)
-                                       (assoc :f pt)
-                                       (assoc :aux pt)
-                                       (cons :scopes vars))
-                                 (remove-if #'null)))))))
+             (nest (mapcar (lambda (vars)
+                             (list (assoc :c pt)
+                                   (assoc :f pt)
+                                   (assoc :aux pt)
+                                   (cons :scopes vars))))
+                   (cartesian-without-duplicates)
+                   (mapcar (lambda (type-spec)
+                             (remove-if-not (lambda (type)
+                                              (member type type-spec
+                                                      :test #'string=))
+                                            (cdr (assoc :scopes pt))
+                                            :key {elt _ 1}))
+                           var-types)))
+            (remove-duplicate-statement-and-bindings (query-results)
+              (remove-duplicates query-results
+                                 :key #'get-statement-and-bindings
+                                 :test #'equalp)))
     (when-let* ((trace (nth index (traces db))))
       (cons (cons :results
                   (if pick
-                      (-<>> (random-elt trace)
+                      (nest (remove-duplicate-statement-and-bindings)
+                            (remove-if-not (lambda (pt)
+                                             (apply filter
+                                                    (cdr (assoc :f pt))
+                                                    (cdr (assoc :c pt))
+                                                    (cdr (assoc :scopes pt)))))
                             (satisfying-assignments-at-point)
+                            (random-elt trace))
+                      (nest (remove-duplicate-statement-and-bindings)
                             (remove-if-not (lambda (pt)
                                              (apply filter
                                                     (cdr (assoc :f pt))
                                                     (cdr (assoc :c pt))
                                                     (cdr (assoc :scopes pt)))))
-                            (remove-duplicates <>
-                                               :key #'get-statement-and-bindings
-                                               :test #'equalp))
-                      (-<>> (mappend #'satisfying-assignments-at-point trace)
-                            (remove-if-not (lambda (pt)
-                                             (apply filter
-                                                    (cdr (assoc :f pt))
-                                                    (cdr (assoc :c pt))
-                                                    (cdr (assoc :scopes pt)))))
-                            (remove-duplicates <>
-                                               :key #'get-statement-and-bindings
-                                               :test #'equalp))))
+                            (mappend #'satisfying-assignments-at-point trace))))
             (nth index (trace-metadata db))))))
 
 (defmethod restrict-to-file ((db sexp-trace-db) file-id)

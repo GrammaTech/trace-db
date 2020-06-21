@@ -1,11 +1,34 @@
 variables:
-  LOCAL_IMAGE_NAME: '$CI_PROJECT_PATH-$CI_PIPELINE_ID'
+  GIT_SUBMODULE_STRATEGY: recursive
 
-test:
-  stage: test
+default:
+  image: $DOCKER_REGISTRY/$CI_PROJECT_NAMESPACE/sel
+  tags: ["kubernetes", "cluster"]
   before_script:
-    - docker build -t $LOCAL_IMAGE_NAME .
+    - cp -r $(pwd)/ /root/quicklisp/local-projects/
+
+check-format:
+  stage: .pre
   script:
-    - docker run $LOCAL_IMAGE_NAME /bin/bash -c "cd /root/quicklisp/local-projects/trace-db && make check";
-  after_script:
-    - docker rmi -f $LOCAL_IMAGE_NAME
+    - git lisp-format
+
+build-manual:
+  stage: test
+  script:
+    - GT=yes make doc
+
+.test-template: &test
+.test-template: &test
+  stage: test
+  script:
+    - LISP=$LISP GT=yes make check
+
+test-sbcl:
+  variables:
+    LISP: 'sbcl'
+  <<: *test
+
+test-ccl:
+  variables:
+    LISP: 'ccl'
+  <<: *test

@@ -1,6 +1,18 @@
-;; trace-db.lisp - Common interface for all trace databases.
-
-(in-package :trace-db)
+;; interface.lisp - Common interface for all trace databases.
+(defpackage :trace-db/trace-db
+  (:use :gt/full)
+  (:export :trace-db
+           :add-trace
+           :add-trace-points
+           :get-trace
+           :n-traces
+           :trace-size
+           :trace-types
+           :query-trace
+           :trace-metadata
+           :restrict-to-file
+           :get-statement-and-bindings))
+(in-package :trace-db/trace-db)
 (in-readtable :curry-compose-reader-macros)
 
 (defclass trace-db () ()
@@ -8,6 +20,12 @@
 
 (defgeneric add-trace (db filename timeout metadata &key max-trace-points)
   (:documentation "Read a trace from FILENAME into DB."))
+
+(defgeneric add-trace-points  (db trace &optional metadata)
+  (:documentation "Directly add a list of trace points to the database.
+
+This method is for legacy testing purposes only and is not complete or
+efficient. Do not use in production or new development."))
 
 (defgeneric get-trace (db index &key file-id)
   (:documentation "Retrieve the trace at INDEX in DB.

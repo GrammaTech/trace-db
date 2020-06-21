@@ -1,16 +1,12 @@
-lisp/libtrace-db.so
-unit-test
-sample
+cffi-interface/libtrace-db.so
+test/cffi-interface/trace-db/unit-test
+test/cffi-interface/trace-db/sample
 
 *.o
 *.fasl
 *.pkg.tar.xz
 *.swp
 
+.qlfile
 local.mk
-
 third-party/
-
-pkg/
-
-README.html

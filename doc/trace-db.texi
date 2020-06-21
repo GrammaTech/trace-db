@@ -1,0 +1,93 @@
+\input texinfo
+
+@documentencoding utf-8
+@settitle Trace Database
+
+@copying
+This file documents the trace database, a library for writing, reading, storing
+and searching program traces.
+
+Copyright @copyright{} 2019 GrammaTech
+@end copying
+
+@dircategory Libraries
+@direntry
+* Trace Database: (trace-db). Write, read, store, and search program traces.
+@end direntry
+
+@titlepage
+@title Trace Database
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@c Output the table of the contents at the beginning.
+@contents
+
+@macro refapiclass{name}
+@ref{Class \name\, @code{\name\}}
+@end macro
+
+@macro refapigeneric{name}
+@ref{Generic-Function \name\, @code{\name\}}
+@end macro
+
+@ifnottex
+@node Top, Introduction, (dir), (dir)
+@top Trace Database
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::                What is the trace database?
+* Trace Database::              Information on the trace database component
+* Instrumentation and Tracing:: Information on the instrumentation and tracing components
+* Troubleshooting::             Frequently asked questions
+
+Appendices
+* API::                         Public functions, variables, and macros
+* Index::                       Complete index.
+
+@end menu
+
+@node Introduction, Trace Database, Top, Top
+@chapter Introduction
+@cindex introduction
+
+@include intro.texi
+
+@node Trace Database, Instrumentation and Tracing, Introduction, Top
+@chapter Trace Database
+@cindex trace database
+
+@include trace-database-component.texi
+
+@node Instrumentation and Tracing, Troubleshooting, Trace Database, Top
+@chapter Instrumentation and Tracing
+@cindex instrumentation and tracing
+
+@include instrumentation-and-tracing-component.texi
+
+@node Troubleshooting, API, Instrumentation and Tracing, Top
+@chapter Troubleshooting
+@cindex troubleshooting
+
+@include troubleshooting.texi
+
+@node API, Index, Troubleshooting, Top
+@appendix API
+@include trace-db-api.texi
+
+@node Index,  , API, Top
+@unnumbered Index
+
+@c Combine all index (function variable type and concept) types into a
+@c single index.
+@syncodeindex fn cp
+@syncodeindex vr cp
+@syncodeindex tp cp
+@printindex cp
+
+@bye

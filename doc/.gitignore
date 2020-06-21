@@ -1,0 +1,18 @@
+include/
+trace-db/
+*.html
+*.info
+*.pdf
+*.svg
+*.1.gz
+
+# Automatically generated package texi files
+trace-db-binary-trace-db-api.texi
+trace-db-core-api.texi
+trace-db-instrumentation-cil-instrument-api.texi
+trace-db-instrumentation-clang-instrument-api.texi
+trace-db-instrumentation-instrument-api.texi
+trace-db-instrumentation-javascript-instrument-api.texi
+trace-db-sexp-trace-db-api.texi
+trace-db-trace-db-api.texi
+trace-db-traceable-api.texi
