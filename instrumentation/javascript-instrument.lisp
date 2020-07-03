@@ -259,10 +259,10 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
   (with-slots (genome) obj
     (setf genome
           (copy genome
-                :children (cons (replace-all (first (ast-children genome))
+                :children (cons (replace-all (first (children genome))
                                              +javascript-trace-code+
                                              "")
-                                (cdr (ast-children genome))))))
+                                (cdr (children genome))))))
   (apply-mutation-ops
     obj
     (iter (for ast in (nest (reverse)

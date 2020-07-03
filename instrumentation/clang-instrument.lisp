@@ -474,9 +474,7 @@ and jump to the exit point, allowing instrumentation of function exit.
                          :annotations '((:instrumentation t))))
       `(,(make-operator :fullstmt "="
                         (list (make-var-reference "_inst_ret" nil)
-                              (car (get-immediate-children
-                                     (software instrumenter)
-                                     return-stmt)))
+                              (car (child-asts return-stmt)))
                         :full-stmt t
                         :annotations '((:instrumentation t)))
         ,(make-statement :gotostmt :fullstmt '("goto inst_exit")
@@ -513,8 +511,7 @@ instrumentation of function exit.
                    ;; generate a new ast. Search for the original in
                    ;; order to look up the id.
                    (write-trace-id instrumenter
-                                   (find-if {equalp (function-body obj
-                                                                   function)}
+                                   (find-if {equalp (function-body function)}
                                             (asts obj)))
                    :annotations '((:instrumentation t)))
       ,(write-end-entry instrumenter)
@@ -608,14 +605,14 @@ declaration, or NIL if PROTO is not a function declaration or there
 is no such traceable statement."
   (nest (enclosing-traceable-stmt obj)
         (lastcar)
-        (get-immediate-children obj)
-        (function-body obj proto)))
+        (child-asts)
+        (function-body proto)))
 
-(defun first-traceable-stmt (obj proto)
+(defun first-traceable-stmt (proto)
   "The first traceable statement in the body of a function
 declaration, or NIL if PROTO is not a function declaration or there
 is no such traceable statement."
-  (first (get-immediate-children obj (function-body obj proto))))
+  (first (child-asts (function-body proto))))
 
 (defmethod instrument
     ((instrumenter clang-instrumenter)
@@ -687,7 +684,7 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
                ;; Instrumentation before
                (;; Temp variable for return value
                 ,@(when (and instrument-exit
-                             (equalp ast (first-traceable-stmt obj function))
+                             (equalp ast (first-traceable-stmt function))
                              return-type)
                         `(,(make-var-decl "_inst_ret" return-type nil
                                           :annotations '((:instrumentation t)))))
@@ -757,26 +754,26 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
                (setf genome
                  (copy genome
                        :children
-                       (cons (replace-all (first (ast-children genome))
+                       (cons (replace-all (first (children genome))
                                           +write-trace-forward-declarations+
                                           "")
-                             (cdr (ast-children genome)))))))
+                             (cdr (children genome)))))))
            (uninstrument-genome-epilogue (clang)
              (with-slots (genome) clang
                (setf genome
                  (copy genome
                        :children
                        (let ((last-child (nest (lastcar)
-                                               (ast-children)
+                                               (children)
                                                (genome clang))))
                          (if (stringp last-child)
                              (append
-                              (butlast (ast-children (genome clang)))
+                              (butlast (children (genome clang)))
                               (list (subseq last-child
                                             0
                                             (search +write-trace-implementation+
                                                     last-child))))
-                             (ast-children (genome clang)))))))))
+                             (children (genome clang)))))))))
 
     ;; Remove instrumentation setup code
     (uninstrument-genome-prologue clang)
@@ -788,7 +785,7 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
       (apply-mutation-ops
         clang
         (iter (for ast in (nest (reverse)
-                                (remove-if-not {block-p clang})
+                                (remove-if-not #'block-p)
                                 (remove-if-not [{aget :instrumentation}
                                                 #'ast-annotations])
                                 (asts clang)))
@@ -800,14 +797,14 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
                                               (remove-if
                                                 [{aget :instrumentation}
                                                  #'ast-annotations])
-                                              (get-immediate-children clang)
+                                              (child-asts)
                                               (lookup clang)
                                               (ast-path clang ast))})))))
 
       (apply-mutation-ops
         clang
         (iter (for ast in (nest (reverse)
-                                (remove-if {block-p clang})
+                                (remove-if #'block-p)
                                 (remove-if-not [{aget :instrumentation}
                                                 #'ast-annotations])
                                 (asts clang)))
@@ -1023,25 +1020,6 @@ Returns a list of strings containing C source code."))
         (finally
          (return (instrument-c-exprs instrumenter names-and-types
                                      print-strings)))))
-
-(defgeneric get-entry (software)
-  (:documentation
-   "Return the AST of the entry point (main function) in SOFTWARE,
-or NIL if there is no entry point.")
-  (:method ((soft software)) nil))
-
-(defmethod get-entry ((obj clang))
-  "Return the AST of the entry point (main function) in SOFTWARE.
-
-OBJ a clang software object
-"
-  (when-let* ((main (find-if [{name= "main"} {ast-name}]
-                             (functions obj)))
-              (return-type (find-type obj (ast-ret main)))
-              (_ (and (equal :Function (ast-class main))
-                      (member (type-name return-type)
-                              '("int" "void") :test #'name=))))
-    (function-body obj main)))
 
 (defun initialize-tracing (instrumenter file-name env-name contains-entry
                            &aux (obj (software instrumenter)))

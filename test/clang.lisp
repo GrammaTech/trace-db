@@ -233,7 +233,7 @@
            (format
             nil
             "__write_trace_id(__sel_trace_file, __sel_trace_file_lock, ~du)"
-            (position (function-body *soft* (first (functions *soft*)))
+            (position (function-body (first (functions *soft*)))
                       (asts *soft*)
                       :test #'equalp))))
 
