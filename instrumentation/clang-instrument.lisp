@@ -551,7 +551,7 @@ Creates a CLANG-INSTRUMENTER for OBJ and calls its instrument method.
   (let* (;; Look up AST again in case its children have been
          ;; instrumented
          (wrap (not (traceable-stmt-p obj ast)))
-         (new-ast (get-ast obj (ast-path obj ast)))
+         (new-ast (@ obj (ast-path obj ast)))
          (stmts (append (mapcar {add-semicolon _ :after} before)
                         (if (and instrument-exit
                                  (eq (ast-class ast) :ReturnStmt))
@@ -793,15 +793,15 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
                                 (asts clang)))
               (collect `(:set (:stmt1 . ,ast)
                               (:value1 .
-                               ,{get-ast clang
-                                         (nest (ast-path clang)
-                                               (first)
-                                               (remove-if
-                                                 [{aget :instrumentation}
-                                                  #'ast-annotations])
-                                               (get-immediate-children clang)
-                                               (get-ast clang)
-                                               (ast-path clang ast))})))))
+                               ,{lookup clang
+                                        (nest (ast-path clang)
+                                              (first)
+                                              (remove-if
+                                                [{aget :instrumentation}
+                                                 #'ast-annotations])
+                                              (get-immediate-children clang)
+                                              (lookup clang)
+                                              (ast-path clang ast))})))))
 
       (apply-mutation-ops
         clang
