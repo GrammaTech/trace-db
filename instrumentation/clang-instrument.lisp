@@ -11,6 +11,7 @@
         :software-evolution-library/software/clang-project
         :trace-db/binary-trace-db
         :trace-db/instrumentation/instrument)
+  (:import-from :functional-trees :path-later-p)
   (:export :clang-instrumenter
            :instrument-c-exprs))
 (in-package :trace-db/instrumentation/clang-instrument)

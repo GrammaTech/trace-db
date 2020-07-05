@@ -8,6 +8,7 @@
         :software-evolution-library/software/javascript
         :software-evolution-library/software/javascript-project
         :trace-db/instrumentation/instrument)
+  (:import-from :functional-trees :path-later-p)
   (:export :javascript-instrumenter))
 (in-package :trace-db/instrumentation/javascript-instrument)
 (in-readtable :curry-compose-reader-macros)
