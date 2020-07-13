@@ -1,4 +1,4 @@
-git gt https://github.com/GrammaTech/cl-utils.git
-git functional-trees https://github.com/GrammaTech/functional-trees.git
+git gt https://git.grammatech.com/synthesis/gt.git
+git functional-trees https://git.grammatech.com/synthesis/functional-trees.git
 git software-evolution-library https://git.grammatech.com/synthesis/sel.git
 git testbot http://git.grammatech.com/synthesis/testbot.git
