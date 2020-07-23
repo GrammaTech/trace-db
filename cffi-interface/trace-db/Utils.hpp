@@ -82,7 +82,8 @@ inline std::istream* openWithTimeout(const char *filename,
         return new std::istream(fpstream);
     }
     else {
-        /* Throw an error */
+        /* Close file descriptor and throw an error */
+        close(fd);
         throw TraceError(std::string(filename) + " could not be opened.");
     }
 }
