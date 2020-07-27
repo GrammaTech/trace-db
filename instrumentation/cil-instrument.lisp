@@ -8,7 +8,7 @@
 (in-readtable :curry-compose-reader-macros)
 
 (defmethod instrument ((cil cil) &key points functions functions-after
-                                      trace-file trace-env
+                                      trace-file trace-env target-asts
                                       instrument-exit filter num-threads)
   "Instrument CIL for traced execution.
 Optionally specify the name of the file in which to save trace data as
@@ -30,5 +30,8 @@ Optionally specify the name of the file in which to save trace data as
   (unless (null num-threads)
     (warn
      "Multi-threaded instrumented not supported for CIL software objects."))
+  (unless (null target-asts)
+    (warn
+     "Instrumenting targeted asts is not supported for CIL software objects."))
   (apply-mutation cil (list :trace trace-file))
   cil)

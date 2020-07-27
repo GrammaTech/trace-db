@@ -50,6 +50,7 @@ Keyword arguments are as follows:
   TRACE-FILE ----------- file for trace output
   TRACE-ENV ------------ trace output to file specified by ENV variable
   INSTRUMENT-EXIT ------ print counter of function body before exit
+  TARGET-ASTS ---------- a subset of ASTs in OBJ to filter for tracing.
   FILTER --------------- function to select a subset of ASTs for instrumentation
   NUM-THREADS ---------- number of threads to use for instrumentation"))
 

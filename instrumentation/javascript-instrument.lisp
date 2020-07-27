@@ -113,7 +113,7 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
 (defmethod instrument
   ((instrumenter javascript-instrumenter)
    &key points functions functions-after trace-file trace-env instrument-exit
-     (filter (constantly t)) (num-threads 1)
+     target-asts (filter (constantly t)) (num-threads 1)
   &aux (obj (software instrumenter)))
   "Use INSTRUMENTER to instrument a javascript software object.
 
@@ -124,6 +124,8 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
 * TRACE-FILE file or stream (stdout/stderr) for trace output (ignored)
 * TRACE-ENV trace output to file specified by ENV variable (ignored)
 * INSTRUMENT-EXIT print counter of function body before exit (ignored)
+* TARGET-ASTS a list of ASTs to filter for tracing instead of
+              searching all of the ASTs in the software of INSTRUMENTER.
 * FILTER function to select a subset of ASTs for instrumentation
          function should take a software object and an AST parameters,
          returning nil if the AST should be filtered from instrumentation
@@ -183,7 +185,7 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
                      (sort-asts obj)
                      (remove-if-not {funcall filter obj})
                      (remove-if-not {traceable-stmt-p obj})
-                     (asts obj))))
+                     (or target-asts (asts obj)))))
            (next (path)
              (append (butlast path)
                      (1+ (lastcar path))))

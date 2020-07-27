@@ -617,7 +617,7 @@ is no such traceable statement."
 (defmethod instrument
     ((instrumenter clang-instrumenter)
      &key points functions functions-after trace-file trace-env instrument-exit
-       (filter (constantly t)) (num-threads 0))
+       target-asts (filter (constantly t)) (num-threads 0))
   "Use INSTRUMENTER to instrument a clang software object.
 
 * INSTRUMENTER current instrumentation state
@@ -627,6 +627,8 @@ is no such traceable statement."
 * TRACE-FILE file or stream (stdout/stderr) for trace output
 * TRACE-ENV trace output to file specified by ENV variable
 * INSTRUMENT-EXIT print counter of function body before exit
+* TARGET-ASTS a list of ASTs to filter for tracing instead of
+              searching all of the ASTs in the software of INSTRUMENTER.
 * FILTER function to select a subset of ASTs for instrumentation
          function should take a software object and an AST parameters,
          returning nil if the AST should be filtered from instrumentation
@@ -667,7 +669,7 @@ update POINTS after instrumenting ASTs."
                  (sort-asts obj)
                  (remove-if-not {funcall filter obj})
                  (remove-if-not {can-be-made-traceable-p obj})
-                 (asts obj)))
+                 (or target-asts (asts obj))))
          (instrument-ast (ast extra-stmts extra-stmts-after aux-values)
            "Generate instrumentation for AST.
 Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER).
