@@ -690,6 +690,24 @@ prints unique counters in the trace"
                  (genome-string (uninstrument instrumented)))
           "(uninstrument (instrument obj ...)) is not an identity"))))
 
+(deftest (targeted-uninstrument-instrument-is-identity :long-running) ()
+  "Targeted instrumentation makes changes to the object and is reverted to the
+original object without any differences in the genome-string."
+  (with-fixture gcd-clang
+    (let* ((orig (copy *soft*))
+           (instrumented (copy *soft*))
+           (target-asts (list (find-if [{eq :returnstmt} #'ast-class]
+                                       (genome instrumented)))))
+      (handler-bind ((warning #'muffle-warning))
+        (instrument instrumented :target-asts target-asts))
+      ;; Confirm that changes have been made.
+      (is (find-if {ast-annotation _ :instrumentation} (genome instrumented))
+          "The instrumented object doesn't contain any instrumentation ASTs.")
+      (is (equal (genome-string orig)
+                 (genome-string (uninstrument instrumented
+                                              :instrumented-asts target-asts)))
+          "(uninstrument (instrument obj ...)) is not an identity"))))
+
 (deftest (run-traceable-gcd :long-running) ()
   (with-fixture traceable-gcd
     (instrument *soft*)
