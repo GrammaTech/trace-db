@@ -748,10 +748,33 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
 
     obj))
 
-(defmethod uninstrument ((clang clang) &key (num-threads 0))
-  "Remove instrumentation from CLANG"
+(defmethod uninstrument ((clang clang) &key instrumented-asts (num-threads 0))
+  "Remove instrumentation from CLANG. INSTRUMENTED-ASTS can be provided if
+all known instrumented ASTs are known and the instrumentation ASTs can be
+inferred from their paths. This will save iterating over all the ASTs in
+CLANG."
   (declare (ignorable num-threads))
-  (labels ((uninstrument-genome-prologue (clang)
+  (labels ((preceding-sibling-p
+               (ast &aux (reverse-path (reverse (ast-path clang ast))))
+             "Return the sibling that precedes AST if one exists."
+             ;; TODO: Should this be in SEL?
+             (iter
+               (for previous-index from (1- (pop reverse-path)) downto 0)
+               (for previous-sibling =
+                    (lookup clang
+                            (reverse (cons previous-index reverse-path))))
+               (when (typep previous-sibling 'ast)
+                 (return previous-sibling))))
+           (get-instrumentation-asts (instrumented-ast)
+             "Get the instrumentation-asts that are associated with
+              INSTRUMENTED-ASTS."
+             (iter
+               (for preceding-sibling
+                    initially (preceding-sibling-p instrumented-ast)
+                    then (preceding-sibling-p preceding-sibling))
+               (while (ast-annotation preceding-sibling :instrumentation))
+               (collect preceding-sibling)))
+           (uninstrument-genome-prologue (clang)
              (with-slots (genome) clang
                (setf genome
                  (copy genome
@@ -783,14 +806,17 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
 
     ;; Remove instrumented ASTs - blocks first, then individual statements
     (let ((*matching-free-var-retains-name-bias* 1.0)
-          (*matching-free-function-retains-name-bias* 1.0))
+          (*matching-free-function-retains-name-bias* 1.0)
+          (instrumentation-asts
+            (when instrumented-asts
+              (mappend #'get-instrumentation-asts instrumented-asts))))
       (apply-mutation-ops
         clang
         (iter (for ast in (nest (reverse)
                                 (remove-if-not #'block-p)
                                 (remove-if-not [{aget :instrumentation}
                                                 #'ast-annotations])
-                                (asts clang)))
+                                (or instrumentation-asts (asts clang))))
               (collect `(:set (:stmt1 . ,ast)
                               (:value1 .
                                ,{lookup clang
@@ -809,7 +835,7 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
                                 (remove-if #'block-p)
                                 (remove-if-not [{aget :instrumentation}
                                                 #'ast-annotations])
-                                (asts clang)))
+                                (or instrumentation-asts (asts clang))))
               (collect `(:splice (:stmt1 . ,ast) (:value1 . nil)))))))
 
   ;; Return the software object

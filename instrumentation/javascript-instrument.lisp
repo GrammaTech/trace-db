@@ -253,10 +253,11 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
                              :file-id file-id))))
   javascript-project)
 
-(defmethod uninstrument ((obj javascript) &key (num-threads 1))
-  "Remove instrumentation from OBJ.
-* OBJ javascript software object to uninstrument
-"
+(defmethod uninstrument ((obj javascript) &key instrumented-asts (num-threads 1))
+  "Remove instrumentation from OBJ. INSTRUMENTED-ASTS can be provided if
+all known instrumented ASTs are known and the instrumentation ASTs can be
+inferred from their paths. This will save iterating over all the ASTs in
+CLANG."
   (declare (ignorable num-threads))
   (with-slots (genome) obj
     (setf genome
@@ -270,6 +271,6 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
     (iter (for ast in (nest (reverse)
                             (remove-if-not [{aget :instrumentation}
                                             #'ast-annotations])
-                            (asts obj)))
+                            (or instrumented-asts (asts obj))))
           (collect `(:cut (:stmt1 . ,ast)))))
   obj)

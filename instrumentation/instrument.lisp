@@ -73,7 +73,8 @@ SOFTWARE."))
   (:documentation "Remove instrumentation from OBJ
 
 Keyword arguments are as follows:
-  NUM-THREADS ---------- number of threads to use for uninstrumenting"))
+  NUM-THREADS ---------- number of threads to use for uninstrumenting
+  INSTRUMENTED-ASTS ---- list of all instrumented ASTs."))
 
 (defgeneric instrumentation-files (project)
   (:documentation
