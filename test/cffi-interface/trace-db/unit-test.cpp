@@ -553,7 +553,12 @@ void test_read_from_fifo()
     mkfifo("test/fifo", 0700);
     ASSERT(system("cat test/tmp.trace > test/fifo &") == 0);
 
-    ASSERT_NO_TRACE_ERROR(Trace tmp(*openWithTimeout("test/fifo", TIMEOUT)));
+    boost::iostreams::stream_buffer
+        <boost::iostreams::file_descriptor_source>* fpstream
+        = openWithTimeout("test/fifo", TIMEOUT);
+
+    ASSERT_NO_TRACE_ERROR(Trace tmp(std::istream(fpstream)));
+    delete fpstream;
     unlink("test/fifo");
 }
 
@@ -561,7 +566,7 @@ void test_timeout_from_fifo()
 {
     mkfifo("test/fifo", 0700);
 
-    ASSERT_TRACE_ERROR(Trace(*openWithTimeout("test/fifo", 1)));
+    ASSERT_TRACE_ERROR(openWithTimeout("test/fifo", 1));
     unlink("test/fifo");
 }
 
