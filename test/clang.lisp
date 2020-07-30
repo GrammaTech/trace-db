@@ -16,7 +16,7 @@
    :trace-db/binary-trace-db
    :trace-db/test/util)
   (:shadowing-import-from :uiop/run-program :run-program)
-  (:export :test-instrumentation))
+  (:export :test-clang))
 (in-package :trace-db/test/clang)
 (in-readtable :curry-compose-reader-macros)
 
