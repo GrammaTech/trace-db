@@ -30,15 +30,23 @@ int add_trace(void /* TraceDB */ *db_ptr,
               uint32_t timeout_seconds,
               uint64_t max_points)
 {
+    namespace ios = boost::iostreams;
+    std::istream *in = NULL;
+    ios::stream_buffer<ios::file_descriptor_source>* fpstream = NULL;
+
     try {
         TraceDB *db = (TraceDB *) db_ptr;
-        std::istream *in = openWithTimeout(filename, timeout_seconds);
+        fpstream = openWithTimeout(filename, timeout_seconds);
+        in = new std::istream(fpstream);
         Trace trace(*in, max_points);
         db->addTrace(trace);
+        delete fpstream;
         delete in;
         return true;
     }
     catch (std::exception &ex) {
+        delete fpstream;
+        delete in;
         return false;
     }
 }

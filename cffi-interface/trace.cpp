@@ -8,13 +8,21 @@ void /* Trace */* read_trace(const char *filename,
                              uint32_t timeout_seconds,
                              uint64_t max)
 {
+    namespace ios = boost::iostreams;
+    std::istream *in = NULL;
+    ios::stream_buffer<ios::file_descriptor_source>* fpstream = NULL;
+
     try {
-        std::istream *in = openWithTimeout(filename, timeout_seconds);
+        fpstream = openWithTimeout(filename, timeout_seconds);
+        in = new std::istream(fpstream);
         Trace *trace = new Trace(*in, max);
+        delete fpstream;
         delete in;
         return trace;
     }
     catch (std::exception &ex) {
+        delete fpstream;
+        delete in;
         return NULL;
     }
 }

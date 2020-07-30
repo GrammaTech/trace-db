@@ -43,8 +43,10 @@
 
    The client is responsible for deallocating the pointer.
  */
-inline std::istream* openWithTimeout(const char *filename,
-                                     uint64_t timeout_seconds) {
+inline boost::iostreams::stream_buffer
+         <boost::iostreams::file_descriptor_source>*
+       openWithTimeout(const char *filename,
+                       uint64_t timeout_seconds) {
     namespace ios = boost::iostreams;
 
     /* Open in non-blocking mode. Returns immediately even if file is a FIFO
@@ -75,11 +77,8 @@ inline std::istream* openWithTimeout(const char *filename,
         int flags = fcntl(fd, F_GETFL, 0);
         fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
 
-        ios::file_descriptor_source fds(fileno(fdopen(fd, "rb")),
-                                        ios::close_handle);
-        ios::stream_buffer<ios::file_descriptor_source> *fpstream =
-            new ios::stream_buffer<ios::file_descriptor_source>(fds);
-        return new std::istream(fpstream);
+        ios::file_descriptor_source fds(fd, ios::close_handle);
+        return new ios::stream_buffer<ios::file_descriptor_source>(fds);
     }
     else {
         /* Close file descriptor and throw an error */
