@@ -232,7 +232,7 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
 (defmethod traceable-stmt-p ((obj javascript) (ast javascript-ast))
   "Return TRUE if AST is a traceable statement in the javascript software OBJ."
   (or (null (get-parent-ast obj ast))
-      (eq :BlockStatement (ast-class (get-parent-ast obj ast)))))
+      (typep (get-parent-ast obj ast) 'js-block-statement)))
 
 (defmethod instrument ((javascript-project javascript-project) &rest args)
   "Add instrumentation to JAVASCRIPT-PROJECT.
