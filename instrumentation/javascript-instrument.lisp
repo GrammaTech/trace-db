@@ -135,44 +135,61 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
            (sort-asts (obj asts)
              (sort asts {path-later-p obj}))
            (instrument-before (instrumenter ast)
-             (convert 'javascript-ast
-                      `(:ExpressionStatement
-                        :annotations ((:instrumentation . t))
-                        (:CallExpression
-                         "__sel_trace_point("
-                         (:Literal
-                          ,(if (file-id instrumenter)
-                               (format nil "~d" (file-id instrumenter))
-                               "null"))
-                         ", "
-                         (:Literal
-                          ,(format nil "~d" (get-ast-id ast)))
-                         ", "
-                         ,@(interleave
-                            (mappend {funcall _ instrumenter ast}
-                                     functions)
-                            ",")
-                         ");"))))
-           (instrument-after (instrumenter ast)
-             (when functions-after
+             (let ((variables (mappend {funcall _ instrumenter ast}
+                                       functions)))
                (convert 'javascript-ast
-                        `(:ExpressionStatement
-                          :annotations ((:instrumentation . t))
-                          (:CallExpression
-                           "__sel_trace_point("
-                           (:Literal
-                            ,(if (file-id instrumenter)
-                                 (format nil "~d" (file-id instrumenter))
-                                 "null"))
-                           ", "
-                           (:Literal
-                            ,(format nil "~d" (get-ast-id ast)))
-                           ", "
-                           ,@(interleave
-                              (mappend {funcall _ instrumenter ast}
-                                       functions-after)
-                              ",")
-                           ");")))))
+                        `((:class . :expression-statement)
+                          (:annotations . ((:instrumentation . t)))
+                          (:interleaved-text . ("" ""))
+                          (:expression .
+                            ((:class . :call-expression)
+                             (:interleaved-text .
+                              (""
+                               "("
+                               ,@(repeat-sequence '(",")
+                                                  (+ 1 (length variables)))
+                               ");"))
+                             (:callee .
+                               ((:class . :literal)
+                                (:interleaved-text . ("__sel_trace_point"))))
+                             (:arguments .
+                               (((:class . :literal)
+                                 (:interleaved-text .
+                                  (,(if (file-id instrumenter)
+                                        (format nil "~d" (file-id instrumenter))
+                                        "null"))))
+                                ((:class . :literal)
+                                 (:interleaved-text .
+                                  (,(format nil "~d" (get-ast-id ast)))))
+                                ,@variables))))))))
+           (instrument-after (instrumenter ast)
+             (when-let ((variables (mappend {funcall _ instrumenter ast}
+                                            functions-after)))
+               (convert 'javascript-ast
+                        `((:class . :expression-statement)
+                          (:annotations . ((:instrumentation . t)))
+                          (:interleaved-text . ("" ""))
+                          (:expression .
+                            ((:class . :call-expression)
+                             (:interleaved-text .
+                              (""
+                               "("
+                               ,@(repeat-sequence '(",")
+                                                  (+ 1 (length variables)))
+                               ");"))
+                             (:callee .
+                               ((:class . :literal)
+                                (:interleaved-text . ("__sel_trace_point"))))
+                             (:arguments .
+                               (((:class . :literal)
+                                 (:interleaved-text .
+                                  (,(if (file-id instrumenter)
+                                        (format nil "~d" (file-id instrumenter))
+                                        "null"))))
+                                ((:class . :literal)
+                                 (:interleaved-text .
+                                  (,(format nil "~d" (get-ast-id ast)))))
+                                ,@variables))))))))
            (instrument-ast (instrumenter ast)
              (list (instrument-before instrumenter ast)
                    ast
@@ -215,19 +232,28 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
   (declare (ignorable print-strings))
   (iter (for var in (funcall key ast))
         (collect (convert 'javascript-ast
-                          `(:ObjectExpression
-                            "{"
-                            (:Property
-                             (:Identifier "name")
-                             ": "
-                             (:Literal ,(format nil "\"~a\""
-                                                (aget :name var))))
-                            ", "
-                            (:Property
-                             (:Identifier "value")
-                             ": "
-                             (:Identifer ,(aget :name var)))
-                            "}")))))
+                          `((:class . :object-expression)
+                            (:interleaved-text . ("{" ", " "}"))
+                            (:properties .
+                              (((:class . :property)
+                                (:interleaved-text . ("" ": " ""))
+                                (:key .
+                                  ((:class . identifier)
+                                   (:interleaved-text . ("name"))))
+                                (:value .
+                                  ((:class . :literal)
+                                   (:interleaved-text .
+                                    (,(format nil "\"~a\""
+                                                  (aget :name var)))))))
+                               ((:class . :property)
+                                (:interleaved-text . ("" ": " ""))
+                                (:key .
+                                  ((:class . :identifier)
+                                   (:interleaved-text . ("value"))))
+                                (:value .
+                                  ((:class . :identifier)
+                                   (:interleaved-text .
+                                    (,(aget :name var)))))))))))))
 
 (defmethod traceable-stmt-p ((obj javascript) (ast javascript-ast))
   "Return TRUE if AST is a traceable statement in the javascript software OBJ."
