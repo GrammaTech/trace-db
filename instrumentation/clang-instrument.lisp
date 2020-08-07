@@ -648,7 +648,7 @@ is no such traceable statement."
                     points))))
     (labels
         ((sort-asts (obj asts)
-           (sort asts #'path-later-p :key {ast-path obj}))
+           (sort asts {path-later-p obj}))
          (instrument-asts (obj)
            "Generate instrumentation for all ASTs in OBJ.  As a side-effect,
 update POINTS after instrumenting ASTs."

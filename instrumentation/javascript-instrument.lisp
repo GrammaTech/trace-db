@@ -133,7 +133,7 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
   (labels ((get-ast-id (ast)
              (gethash ast (ast-ids instrumenter)))
            (sort-asts (obj asts)
-             (sort asts #'path-later-p :key {ast-path obj}))
+             (sort asts {path-later-p obj}))
            (instrument-before (instrumenter ast)
              (convert 'javascript-ast
                       `(:ExpressionStatement
