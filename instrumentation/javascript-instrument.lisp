@@ -4,6 +4,7 @@
         :software-evolution-library
         :software-evolution-library/utility/task
         :software-evolution-library/software/parseable
+        :software-evolution-library/software/non-homologous-parseable
         :software-evolution-library/software/project
         :software-evolution-library/software/javascript
         :software-evolution-library/software/javascript-project
@@ -284,11 +285,11 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
   (declare (ignorable num-threads))
   (with-slots (genome) obj
     (setf genome
-          (copy genome
-                :children (cons (replace-all (first (children genome))
-                                             +javascript-trace-code+
-                                             "")
-                                (cdr (children genome))))))
+          (nest (copy genome :interleaved-text)
+                (cons (replace-all (first (interleaved-text genome))
+                                   +javascript-trace-code+
+                                   "")
+                      (cdr (interleaved-text genome))))))
   (apply-mutation-ops
     obj
     (iter (for ast in (nest (reverse)
