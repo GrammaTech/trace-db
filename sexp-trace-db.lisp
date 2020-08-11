@@ -193,22 +193,3 @@ KWARGS are passed on to the OPEN call."
 
 (defmethod trace-metadata ((db single-file-sexp-trace-db))
   (trace-metadata (parent-db db)))
-
-(defun cartesian-without-duplicates (lists &key (test #'equalp))
-  "Cartesian product of a set of lists, without sets containing duplicates.
-For example:
-> \(cartesian-without-duplicates '\(1 2\) '\(2 3\)\)
-\(\(1 2\) \(1 3\) \(2 3\)\)
-The set \(2 2\) is not included in the result.
-"
-  (labels ((cartesian-nil-duplicates (lists)
-             (if (car lists)
-                 (mappend (lambda (inner)
-                            (mapcar (lambda (outer)
-                                      (if (not (member outer inner :test test))
-                                          (cons outer inner)
-                                          nil))
-                                    (car lists)))
-                          (cartesian-nil-duplicates (cdr lists)))
-                 (list nil))))
-    (remove-if [{> (length lists)} #'length] (cartesian-nil-duplicates lists))))
