@@ -2,7 +2,7 @@
 (defpackage :trace-db/test
   (:use :gt/full
         #+gt :testbot
-        :software-evolution-library/stefil-plus
+        :stefil+
         :trace-db/core
         :trace-db/test/clang
         :trace-db/test/javascript
@@ -38,5 +38,5 @@
 (defun run-batch (&rest a)
   (declare (ignorable a))
   #+ccl (setf ccl::*interactive-streams-initialized* nil)
-  (setf sel/stefil+:*long-tests* t)
+  (setf stefil+:*long-tests* t)
   (batch-test #'test "SEL" +trace-db-branch+))

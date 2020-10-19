@@ -1,7 +1,7 @@
 ;;;; util.lisp --- Utils for trace-db tests.
 (defpackage :trace-db/test/util
   (:use :gt/full
-        :software-evolution-library/stefil-plus
+        :stefil+
         :software-evolution-library/software-evolution-library
         :software-evolution-library/software/parseable
         :trace-db/core)
