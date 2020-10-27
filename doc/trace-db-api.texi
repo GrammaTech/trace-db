@@ -36,19 +36,11 @@ appendix holds each individual package's API in turn.
 @subsection binary-trace-db
 @include trace-db-binary-trace-db-api.texi
 
-@node traceable, instrumentation-instrument, binary-trace-db, Packages
+@node traceable, instrumentation-clang-instrument, binary-trace-db, Packages
 @subsection traceable
 @include trace-db-traceable-api.texi
 
-@node instrumentation-instrument, instrumentation-cil-instrument, traceable, Packages
-@subsection instrumentation-instrument
-@include trace-db-instrumentation-instrument-api.texi
-
-@node instrumentation-cil-instrument, instrumentation-clang-instrument, instrumentation-instrument, Packages
-@subsection instrumentation-cil-instrument
-@include trace-db-instrumentation-cil-instrument-api.texi
-
-@node instrumentation-clang-instrument, instrumentation-javascript-instrument, instrumentation-cil-instrument, Packages
+@node instrumentation-clang-instrument, instrumentation-javascript-instrument, traceable, Packages
 @subsection instrumentation-clang-instrument
 @include trace-db-instrumentation-clang-instrument-api.texi
 
