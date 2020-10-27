@@ -8,7 +8,8 @@
         :software-evolution-library/software/project
         :software-evolution-library/software/javascript
         :software-evolution-library/software/javascript-project
-        :trace-db/instrumentation/instrument)
+        :software-evolution-library/component/instrument
+        :trace-db/traceable)
   (:import-from :functional-trees :path-later-p)
   (:export :javascript-instrumenter))
 (in-package :trace-db/instrumentation/javascript-instrument)
@@ -99,7 +100,7 @@
   "Return true if OBJ is instrumented.
 * OBJ a javascript software object
 "
-  (search *instrument-log-env-name* (genome-string obj)))
+  (search *trace-instrument-log-env-name* (genome-string obj)))
 
 (defmethod instrument ((obj javascript) &rest args)
   "Instrumentation for javascript software objects.
@@ -135,6 +136,9 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
              (gethash ast (ast-ids instrumenter)))
            (sort-asts (obj asts)
              (sort asts {path-later-p obj}))
+           (traceable-stmt-p (obj ast)
+             (or (null (get-parent-ast obj ast))
+                 (typep (get-parent-ast obj ast) 'js-block-statement)))
            (instrument-before (instrumenter ast)
              (let ((variables (mappend {funcall _ instrumenter ast}
                                        functions)))
@@ -255,11 +259,6 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
                                   ((:class . :identifier)
                                    (:interleaved-text .
                                     (,(aget :name var)))))))))))))
-
-(defmethod traceable-stmt-p ((obj javascript) (ast javascript-ast))
-  "Return TRUE if AST is a traceable statement in the javascript software OBJ."
-  (or (null (get-parent-ast obj ast))
-      (typep (get-parent-ast obj ast) 'js-block-statement)))
 
 (defmethod instrument ((javascript-project javascript-project) &rest args)
   "Add instrumentation to JAVASCRIPT-PROJECT.

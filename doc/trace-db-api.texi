@@ -16,8 +16,6 @@ appendix holds each individual package's API in turn.
 * sexp-trace-db::                         trace-db/sexp-trace-db S-expression trace database.
 * binary-trace-db::                       trace-db/binary-trace-db Binary trace database.
 * traceable::                             trace-db/traceable Traceable mixin.
-* instrumentation-instrument::            trace-db/instrumentation/instrument Instrumentation interface.
-* instrumentation-cil-instrument::        trace-db/instrumentation/cil-instrument CIL instrumentation.
 * instrumentation-clang-instrument::      trace-db/instrumentation/clang-instrument Clang instrumentation.
 * instrumentation-javascript-instrument:: trace-db/instrumentation/javascriptinstrument Javascript Instrumentation.
 @end menu

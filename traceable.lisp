@@ -4,10 +4,10 @@
         :software-evolution-library
         :software-evolution-library/utility/debug
         :software-evolution-library/components/test-suite
+        :software-evolution-library/components/instrument
         :trace-db/trace-db
         :trace-db/sexp-trace-db
-        :trace-db/binary-trace-db
-        :trace-db/instrumentation/instrument)
+        :trace-db/binary-trace-db)
   (:export :traceable
            :binary-traceable
            :sexp-traceable
@@ -17,7 +17,10 @@
            :trace-error
            :skip-trace-collection
            :nil-traces
-           :ignore-empty-trace))
+           :ignore-empty-trace
+           :*trace-instrument-log-env-name*
+           :*trace-instrument-handshake-env-name*
+           :+trace-instrument-log-variable-name+))
 (in-package :trace-db/traceable)
 (in-readtable :curry-compose-reader-macros)
 
@@ -29,6 +32,16 @@
            :documentation "Execution traces from execution of the software."))
   (:documentation
    "Instrumentable software with support for collecting dynamic traces."))
+
+(defvar *trace-instrument-log-env-name* "__SEL_TRACE_FILE"
+  "Default environment variable in which to store log file.")
+
+(defvar *trace-instrument-handshake-env-name* "__SEL_HANDSHAKE_FILE"
+  "Default environment variable in which to store log file.")
+
+(define-constant +trace-instrument-log-variable-name+ "__sel_trace_file"
+  :test #'string=
+  :documentation "Variable used for instrumentation.")
 
 (define-software binary-traceable (traceable) ()
   (:documentation "Instrumentable software with support for collecting dynamic
@@ -124,7 +137,7 @@ times.
             (return-from collect-test-case-traces nil)))
       (with-temporary-file (:pathname handshake-file) ;; Start running the test case.
         (let ((proc (start-test bin test-case
-                                :env (list (cons *instrument-handshake-env-name*
+                                :env (list (cons *trace-instrument-handshake-env-name*
                                                  handshake-file))
                                 :output nil
                                 :error-output nil
@@ -211,7 +224,7 @@ times.
       (with-temporary-fifo (:pathname pipe)
         ;; Start run on the input.
         (let ((proc (start-test bin test-case
-                                :env (list (cons *instrument-log-env-name*
+                                :env (list (cons *trace-instrument-log-env-name*
                                                  pipe))
                                 :output nil
                                 :error-output nil

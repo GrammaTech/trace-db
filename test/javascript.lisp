@@ -9,7 +9,7 @@
    :software-evolution-library/software/javascript
    :software-evolution-library/software/javascript-project
    :software-evolution-library/components/test-suite
-   :trace-db/instrumentation/instrument
+   :software-evolution-library/components/instrument
    :trace-db/instrumentation/javascript-instrument
    :trace-db/traceable
    :trace-db/trace-db

@@ -9,8 +9,9 @@
         :software-evolution-library/software/clang
         :software-evolution-library/software/project
         :software-evolution-library/software/clang-project
+        :software-evolution-library/component/instrument
         :trace-db/binary-trace-db
-        :trace-db/instrumentation/instrument)
+        :trace-db/traceable)
   (:import-from :functional-trees :path-later-p)
   (:export :clang-instrumenter
            :instrument-c-exprs))
@@ -56,7 +57,7 @@ typedef struct __trace_type_description __trace_type_description;
 typedef struct __trace_buffer_size __trace_buffer_size;
 
 __attribute__((unused))
-extern void * " +instrument-log-variable-name+ ";
+extern void * " +trace-instrument-log-variable-name+ ";
 __attribute__((unused))
 extern void * " +instrument-log-lock-variable-name+ ";
 
@@ -304,7 +305,7 @@ static void __write_buffer_size(void *out,
 #include <stdlib.h>
 #include <unistd.h>
 
-void * " +instrument-log-variable-name+ ";
+void * " +trace-instrument-log-variable-name+ ";
 void * " +instrument-log-lock-variable-name+ ";
 
 void __attribute__((constructor(101))) __bi_setup() {
@@ -322,14 +323,14 @@ void __attribute__((constructor(101))) __bi_setup() {
     unlink(handshake_file_path);
   }
 
-  " +instrument-log-variable-name+ " = ~a;
+  " +trace-instrument-log-variable-name+ " = ~a;
   " +instrument-log-lock-variable-name+ " = &__static_lock;
   ~a;
   ~a;
 
   pthread_mutex_init( (pthread_mutex_t *) " +instrument-log-lock-variable-name+
   ", NULL);
-  __write_trace_header(" +instrument-log-variable-name+ ",
+  __write_trace_header(" +trace-instrument-log-variable-name+ ",
                        " +instrument-log-lock-variable-name+ ",
                        " +names-variable-name+ ", ~d,
                        " +types-variable-name+ ", ~d);
@@ -403,7 +404,7 @@ trace statement ID for each AST in OBJ.
 * AST the AST to instrument
 "
   (make-call-expr "__write_trace_id"
-                  (list (make-var-reference +instrument-log-variable-name+
+                  (list (make-var-reference +trace-instrument-log-variable-name+
                                             nil)
                         (make-var-reference +instrument-log-lock-variable-name+
                                             nil)
@@ -425,7 +426,7 @@ trace statement ID for each AST in OBJ.
 "
   (declare (ignorable instrumenter))
   (make-call-expr "__write_trace_aux"
-                  (list (make-var-reference +instrument-log-variable-name+ nil)
+                  (list (make-var-reference +trace-instrument-log-variable-name+ nil)
                         (make-literal value))
                   :fullstmt
                   :full-stmt t
@@ -442,7 +443,7 @@ trace statement ID for each AST in OBJ.
 "
   (declare (ignorable instrumenter))
   (make-call-expr "__write_end_entry"
-                  (list (make-var-reference +instrument-log-variable-name+
+                  (list (make-var-reference +trace-instrument-log-variable-name+
                                             nil)
                         (make-var-reference +instrument-log-lock-variable-name+
                                             nil))
@@ -527,7 +528,7 @@ instrumentation of function exit.
   "Return true if CLANG is instrumented
 * CLANG a clang software object
 "
-  (search +instrument-log-variable-name+ (genome-string clang)))
+  (search +trace-instrument-log-variable-name+ (genome-string clang)))
 
 (defmethod instrument ((obj clang) &rest args)
   "Instrumentation for clang software objects.
@@ -582,7 +583,7 @@ but which could be made traceable by wrapping with curly braces, return that.")
        (when-let ((parent (get-parent-ast obj ast)))
          (enclosing-traceable-stmt obj parent))))))
 
-(defmethod can-be-made-traceable-p ((obj clang) (ast clang-ast))
+(defun can-be-made-traceable-p (obj ast)
   (or (traceable-stmt-p obj ast)
       (unless (or (ast-guard-stmt ast) ; Don't wrap guard statements.
                   (eq :CompoundStmt ; Don't wrap CompoundStmts.
@@ -591,7 +592,7 @@ but which could be made traceable by wrapping with curly braces, return that.")
           ;; Is a child of a statement which might have a hanging body.
           (member (ast-class parent) +clang-wrapable-parents+)))))
 
-(defmethod traceable-stmt-p ((obj clang) (ast clang-ast))
+(defun traceable-stmt-p (obj ast)
   (and (ast-full-stmt ast)
        (not (function-decl-p ast))
        (not (ast-in-macro-expansion ast))
@@ -956,7 +957,7 @@ Returns a list of strings containing C source code."))
                                 (list (make-statement :DeclRefExpr :generic
                                                       (list function-name))))
                              ,(format nil "(~a, ~d, ~{~a~^, ~})"
-                                          +instrument-log-variable-name+
+                                          +trace-instrument-log-variable-name+
                                           (length function-args)
                                           function-args))
                            :full-stmt t
@@ -1081,7 +1082,7 @@ Returns a list of strings containing C source code."))
       ;; writes the header.
       (append-text-to-genome obj
                              (format nil +write-trace-initialization+
-                                     *instrument-handshake-env-name*
+                                     *trace-instrument-handshake-env-name*
                                      (file-open-str)
                                      (names-initialization-str)
                                      (types-initialization-str)

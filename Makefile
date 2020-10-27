@@ -92,8 +92,6 @@ DOC_PACKAGES=                                      \
     trace-db/sexp-trace-db                         \
     trace-db/binary-trace-db                       \
     trace-db/traceable                             \
-    trace-db/instrumentation/instrument            \
-    trace-db/instrumentation/cil-instrument        \
     trace-db/instrumentation/clang-instrument      \
     trace-db/instrumentation/javascript-instrument
 
