@@ -14,6 +14,7 @@
         :trace-db/traceable)
   (:import-from :functional-trees :path-later-p)
   (:export :clang-instrumenter
+           :can-be-made-traceable-p  
            :instrument-c-exprs))
 (in-package :trace-db/instrumentation/clang-instrument)
 (in-readtable :curry-compose-reader-macros)
