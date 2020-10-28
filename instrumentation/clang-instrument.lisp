@@ -14,7 +14,6 @@
         :trace-db/traceable)
   (:import-from :functional-trees :path-later-p)
   (:export :clang-instrumenter
-           :can-be-made-traceable-p  
            :instrument-c-exprs))
 (in-package :trace-db/instrumentation/clang-instrument)
 (in-readtable :curry-compose-reader-macros)
@@ -584,7 +583,7 @@ but which could be made traceable by wrapping with curly braces, return that.")
        (when-let ((parent (get-parent-ast obj ast)))
          (enclosing-traceable-stmt obj parent))))))
 
-(defun can-be-made-traceable-p (obj ast)
+(defmethod can-be-made-traceable-p ((obj clang) (ast clang-ast))
   (or (traceable-stmt-p obj ast)
       (unless (or (ast-guard-stmt ast) ; Don't wrap guard statements.
                   (eq :CompoundStmt ; Don't wrap CompoundStmts.
@@ -593,7 +592,7 @@ but which could be made traceable by wrapping with curly braces, return that.")
           ;; Is a child of a statement which might have a hanging body.
           (member (ast-class parent) +clang-wrapable-parents+)))))
 
-(defun traceable-stmt-p (obj ast)
+(defmethod traceable-stmt-p ((obj clang) (ast clang-ast))
   (and (ast-full-stmt ast)
        (not (function-decl-p ast))
        (not (ast-in-macro-expansion ast))

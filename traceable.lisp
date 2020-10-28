@@ -18,6 +18,8 @@
            :skip-trace-collection
            :nil-traces
            :ignore-empty-trace
+           :can-be-made-traceable-p
+           :traceable-stmt-p
            :*trace-instrument-log-env-name*
            :*trace-instrument-handshake-env-name*
            :+trace-instrument-log-variable-name+))
@@ -50,6 +52,14 @@ traces in a proprietary binary format."))
 (define-software sexp-traceable (traceable) ()
   (:documentation "Instrumentable software with support for collecting dynamic
 traces in a s-expression format."))
+
+(defgeneric can-be-made-traceable-p (software ast)
+  (:documentation "Check if AST can be made a traceable statement in
+SOFTWARE."))
+
+(defgeneric traceable-stmt-p (software ast)
+  (:documentation "Return TRUE if AST is a traceable statement in
+SOFTWARE."))
 
 (define-condition trace-error (error)
   ((text :initarg :text :initform nil :reader text)

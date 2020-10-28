@@ -136,9 +136,6 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
              (gethash ast (ast-ids instrumenter)))
            (sort-asts (obj asts)
              (sort asts {path-later-p obj}))
-           (traceable-stmt-p (obj ast)
-             (or (null (get-parent-ast obj ast))
-                 (typep (get-parent-ast obj ast) 'js-block-statement)))
            (instrument-before (instrumenter ast)
              (let ((variables (mappend {funcall _ instrumenter ast}
                                        functions)))
@@ -297,3 +294,8 @@ Creates a JAVASCRIPT-INSTRUMENTER for OBJ and calls its instrument method.
                             (asts obj)))
           (collect `(:cut (:stmt1 . ,ast)))))
   obj)
+  
+(defmethod traceable-stmt-p ((obj javascript) (ast javascript-ast))
+  "Return TRUE if AST is a traceable statement in the javascript software OBJ."
+  (or (null (get-parent-ast obj ast))
+      (typep (get-parent-ast obj ast) 'js-block-statement)))
