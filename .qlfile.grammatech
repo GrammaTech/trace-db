@@ -1,3 +1,5 @@
+git cffi https://github.com/death/cffi
+git cl-tree-sitter https://github.com/death/cl-tree-sitter
 git gt https://git.grammatech.com/synthesis/gt.git
 git functional-trees https://git.grammatech.com/synthesis/functional-trees.git
 git software-evolution-library https://git.grammatech.com/synthesis/sel.git
