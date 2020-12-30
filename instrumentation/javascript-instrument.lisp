@@ -8,6 +8,7 @@
         :software-evolution-library/software/non-homologous-parseable
         :software-evolution-library/software/project
         :software-evolution-library/software/javascript
+        :software-evolution-library/software/json
         :software-evolution-library/software/javascript-project
         :trace-db/traceable)
   (:import-from :functional-trees :path-later-p)
