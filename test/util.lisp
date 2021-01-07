@@ -8,7 +8,6 @@
   (:export :test
            :*soft*
            :clang-dir
-           :javascript-dir
            :stmt-with-text
            :stmt-starting-with-text))
 (in-package :trace-db/test/util)
@@ -25,21 +24,11 @@
   :test #'equalp
   :documentation "Path to the directory holding clang test artifacts.")
 
-(define-constant +javascript-dir+
-    (append +trace-db-dir+ (list "test" "etc" "javascript"))
-  :test #'equalp
-  :documentation "Path to the directory holding JavaScript test artifacts.")
-
 
 ;;; Functions
 (defun clang-dir (path)
   "Return PATH relative to +clang-dir+."
   (merge-pathnames-as-file (make-pathname :directory +clang-dir+)
-                           path))
-
-(defun javascript-dir (path)
-  "Return PATH relative to +javascript-dir+."
-  (merge-pathnames-as-file (make-pathname :directory +javascript-dir+)
                            path))
 
 (defun stmt-with-text (obj text)

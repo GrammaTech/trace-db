@@ -92,8 +92,7 @@ DOC_PACKAGES=                                      \
     trace-db/sexp-trace-db                         \
     trace-db/binary-trace-db                       \
     trace-db/traceable                             \
-    trace-db/instrumentation/clang-instrument      \
-    trace-db/instrumentation/javascript-instrument
+    trace-db/instrumentation/clang-instrument
 
 
 ## Cleaning the trace database

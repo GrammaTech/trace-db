@@ -17,7 +17,6 @@ appendix holds each individual package's API in turn.
 * binary-trace-db::                       trace-db/binary-trace-db Binary trace database.
 * traceable::                             trace-db/traceable Traceable mixin.
 * instrumentation-clang-instrument::      trace-db/instrumentation/clang-instrument Clang instrumentation.
-* instrumentation-javascript-instrument:: trace-db/instrumentation/javascriptinstrument Javascript Instrumentation.
 @end menu
 
 @node core, trace-db, Packages, Packages
@@ -40,10 +39,6 @@ appendix holds each individual package's API in turn.
 @subsection traceable
 @include trace-db-traceable-api.texi
 
-@node instrumentation-clang-instrument, instrumentation-javascript-instrument, traceable, Packages
+@node instrumentation-clang-instrument, Index, traceable, Packages
 @subsection instrumentation-clang-instrument
 @include trace-db-instrumentation-clang-instrument-api.texi
-
-@node instrumentation-javascript-instrument, Index, instrumentation-clang-instrument, Packages
-@subsection instrumentation-javascript-instrument
-@include trace-db-instrumentation-javascript-instrument-api.texi
