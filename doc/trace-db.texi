@@ -47,7 +47,7 @@ Copyright @copyright{} 2019 GrammaTech
 * Troubleshooting::             Frequently asked questions
 
 Appendices
-* API::                         Public functions, variables, and macros
+* trace-db API::                Public functions, variables, and macros
 * Index::                       Complete index.
 
 @end menu
@@ -70,17 +70,16 @@ Appendices
 
 @include instrumentation-and-tracing-component.texi
 
-@node Troubleshooting, API, Instrumentation and Tracing, Top
+@node Troubleshooting, trace-db API, Instrumentation and Tracing, Top
 @chapter Troubleshooting
 @cindex troubleshooting
 
 @include troubleshooting.texi
 
-@node API, Index, Troubleshooting, Top
-@appendix API
-@include trace-db-api.texi
+@include include/sb-texinfo.texinfo
+@include trace-db-api-sb-texinfo.texi
 
-@node Index,  , API, Top
+@node Index,  , trace-db API, Top
 @unnumbered Index
 
 @c Combine all index (function variable type and concept) types into a
