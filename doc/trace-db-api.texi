@@ -21,24 +21,24 @@ appendix holds each individual package's API in turn.
 
 @node core, trace-db, Packages, Packages
 @subsection core
-@include trace-db-core-api.texi
+@include trace-db-slash-core-sb-texinfo.texi
 
 @node trace-db, sexp-trace-db, core, Packages
 @subsection trace-db
-@include trace-db-trace-db-api.texi
+@include trace-db-slash-trace-db-sb-texinfo.texi
 
 @node sexp-trace-db, binary-trace-db, trace-db, Packages
 @subsection sexp-trace-db
-@include trace-db-sexp-trace-db-api.texi
+@include trace-db-slash-sexp-trace-db-sb-texinfo.texi
 
 @node binary-trace-db, traceable, sexp-trace-db, Packages
 @subsection binary-trace-db
-@include trace-db-binary-trace-db-api.texi
+@include trace-db-slash-binary-trace-db-sb-texinfo.texi
 
 @node traceable, instrumentation-clang-instrument, binary-trace-db, Packages
 @subsection traceable
-@include trace-db-traceable-api.texi
+@include trace-db-slash-traceable-sb-texinfo.texi
 
 @node instrumentation-clang-instrument, Index, traceable, Packages
 @subsection instrumentation-clang-instrument
-@include trace-db-instrumentation-clang-instrument-api.texi
+@include trace-db-slash-instrumentation-slash-clang-instrument-sb-texinfo.texi

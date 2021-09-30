@@ -1,17 +1,18 @@
 The trace database component is responsible for reading, storing, and
-searching program traces. An abstract @refapiclass{trace-db} class
-and interface which allows for these tasks exists in the
-@code{trace-db/trace-db} package; all concrete instances of
-@refapiclass{trace-db} implement this generic interface.
+searching program traces. An abstract
+@refapiclass{trace-db/trace-db:trace-db} class and interface which
+allows for these tasks exists in the @code{trace-db/trace-db} package;
+all concrete instances of @refapiclass{trace-db/trace-db:trace-db}
+implement this generic interface.
 
 @section S-expression Trace Database
 
 The @code{sexp-trace-db} concrete instance of the
-@refapiclass{trace-db} abstract base class implements the trace
-database for traces in a simple s-expression format. This is
-the simplest trace format as it can be read by the built-in
-LISP `read' function and the trace can be examined by the
-debugger in memory. However, this format is also memory
+@refapiclass{trace-db/trace-db:trace-db} abstract base class
+implements the trace database for traces in a simple s-expression
+format. This is the simplest trace format as it can be read by
+the built-in LISP `read' function and the trace can be examined
+by the debugger in memory. However, this format is also memory
 intensive and slow for larger traces; for this reason, it
 is suggested that for serious development the binary trace
 database format described below is used.
@@ -19,10 +20,10 @@ database format described below is used.
 @section Binary Trace Database
 
 The @code{binary-trace-db} concrete instance of the
-@refapiclass{trace-db} abstract base class implements the trace
-database for traces which utilize Grammatech's proprietary
-binary trace format.  Traces are stored in C++ hash consing
-trace database for efficient searching and storage; a CFFI
+@refapiclass{trace-db/trace-db:trace-db} abstract base class
+implements the trace database for traces which utilize Grammatech's
+proprietary binary trace format.  Traces are stored in C++ hash
+consing trace database for efficient searching and storage; a CFFI
 interface provides a thin wrapper around the C++ library
 allowing for translation of results into LISP.
 

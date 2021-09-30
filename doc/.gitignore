@@ -7,11 +7,12 @@ trace-db/
 *.1.gz
 
 # Automatically generated package texi files
-trace-db-binary-trace-db-api.texi
-trace-db-core-api.texi
-trace-db-instrumentation-cil-instrument-api.texi
-trace-db-instrumentation-clang-instrument-api.texi
-trace-db-instrumentation-instrument-api.texi
-trace-db-sexp-trace-db-api.texi
-trace-db-trace-db-api.texi
-trace-db-traceable-api.texi
+trace-db-slash-binary-trace-db-sb-texinfo.texi
+trace-db-slash-core-sb-texinfo.texi
+trace-db-slash-instrumentation-cil-instrument-sb-texinfo.texi
+trace-db-slash-instrumentation-slash-clang-instrument-sb-texinfo.texi
+trace-db-slash-instrumentation-instrument-sb-texinfo.texi
+trace-db-slash-sexp-trace-db-sb-texinfo.texi
+trace-db-slash-trace-db-sb-texinfo.texi
+trace-db-slash-traceable-sb-texinfo.texi
+trace-db-api-sb-texinfo.texi

@@ -6,7 +6,7 @@ use.
 
 Software objects which need to support trace collection should include
 an `instrument` method (from SEL) to set it up and derive from
-@refapiclass{traceable}.
+@refapiclass{trace-db/traceable:traceable}.
 
 
 @section Instrumenting
@@ -49,8 +49,9 @@ The trace returned will contain the following elements:
 @section Traces
 
 To collect traces, pass an instrumented version of the software object
-to the @refapigeneric{collect-traces} method along with a test suite of
-test cases you wish to execute on the instrumented object.
+to the @refapigeneric{trace-db/traceable:collect-traces} method along
+with a test suite of test cases you wish to execute on the instrumented
+object.
 
 The trace format can store program locations, variables, and auxiliary
 data represented as integers. Program locations are identified by a
