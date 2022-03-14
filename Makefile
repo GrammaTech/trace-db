@@ -47,7 +47,7 @@ all: $(LIBTRACEDB_SO)
 $(BOOST_SERIALIZATION):
 	mkdir -p $(BASEDIR)/third-party && \
 	cd $(BASEDIR)/third-party && \
-	wget https://dl.bintray.com/boostorg/release/1.67.0/source/boost_1_67_0.tar.bz2 && \
+	wget https://boostorg.jfrog.io/artifactory/main/release/1.67.0/source/boost_1_67_0.tar.bz2 && \
 	tar --bzip2 -xf boost_1_67_0.tar.bz2 && \
 	cd boost_1_67_0/ && \
 	./bootstrap.sh --prefix=$(BASEDIR)/third-party/boost_1_67_0/ && \
