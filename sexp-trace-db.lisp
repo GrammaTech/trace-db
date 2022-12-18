@@ -44,6 +44,14 @@ software objects.")
 (defrestore-cl-store (single-file-sexp-trace-db stream)
   (cl-store::restore-object stream))
 
+(defmethod initialize-instance :after ((db single-file-sexp-trace-db)
+                                       &rest initargs &key &allow-other-keys)
+  (declare (ignorable initargs))
+  (setf (slot-value db 'traces)
+        (mapcar (lambda (trace)
+                  (remove-if-not [{eq (file-id db)} #'cdr {assoc :f}] trace))
+                (traces (parent-db db)))))
+
 (defun read-sexp-trace (file &key timeout max-trace-points)
   "Read a trace from FILE-NAME with `read-trace-stream'."
   (when-let ((in (open-file-timeout file timeout)))
@@ -182,14 +190,6 @@ KWARGS are passed on to the OPEN call."
 
 (defmethod restrict-to-file ((db sexp-trace-db) file-id)
   (make-instance 'single-file-sexp-trace-db :parent-db db :file-id file-id))
-
-(defmethod traces ((db single-file-sexp-trace-db))
-  (if (slot-value db 'traces)
-      (slot-value db 'traces)
-      (setf (slot-value db 'traces)
-            (mapcar (lambda (trace)
-                      (remove-if-not [{eq (file-id db)} #'cdr {assoc :f}] trace))
-                    (traces (parent-db db))))))
 
 (defmethod trace-metadata ((db single-file-sexp-trace-db))
   (trace-metadata (parent-db db)))
