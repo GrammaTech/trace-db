@@ -444,79 +444,6 @@ trace statement ID for each AST in OBJ.
                   :full-stmt t
                   :annotations '((:instrumentation t))))
 
-(defgeneric instrument-return (instrumenter return-stmt return-void)
-  (:documentation "Generate ASTs which instrument RETURN-STMT.
-The generated ASTs will store the return value in a temporary variable
-and jump to the exit point, allowing instrumentation of function exit.
-* INSTRUMENTER current instrumentation state
-* RETURN-STMT the AST for a return statement
-* RETURN-VOID does this function return void?
-"))
-
-(defmethod instrument-return ((instrumenter clang-instrumenter)
-                              return-stmt return-void)
-  "Generate ASTs which instrument RETURN-STMT.
-The generated ASTs will store the return value in a local variable
-and jump to the exit point, allowing instrumentation of function exit.
-* INSTRUMENTER current instrumentation state
-* RETURN-STMT the AST for a return statement
-* RETURN-VOID does this function return void?
-"
-  (if return-void
-      `(,(make-statement :gotostmt :fullstmt '("goto inst_exit")
-                         :full-stmt t
-                         :annotations '((:instrumentation t))))
-      `(,(make-operator :fullstmt "="
-                        (list (make-var-reference "_inst_ret" nil)
-                              (car (child-asts return-stmt)))
-                        :full-stmt t
-                        :annotations '((:instrumentation t)))
-        ,(make-statement :gotostmt :fullstmt '("goto inst_exit")
-                         :full-stmt t
-                         :annotations '((:instrumentation t))))))
-
-(defgeneric instrument-exit (instrumenter function return-void)
-  (:documentation "Generate ASTs to instrument exit from FUNCTION.
-
-The generated ASTs add a label which can be jumped to from return
-statements, and return a value stored in a local variable, allowing
-instrumentation of function exit.
-
-* INSTRUMENTER current instrumentation state
-* FUNCTION the AST for the current function
-* RETURN-VOID does this function return void?
-"))
-
-(defmethod instrument-exit ((instrumenter clang-instrumenter)
-                            function return-void)
-  "Generate ASTs to instrument exit from FUNCTION.
-
-The generated ASTs add a label which can be jumped to from return
-statements, and return a value stored in a local variable, allowing
-instrumentation of function exit.
-
-* INSTRUMENTER current instrumentation state
-* FUNCTION the AST for the current function
-* RETURN-VOID does this function return void?
-"
-  (let ((obj (software instrumenter)))
-    `(,(make-label "inst_exit"
-                   ;; ast-id hash table uses eq, but function-body will
-                   ;; generate a new ast. Search for the original in
-                   ;; order to look up the id.
-                   (write-trace-id instrumenter
-                                   (find-if {equalp (function-body function)}
-                                            (asts obj)))
-                   :annotations '((:instrumentation t)))
-      ,(write-end-entry instrumenter)
-      ,(make-statement :ReturnStmt :fullstmt
-                       (cons "return "
-                             (when (not return-void)
-                               (list (make-var-reference "_inst_ret"
-                                                         nil))))
-                       :full-stmt t
-                       :annotations '((:instrumentation t))))))
-
 (defmethod instrumented-p ((clang clang))
   "Return true if CLANG is instrumented
 * CLANG a clang software object
@@ -536,23 +463,11 @@ Creates a CLANG-INSTRUMENTER for OBJ and calls its instrument method.
            :ast-ids (get-ast-ids-ht obj))
          args))
 
-
-
-(defun instrument-create-value (obj ast return-type before after
-                                instrumenter instrument-exit)
-  (let* (;; Look up AST again in case its children have been
-         ;; instrumented
-         (wrap (not (traceable-stmt-p obj ast)))
-         (new-ast (@ obj (ast-path obj ast)))
-         (stmts (append (mapcar {add-semicolon _ :after} before)
-                        (if (and instrument-exit
-                                 (eq (ast-class ast) :ReturnStmt))
-                            (nest (mapcar {add-semicolon _ :both})
-                                  (instrument-return instrumenter
-                                                     new-ast
-                                                     (null return-type)))
-                            (list new-ast))
-                        (mapcar {add-semicolon _ :both} after))))
+(defun instrument-create-value (obj ast before after)
+  (let ((wrap (not (traceable-stmt-p obj ast)))
+        (stmts (append (mapcar {add-semicolon _ :after} before)
+                       (list (@ obj (ast-path obj ast)))
+                       (mapcar {add-semicolon _ :both} after))))
     ;; Wrap in compound statement if needed
     (if wrap
         (make-statement
@@ -593,24 +508,9 @@ but which could be made traceable by wrapping with curly braces, return that.")
        (get-parent-ast obj ast)
        (eq :CompoundStmt (ast-class (get-parent-ast obj ast)))))
 
-(defun last-traceable-stmt (obj proto)
-  "The last traceable statement in the body of a function
-declaration, or NIL if PROTO is not a function declaration or there
-is no such traceable statement."
-  (nest (enclosing-traceable-stmt obj)
-        (lastcar)
-        (child-asts)
-        (function-body proto)))
-
-(defun first-traceable-stmt (proto)
-  "The first traceable statement in the body of a function
-declaration, or NIL if PROTO is not a function declaration or there
-is no such traceable statement."
-  (first (child-asts (function-body proto))))
-
 (defmethod instrument
     ((instrumenter clang-instrumenter)
-     &key points functions functions-after trace-file trace-env instrument-exit
+     &key points functions functions-after trace-file trace-env
        (filter (constantly t)) (num-threads 0))
   "Use INSTRUMENTER to instrument a clang software object.
 
@@ -620,7 +520,6 @@ is no such traceable statement."
 * FUNCTIONS-AFTER functions to calculate instrumentation after each point
 * TRACE-FILE file or stream (stdout/stderr) for trace output
 * TRACE-ENV trace output to file specified by ENV variable
-* INSTRUMENT-EXIT print counter of function body before exit
 * FILTER function to select a subset of ASTs for instrumentation
          function should take a software object and an AST parameters,
          returning nil if the AST should be filtered from instrumentation
@@ -664,39 +563,20 @@ update POINTS after instrumenting ASTs."
                  (asts obj)))
          (instrument-ast (ast extra-stmts extra-stmts-after aux-values)
            "Generate instrumentation for AST.
-Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER).
+Returns a list of (AST INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER).
 "
-
-           (let* ((function (when instrument-exit
-                              (function-containing-ast obj ast)))
-                  (return-type (when (and function
-                                          (not (ast-void-ret function)))
-                                 (find-type obj (ast-ret function)))))
-
-             `(,ast
-               ,return-type
-               ;; Instrumentation before
-               (;; Temp variable for return value
-                ,@(when (and instrument-exit
-                             (equalp ast (first-traceable-stmt function))
-                             return-type)
-                        `(,(make-var-decl "_inst_ret" return-type nil
-                                          :annotations '((:instrumentation t)))))
-                ;; Instrument before
-                ,(write-trace-id instrumenter ast)
-                ,@(mapcar {write-trace-aux instrumenter} aux-values)
-                ,@extra-stmts
-                ,(write-end-entry instrumenter))
-               (;; Instrumentation after
-                ,@(when functions-after
-                        `(,(write-trace-id instrumenter ast)
-                          ,@extra-stmts-after
-                          ,(write-end-entry instrumenter)))
-                ;; Function exit instrumentation
-                ,@(when (and instrument-exit
-                             (equalp ast (last-traceable-stmt obj function)))
-                        (instrument-exit instrumenter function
-                                         (null return-type))))))))
+           `(,ast
+             ;; Instrumentation before
+             (;; Instrument before
+              ,(write-trace-id instrumenter ast)
+              ,@(mapcar {write-trace-aux instrumenter} aux-values)
+              ,@extra-stmts
+              ,(write-end-entry instrumenter))
+             (;; Instrumentation after
+              ,@(when functions-after
+                      `(,(write-trace-id instrumenter ast)
+                        ,@extra-stmts-after
+                        ,(write-end-entry instrumenter)))))))
 
     ;; Apply mutations to instrument OBJ.
     ;; Note: These mutations are sent as a list to `apply-mutation-ops`
@@ -704,26 +584,20 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
     ;; over calling `apply-mutation-ops` multiple times.
     (apply-mutation-ops
       obj
-      (iter (for (ast return-type before after) in (instrument-asts obj))
+      (iter (for (ast before after) in (instrument-asts obj))
             (collect (if (not (traceable-stmt-p obj ast))
                          `(:set (:stmt1 . ,ast)
                                 (:value1 . ,{instrument-create-value
                                              obj
                                              ast
-                                             return-type
                                              before
-                                             after
-                                             instrumenter
-                                             instrument-exit}))
+                                             after}))
                          `(:splice (:stmt1 . ,ast)
                                    (:value1 . ,{instrument-create-value
                                                 obj
                                                 ast
-                                                return-type
                                                 before
-                                                after
-                                                instrumenter
-                                                instrument-exit})))))))
+                                                after})))))))
 
     ;; Warn about any leftover un-inserted points.
     (mapc (lambda (point)

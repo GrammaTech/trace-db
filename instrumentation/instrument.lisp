@@ -20,7 +20,7 @@
   (:documentation "Return true if OBJ is instrumented"))
 
 (defgeneric instrument (obj &key points functions functions-after
-                                 trace-file trace-env instrument-exit filter
+                                 trace-file trace-env filter
                                  num-threads &allow-other-keys)
   (:documentation
    "Instrument OBJ to print AST index before each full statement.
@@ -33,7 +33,6 @@ Keyword arguments are as follows:
   FUNCTIONS-AFTER ------ functions to calculate instrumentation after each point
   TRACE-FILE ----------- file for trace output
   TRACE-ENV ------------ trace output to file specified by ENV variable
-  INSTRUMENT-EXIT ------ print counter of function body before exit
   FILTER --------------- function to select a subset of ASTs for instrumentation
   NUM-THREADS ---------- number of threads to use for instrumentation"))
 

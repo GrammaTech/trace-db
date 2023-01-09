@@ -217,34 +217,6 @@
           (is (every {aget :c} trace))
           (is (= 1 (length trace))))))))
 
-(deftest (instrumentation-insertion-w-function-exit-test :long-running) ()
-  (with-fixture gcd-clang
-    (let ((instrumented (instrument (copy *soft*)
-                                    :instrument-exit t
-                                    :trace-file :stderr)))
-      ;; Do we insert the right number of printf statements?
-      (is (<= (count-traceable *soft*)
-              (count-traceable instrumented)))
-
-      ;; Is function exit instrumented?
-      (is (stmt-with-text
-           instrumented
-           (format
-            nil
-            "__write_trace_id(__sel_trace_file, __sel_trace_file_lock, ~du)"
-            (position (function-body (first (functions *soft*)))
-                      (asts *soft*)
-                      :test #'equalp))))
-
-      ;; Instrumented compiles and runs.
-      (with-temporary-file (:pathname bin)
-        (is (zerop (nth-value 1 (ignore-phenome-errors
-                                 (phenome instrumented :bin bin)))))
-        (is (probe-file bin))
-        (let ((trace (get-gcd-trace bin)))
-          (is (every {aget :c} trace))
-          (is (= 16 (length trace))))))))
-
 (deftest (instrumentation-insertion-w-points-test :long-running) ()
   (with-fixture gcd-clang
     (let ((instrumented
