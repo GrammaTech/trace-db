@@ -20,6 +20,8 @@
            :ignore-empty-trace
            :can-be-made-traceable-p
            :traceable-stmt-p
+           :type-trace-string
+           :type-from-trace-string
            :*trace-instrument-log-env-name*
            :*trace-instrument-handshake-env-name*
            :+trace-instrument-log-variable-name+))
@@ -59,6 +61,12 @@ SOFTWARE."))
 (defgeneric traceable-stmt-p (software ast)
   (:documentation "Return TRUE if AST is a traceable statement in
 SOFTWARE."))
+
+(defgeneric type-trace-string (type)
+  (:documentation "Return text used to describe TYPE in an execution trace."))
+
+(defgeneric type-from-trace-string (trace-string language)
+  (:documentation "Create a type from a name used in an execution trace."))
 
 (define-condition trace-error (error)
   ((text :initarg :text :initform nil :reader text)

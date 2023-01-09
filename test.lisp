@@ -4,7 +4,7 @@
         #+gt :testbot
         :stefil+
         :trace-db/core
-        :trace-db/test/clang
+        :trace-db/test/c-cpp
         :trace-db/test/util)
   #+gt (:shadowing-import-from :testbot :batch-test)
   (:export :test :batch-test :testbot-test))

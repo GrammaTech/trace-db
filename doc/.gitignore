@@ -10,7 +10,7 @@ trace-db/
 trace-db-slash-binary-trace-db-sb-texinfo.texi
 trace-db-slash-core-sb-texinfo.texi
 trace-db-slash-instrumentation-cil-instrument-sb-texinfo.texi
-trace-db-slash-instrumentation-slash-clang-instrument-sb-texinfo.texi
+trace-db-slash-instrumentation-slash-c-cpp-sb-texinfo.texi
 trace-db-slash-instrumentation-instrument-sb-texinfo.texi
 trace-db-slash-sexp-trace-db-sb-texinfo.texi
 trace-db-slash-trace-db-sb-texinfo.texi

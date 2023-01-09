@@ -1,29 +1,35 @@
-;;;; clang.lisp --- Clang instrumentation tests.
-(defpackage :trace-db/test/clang
+;;;; c-cpp.lisp --- C/CPP instrumentation tests.
+(defpackage :trace-db/test/c-cpp
   (:use
    :gt/full
    #+gt :testbot
+   :functional-trees/attrs
    :stefil+
    :software-evolution-library
    :software-evolution-library/software/parseable
-   :software-evolution-library/software/clang
-   :software-evolution-library/software/clang-project
+   :software-evolution-library/software/c
+   :software-evolution-library/software/cpp
+   :software-evolution-library/software/c-cpp
+   :software-evolution-library/software/c-project
+   :software-evolution-library/software/cpp-project
+   :software-evolution-library/software/tree-sitter
    :software-evolution-library/components/test-suite
    :trace-db/instrumentation/instrument
-   :trace-db/instrumentation/clang-instrument
+   :trace-db/instrumentation/c-cpp
    :trace-db/traceable
    :trace-db/trace-db
    :trace-db/binary-trace-db
    :trace-db/test/util)
   (:shadowing-import-from :uiop/run-program :run-program)
-  (:export :test-clang))
-(in-package :trace-db/test/clang)
+  (:export :test-c-cpp))
+(in-package :trace-db/test/c-cpp)
 (in-readtable :curry-compose-reader-macros)
 
-(defsuite test-clang "Tests for clang instrumentation and tracing."
-  (which "clang"))
+(defsuite test-c/cpp "Tests for C/CPP instrumentation and tracing."
+  (and (c-tree-sitter-available-p)
+       (cpp-tree-sitter-available-p)))
 
-(define-software clang-traceable (clang binary-traceable) ())
+(define-software c-traceable (c binary-traceable) ())
 
 (defconst +gcd-inputs+
     '((:bin "1071" "1029")
@@ -45,94 +51,94 @@
                                     :program-name (car input)
                                     :program-args (cdr input))))))
 
-(defixture gcd-clang
+(defixture gcd-fixture
   (:setup (setf *soft*
-                (from-file (make 'clang)
-                           (clang-dir #P"gcd/gcd.c"))))
+                (from-file (make 'c)
+                           (c/cpp-dir #P"gcd/gcd.c"))))
   (:teardown
    (setf *soft* nil)))
 
-(defixture gcd-wo-curlies-clang
+(defixture gcd-wo-curlies-fixture
   (:setup (setf *soft*
-                (from-file (make 'clang)
-                           (clang-dir #P"gcd/gcd-wo-curlies.c"))))
+                (from-file (make 'c)
+                           (c/cpp-dir #P"gcd/gcd-wo-curlies.c"))))
   (:teardown
    (setf *soft* nil)))
 
 (defixture traceable-gcd
   (:setup (setf *soft*
-                (from-file (make 'clang-traceable)
-                           (clang-dir #P"gcd/gcd.c"))))
+                (from-file (make 'c-traceable)
+                           (c/cpp-dir #P"gcd/gcd.c"))))
   (:teardown
    (setf *soft* nil)))
 
 (defixture c-strings
   (:setup
    (setf *soft*
-         (from-file (make 'clang)
-                    (clang-dir #P"strings/c-strings.c"))))
+         (from-file (make 'c)
+                    (c/cpp-dir #P"strings/c-strings.c"))))
   (:teardown
    (setf *soft* nil)))
 
 (defixture cpp-strings
   (:setup
    (setf *soft*
-         (from-file (make 'clang :compiler "clang++")
-                    (clang-dir #P"strings/cpp-strings.cpp"))))
+         (from-file (make 'cpp :compiler "clang++")
+                    (c/cpp-dir #P"strings/cpp-strings.cpp"))))
   (:teardown
    (setf *soft* nil)))
 
-(defixture shadow-clang
+(defixture shadow-fixture
   (:setup
    (setf *soft*
-         (from-file (make 'clang)
-                    (clang-dir #P"shadow/shadow.c"))))
+         (from-file (make 'c)
+                    (c/cpp-dir #P"shadow/shadow.c"))))
   (:teardown
    (setf *soft* nil)))
 
-(defixture binary-search-clang
+(defixture binary-search-fixture
   (:setup
    (setf *soft*
-         (from-file (make 'clang)
-                    (clang-dir #P"binary-search/binary-search.c"))))
+         (from-file (make 'c)
+                    (c/cpp-dir #P"binary-search/binary-search.c"))))
   (:teardown
    (setf *soft* nil)))
 
-(defixture clang-project
+(defixture cpp-project
   (:setup
    (setf *soft*
-         (from-file (make 'clang-project
+         (from-file (make 'cpp-project
                      :build-command "make foo"
                      :artifacts '("foo"))
-                    (clang-dir #P"multi-file/"))))
+                    (c/cpp-dir #P"multi-file/"))))
   (:teardown
    (setf *soft* nil)))
 
 (defixture grep-project
   (:setup
    (setf *soft*
-         (from-file (make 'clang-project
+         (from-file (make 'c-project
                      :build-command "make grep"
                      :artifacts '("grep"))
-                    (clang-dir #P"grep/"))))
+                    (c/cpp-dir #P"grep/"))))
   (:teardown
    (setf *soft* nil)))
 
-(defixture print-env-clang
+(defixture print-env-fixture
   (:setup (setf *soft*
-                (from-file (make 'clang :compiler "clang")
-                           (clang-dir #P"print-env/print-env.c"))))
+                (from-file (make 'c :compiler "clang")
+                           (c/cpp-dir #P"print-env/print-env.c"))))
   (:teardown (setf *soft* nil)))
 
-(defixture long-running-program-clang
+(defixture long-running-program-fixture
   (:setup
    (setf *soft*
-         (from-file (make 'clang)
-                    (clang-dir #P"long-running/long-running-program.c"))))
+         (from-file (make 'c)
+                    (c/cpp-dir #P"long-running/long-running-program.c"))))
   (:teardown
    (setf *soft* nil)))
 
-(defun do-multi-threaded-instrument-clang-test (obj)
+(defun do-multi-threaded-instrument-c/cpp-test (obj)
   (let ((st-instrumented
          (instrument (copy obj)
                      :functions
@@ -151,23 +157,23 @@
                                              instrumenter
                                              ast)))
                      :num-threads 4)))
-    (is (equalp (mapcar #'ast-class (asts st-instrumented))
-                (mapcar #'ast-class (asts mt-instrumented)))
+    (is (equalp (mapcar #'type-of (asts st-instrumented))
+                (mapcar #'type-of (asts mt-instrumented)))
         "`instrument` should yield the same ASTs regardless of the ~
          number of threads utilized.")
 
     (uninstrument st-instrumented :num-threads 1)
     (uninstrument mt-instrumented :num-threads 4)
-    (is (equalp (mapcar #'ast-class (asts st-instrumented))
-                (mapcar #'ast-class (asts mt-instrumented)))
+    (is (equalp (mapcar #'type-of (asts st-instrumented))
+                (mapcar #'type-of (asts mt-instrumented)))
         "`uninstrument` should yield the same ASTs regardless of the ~
          number of threads utilized.")))
 
-(deftest (multi-threaded-clang-instrument-test :long-running) ()
-  (with-fixture clang-project
-    (do-multi-threaded-instrument-clang-test *soft*))
+(deftest (multi-threaded-c/cpp-instrument-test :long-running) ()
+  (with-fixture cpp-project
+    (do-multi-threaded-instrument-c/cpp-test *soft*))
   (with-fixture grep-project
-    (do-multi-threaded-instrument-clang-test *soft*)))
+    (do-multi-threaded-instrument-c/cpp-test *soft*)))
 
 (defun count-traceable (obj)
   "Return a count of full statements parented by compound statements"
@@ -183,12 +189,12 @@
         trace))))
 
 (deftest instrumented-p-test ()
-  (with-fixture gcd-clang
+  (with-fixture gcd-fixture
     (is (not (instrumented-p *soft*)))
     (is (instrumented-p (instrument (copy *soft*))))))
 
 (deftest (instrumentation-insertion-test :long-running) ()
-  (with-fixture gcd-clang
+  (with-fixture gcd-fixture
     (let ((instrumented (instrument (copy *soft*) :trace-file :stderr)))
       ;; Do we insert the right number of printf statements?
       (is (<= (count-traceable *soft*)
@@ -203,7 +209,7 @@
           (is (= 15 (length trace))))))))
 
 (deftest (instrumentation-insertion-w-filter-test :long-running) ()
-  (with-fixture gcd-clang
+  (with-fixture gcd-fixture
     (let ((instrumented (instrument (copy *soft*)
                                     :filter (lambda (obj ast)
                                               (declare (ignorable obj))
@@ -220,7 +226,7 @@
           (is (= 1 (length trace))))))))
 
 (deftest (instrumentation-insertion-w-trace-file-test :long-running) ()
-  (with-fixture gcd-clang
+  (with-fixture gcd-fixture
     (with-temporary-file (:pathname trace)
       (with-temporary-file (:pathname bin)
         (let ((instrumented
@@ -235,7 +241,7 @@
             (is (probe-file trace))))))))
 
 (deftest (instrumentation-handles-missing-curlies-test :long-running) ()
-  (with-fixture gcd-wo-curlies-clang
+  (with-fixture gcd-wo-curlies-fixture
     (let ((instrumented (instrument (copy *soft*) :trace-file :stderr)))
       ;; Ensure we were able to instrument an else branch w/o curlies.
       (let* ((else-counter (index-of-ast *soft*
@@ -244,9 +250,10 @@
                               else-counter)))
         (is (scan matcher (genome-string instrumented)))
         ;; The next line (after flushing) should be the else branch.
-        (let ((location (position-if {scan matcher} (lines instrumented))))
+        (let ((location (position-if {scan matcher}
+                        (lines (genome-string instrumented)))))
           (is (scan (quote-meta-chars "b = b - a;")
-                    (nth location (lines instrumented))))))
+                    (nth location (lines (genome-string instrumented)))))))
       ;; Finally, lets be sure we still compile.
       (with-temporary-file (:pathname bin)
         (is (zerop (nth-value 1 (ignore-phenome-errors
@@ -257,14 +264,13 @@
 (deftest (instrumentation-after-insertion-mutation-test :long-running) ()
   "Ensure after applying an insert mutation, the instrumented software
 prints unique counters in the trace"
-  (with-fixture gcd-clang
-    (let* ((*matching-free-var-retains-name-bias* 1.0)
-           (variant (copy *soft*))
+  (with-fixture gcd-fixture
+    (let* ((variant (copy *soft*))
            (instrumented (copy *soft*))
            (stmt1 (stmt-with-text variant "a = atoi(argv[1]);"))
            (stmt2 (stmt-with-text variant "a = atoi(argv[1]);")))
       (apply-mutation variant
-                      `(clang-insert (:stmt1 . ,stmt1) (:stmt2 . ,stmt2)))
+                      `(tree-sitter-insert ,stmt1 ,(tree-copy stmt2)))
       (instrument instrumented)
 
       (with-temporary-file (:pathname bin)
@@ -304,33 +310,8 @@ prints unique counters in the trace"
                (genome-string instrumented))
               "instrumentation was not added for the original statement"))))))
 
-(deftest (instrumentation-print-unbound-vars :long-running) ()
-  (with-fixture gcd-clang
-    (handler-bind ((warning #'muffle-warning))
-      (instrument *soft* :functions
-                  (list (lambda (instrumenter ast)
-                          (var-instrument {get-unbound-vals
-                                           (software instrumenter)}
-                                          instrumenter
-                                          ast)))
-                  :trace-file :stderr))
-    (is (scan (quote-meta-chars "__write_trace_variables(__sel_trace_file")
-              (genome-string *soft*))
-        "We find code to print unbound variables in the instrumented source.")
-    (with-temporary-file (:pathname bin)
-      (is (zerop (nth-value 1 (ignore-phenome-errors
-                               (phenome *soft* :bin bin))))
-          "Successfully compiled instrumented GCD.")
-      (let ((trace (get-gcd-trace bin)))
-        (is (= (length trace) (count-if {assoc :c} trace))
-            "Counter in every trace element.")
-        (is (> (count-if {assoc :scopes} trace) 0)
-            "Variable list in some trace elements.")
-        (is (> (length trace) (count-if {aget :scopes} trace))
-            "Variable list not populated in every trace element.")))))
-
 (deftest (instrumentation-print-in-scope-vars :long-running) ()
-  (with-fixture gcd-clang
+  (with-fixture gcd-fixture
     (handler-bind ((warning #'muffle-warning))
       (instrument *soft* :functions
                   (list (lambda (instrumenter ast)
@@ -412,7 +393,7 @@ prints unique counters in the trace"
             "Variable 'x' always has expected value.")))))
 
 (deftest (instrumentation-print-vars-after :long-running) ()
-  (with-fixture gcd-clang
+  (with-fixture gcd-fixture
     (handler-bind ((warning #'muffle-warning))
       (instrument *soft* :functions-after
                   (list (lambda (instrumenter ast)
@@ -434,7 +415,7 @@ prints unique counters in the trace"
             "Variable list not always empty.")))))
 
 (deftest (instrumentation-print-vars-handles-shadowing :long-running) ()
-  (with-fixture shadow-clang
+  (with-fixture shadow-fixture
     (handler-bind ((warning #'muffle-warning))
       (instrument *soft* :functions
                   (list (lambda (instrumenter ast)
@@ -457,17 +438,17 @@ prints unique counters in the trace"
               "No duplicate variables."))
 
         (is (every [«or {equalp '(#("x" "int" 1 nil))}
-                        {equalp '(#("x" "short" 0 nil))}»
+                        {equalp '(#("x" "short int" 0 nil))}»
                     {aget :scopes}]
                    trace)
             "Variables have correct type and value.")))))
 
 (deftest instrumentation-handles-binary-search ()
-  (with-fixture binary-search-clang
+  (with-fixture binary-search-fixture
     (handler-bind ((warning #'muffle-warning))
       (instrument *soft* :functions
                   (list (lambda (instrumenter ast)
-                          (var-instrument {get-unbound-vals
+                          (var-instrument {get-vars-in-scope
                                            (software instrumenter)}
                                           instrumenter
                                           ast)))))))
@@ -478,8 +459,7 @@ prints unique counters in the trace"
                     (if (find-restart 'keep-partial-asts)
                         (invoke-restart 'keep-partial-asts)
                         (error e)))))
-    (let ((soft (make 'clang
-                 :genome "int test(int) { return 1; }")))
+    (let ((soft (make 'c :genome "int test(int) { return 1; }")))
       (instrument soft :functions
                   (list (lambda (instrumenter ast)
                           (var-instrument {get-vars-in-scope
@@ -492,13 +472,12 @@ prints unique counters in the trace"
           "No code to print variables in the instrumented source."))))
 
 (deftest (instrumentation-preserves-annotations :long-running) ()
-  (with-fixture gcd-clang
+  (with-fixture gcd-fixture
     (let* ((stmt (stmt-starting-with-text *soft* "if (a == 0)"))
+           (replacement (tree-copy (copy stmt :annotations '((:foo . t)))))
            (index (index-of-ast *soft* stmt)))
       (apply-mutation *soft*
-                      `(clang-replace
-                        (:stmt1 . ,stmt)
-                        (:value1 . ,(copy stmt :annotations '((:foo . t))))))
+                      `(tree-sitter-replace ,stmt ,replacement))
 
       (instrument *soft* :functions
                   (list (lambda (instrumenter ast)
@@ -524,7 +503,7 @@ prints unique counters in the trace"
                      trace)))))))
 
 (deftest (uninstrument-instrument-is-identity :long-running) ()
-  (with-fixture gcd-clang
+  (with-fixture gcd-fixture
     (let ((orig (copy *soft*))
           (instrumented (copy *soft*)))
       (handler-bind ((warning #'muffle-warning))
@@ -537,7 +516,7 @@ prints unique counters in the trace"
       (is (equal (genome-string orig)
                  (genome-string (uninstrument instrumented)))
           "(uninstrument (instrument obj ...)) is not an identity")))
-  (with-fixture gcd-wo-curlies-clang
+  (with-fixture gcd-wo-curlies-fixture
     (let ((orig (copy *soft*))
           (instrumented (copy *soft*)))
       (handler-bind ((warning #'muffle-warning))
@@ -550,7 +529,7 @@ prints unique counters in the trace"
       (is (equal (genome-string orig)
                  (genome-string (uninstrument instrumented)))
           "(uninstrument (instrument obj ...)) is not an identity")))
-  (with-fixture clang-project
+  (with-fixture cpp-project
     (let ((orig (copy *soft*))
           (instrumented (copy *soft*)))
       (handler-bind ((warning #'muffle-warning))
@@ -563,7 +542,7 @@ prints unique counters in the trace"
       (is (equal (genome-string orig)
                  (genome-string (uninstrument instrumented)))
           "(uninstrument (instrument obj ...)) is not an identity")))
-  (with-fixture shadow-clang
+  (with-fixture shadow-fixture
     (let ((orig (copy *soft*))
           (instrumented (copy *soft*)))
       (handler-bind ((warning #'muffle-warning))
@@ -576,7 +555,7 @@ prints unique counters in the trace"
       (is (equal (genome-string orig)
                  (genome-string (uninstrument instrumented)))
           "(uninstrument (instrument obj ...)) is not an identity")))
-  (with-fixture binary-search-clang
+  (with-fixture binary-search-fixture
     (let ((orig (copy *soft*))
           (instrumented (copy *soft*)))
       (handler-bind ((warning #'muffle-warning))
@@ -636,7 +615,7 @@ prints unique counters in the trace"
     (is (every {every {aget :c}} (mapcar {aget :trace} (traces *soft*))))))
 
 (deftest (long-running-program-killed-test :long-running) ()
-  (with-fixture long-running-program-clang
+  (with-fixture long-running-program-fixture
     (with-temporary-file (:pathname bin)
       (phenome *soft* :bin bin)
       (let ((proc (start-test bin
@@ -648,7 +627,7 @@ prints unique counters in the trace"
             "finish-test did not kill a long running process")))))
 
 (deftest (env-variables-passed-through-to-test-suites :long-running) ()
-  (with-fixture print-env-clang
+  (with-fixture print-env-fixture
     (with-temporary-file (:pathname bin)
       (phenome *soft* :bin bin)
       (is (string=
@@ -682,3 +661,99 @@ prints unique counters in the trace"
       (collect-traces obj (make 'test-suite)))
     (is (not (probe-file (phenome-dir obj)))
         "collect-traces did not remove a phenome directory")))
+
+(deftest type-trace-string-test ()
+  (is (equal "int"
+             (nest (type-trace-string)
+                   (canonicalize-type)
+                   (convert 'c-ast "int a;" :deepest t))))
+  (is (equal "*int"
+             (nest (type-trace-string)
+                   (canonicalize-type)
+                   (convert 'c-ast "int * a;" :deepest t))))
+  (is (equal "[]int"
+             (nest (type-trace-string)
+                   (canonicalize-type)
+                   (convert 'c-ast "int a[];" :deepest t))))
+  (is (equal "[5]int"
+             (nest (type-trace-string)
+                   (canonicalize-type)
+                   (convert 'c-ast "int a[5];" :deepest t))))
+  (is (equal "*[]int"
+             (nest (type-trace-string)
+                   (canonicalize-type)
+                   (convert 'c-ast "int *a[];" :deepest t))))
+  (is (equal "*[5]int"
+             (nest (type-trace-string)
+                   (canonicalize-type)
+                   (convert 'c-ast "int *a[5];" :deepest t))))
+  (is (equal "const int"
+             (nest (type-trace-string)
+                   (canonicalize-type)
+                   (convert 'c-ast "const int a;" :deepest t))))
+  (is (equal "volatile int"
+             (nest (type-trace-string)
+                   (canonicalize-type)
+                   (convert 'c-ast "volatile int a;" :deepest t))))
+  (is (equal "*restrict int"
+             (nest (type-trace-string)
+                   (canonicalize-type)
+                   (convert 'c-ast "restrict int * a;" :deepest t))))
+  (is (equal "auto int"
+             (nest (type-trace-string)
+                   (canonicalize-type)
+                   (convert 'c-ast "auto int a;" :deepest t))))
+  (is (equal "static int"
+             (nest (type-trace-string)
+                   (canonicalize-type)
+                   (convert 'c-ast "static int a;" :deepest t)))))
+
+(deftest type-from-trace-string-test ()
+  (labels ((as-alist (canonical-type)
+             (list (nest (cons :specifier)
+                         (mapcar #'source-text)
+                         (specifier canonical-type))
+                   (nest (cons :declarator)
+                         (mapcar (lambda (spec)
+                                   (cons (car spec)
+                                         (mapcar #'source-text (cdr spec)))))
+                         (declarator canonical-type)))))
+    (is (equalp (as-alist (type-from-trace-string "int" :c))
+                '((:specifier "int")
+                  (:declarator))))
+    (is (equalp (as-alist (type-from-trace-string "*int" :c))
+                '((:specifier "int")
+                  (:declarator (:POINTER)))))
+    (is (equalp (as-alist (type-from-trace-string "[]int" :c))
+                '((:specifier "int")
+                  (:declarator (:ARRAY)))))
+    (is (equalp (as-alist (type-from-trace-string "[5]int" :c))
+                '((:specifier "int")
+                  (:declarator (:ARRAY "5")))))
+    (is (equalp (as-alist (type-from-trace-string "*[]int" :c))
+                '((:specifier "int")
+                  (:declarator (:POINTER) (:ARRAY)))))
+    (is (equalp (as-alist (type-from-trace-string "*[5]int" :c))
+                '((:specifier "int")
+                  (:declarator (:POINTER) (:ARRAY "5")))))
+    (is (equalp (as-alist (type-from-trace-string "const int" :c))
+                '((:specifier "const" "int")
+                  (:declarator))))
+    (is (equalp (as-alist (type-from-trace-string "volatile int" :c))
+                '((:specifier "volatile" "int")
+                  (:declarator))))
+    (is (equalp (as-alist (type-from-trace-string "*restrict int" :c))
+                '((:specifier "restrict" "int")
+                  (:declarator (:POINTER)))))
+    (is (equalp (as-alist (type-from-trace-string "auto int" :c))
+                '((:specifier "auto" "int")
+                  (:declarator))))
+    (is (equalp (as-alist (type-from-trace-string "static int" :c))
+                '((:specifier "static" "int")
+                  (:declarator))))
+    (is (equalp (as-alist (type-from-trace-string "extern int" :c))
+                '((:specifier "extern" "int")
+                  (:declarator))))
+    (is (equalp (as-alist (type-from-trace-string "register int" :c))
+                '((:specifier "register" "int")
+                  (:declarator))))))

@@ -102,7 +102,7 @@
     `(with-foreign-slots ((statement vars n-vars aux n-aux)
                           ,point
                           (:struct trace-point))
-       (list ;; SEL clang-project instrumentation packs file and AST
+       (list ;; c/cpp-project instrumentation packs file and AST
              ;; indices into the trace ID, with the top bits used as a flag
              ;; to indicate the presence of the file ID.
              ;; Since SEL is likely to be the only Lisp client, it's

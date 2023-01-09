@@ -3,11 +3,16 @@
   (:use :gt/full
         :stefil+
         :software-evolution-library/software-evolution-library
+        :software-evolution-library/software/cpp
+        :software-evolution-library/software/c-cpp
         :software-evolution-library/software/parseable
+        :software-evolution-library/software/tree-sitter
         :trace-db/core)
   (:export :test
            :*soft*
-           :clang-dir
+           :c-tree-sitter-available-p
+           :cpp-tree-sitter-available-p
+           :c/cpp-dir
            :stmt-with-text
            :stmt-starting-with-text))
 (in-package :trace-db/test/util)
@@ -19,16 +24,23 @@
 ;;; Variables and constants
 (defvar *soft* nil "Software used in tests.")
 
-(defconst +clang-dir+
-    (append +trace-db-dir+ (list "test" "etc" "clang"))
-  "Path to the directory holding clang test artifacts.")
+(defconst +c-cpp-dir+
+    (append +trace-db-dir+ (list "test" "etc" "c-cpp"))
+  "Path to the directory holding c/cpp test artifacts.")
 
 
 ;;; Functions
-(defun clang-dir (path)
-  "Return PATH relative to +clang-dir+."
-  (merge-pathnames-as-file (make-pathname :directory +clang-dir+)
-                           path))
+(defun c-tree-sitter-available-p ()
+  (handler-case (progn (make-instance 'sel/sw/tree-sitter::c))
+    (error (e) (declare (ignorable e)) nil)))
+
+(defun cpp-tree-sitter-available-p ()
+  (handler-case (progn (make-instance 'sel/sw/tree-sitter::cpp))
+    (error (e) (declare (ignorable e)) nil)))
+
+(defun c/cpp-dir (path)
+  "Return PATH relative to +c-cpp-dir+."
+  (merge-pathnames-as-file (make-pathname :directory +c-cpp-dir+) path))
 
 (defun stmt-with-text (obj text)
   "Return the AST in OBJ holding TEXT."
