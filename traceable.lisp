@@ -4,10 +4,10 @@
         :software-evolution-library
         :software-evolution-library/utility/debug
         :software-evolution-library/components/test-suite
-        :software-evolution-library/components/instrument
         :trace-db/trace-db
         :trace-db/sexp-trace-db
-        :trace-db/binary-trace-db)
+        :trace-db/binary-trace-db
+        :trace-db/instrumentation/instrument)
   (:export :traceable
            :binary-traceable
            :sexp-traceable

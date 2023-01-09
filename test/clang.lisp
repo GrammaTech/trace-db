@@ -9,7 +9,7 @@
    :software-evolution-library/software/clang
    :software-evolution-library/software/clang-project
    :software-evolution-library/components/test-suite
-   :software-evolution-library/components/instrument
+   :trace-db/instrumentation/instrument
    :trace-db/instrumentation/clang-instrument
    :trace-db/traceable
    :trace-db/trace-db

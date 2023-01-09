@@ -4,13 +4,13 @@
         :software-evolution-library
         :software-evolution-library/utility/task
         :software-evolution-library/components/fodder-database
-        :software-evolution-library/components/instrument
         :software-evolution-library/software/parseable
         :software-evolution-library/software/compilable
         :software-evolution-library/software/clang
         :software-evolution-library/software/project
         :software-evolution-library/software/clang-project
         :trace-db/binary-trace-db
+        :trace-db/instrumentation/instrument
         :trace-db/traceable)
   (:import-from :functional-trees :path-later-p)
   (:export :clang-instrumenter))
