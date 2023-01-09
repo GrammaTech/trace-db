@@ -912,7 +912,7 @@ Returns a list of strings containing C source code."))
                         "int32_t" "long" "int64_t")
                       :test #'name=)
               (list :__GT_TRACEDB_SIGNED
-                    (format nil "sizeof(~a)" (type-qual (ct+-type type)))))
+                    (fmt "sizeof(~a)" (type-qual (ct+-type type)))))
              ;; Unsigned integers
              ((member unqualified-c-type
                       '("unsigned char" "uint8_t" "unsigned short" "uint16_t"
@@ -920,7 +920,7 @@ Returns a list of strings containing C source code."))
                         "size_t")
                       :test #'name=)
               (list :__GT_TRACEDB_UNSIGNED
-                    (format nil "sizeof(~a)" (type-qual (ct+-type type)))))
+                    (fmt "sizeof(~a)" (type-qual (ct+-type type)))))
              ((name= unqualified-c-type "float")
               '(:__GT_TRACEDB_FLOAT "sizeof(float)"))
              ((name= unqualified-c-type "double")
@@ -934,10 +934,10 @@ Returns a list of strings containing C source code."))
                    (hash-table-count (names instrumenter)))))
 
        (type-description-struct (c-type format size)
-         (format nil "{~a, ~a, ~a}"
-                 (get-name-index c-type)
-                 format
-                 size))
+         (fmt "{~a, ~a, ~a}"
+              (get-name-index c-type)
+              format
+              size))
 
        (get-type-index (type format size print-strings)
          (let* ((c-type (type-trace-string type))
@@ -956,10 +956,10 @@ Returns a list of strings containing C source code."))
                            `(,(make-statement :ImplictCastExpr :generic
                                 (list (make-statement :DeclRefExpr :generic
                                                       (list function-name))))
-                             ,(format nil "(~a, ~d, ~{~a~^, ~})"
-                                          +trace-instrument-log-variable-name+
-                                          (length function-args)
-                                          function-args))
+                             ,(fmt "(~a, ~d, ~{~a~^, ~})"
+                                   +trace-instrument-log-variable-name+
+                                   (length function-args)
+                                   function-args))
                            :full-stmt t
                            :annotations '((:instrumentation t))))))
 
@@ -974,24 +974,23 @@ Returns a list of strings containing C source code."))
                   ((and print-strings
                         (array-or-pointer-type type)
                         (string= "char" (type-name type)))
-                   (collect (format nil "~d, ~d, strlen(~a), ~a"
-                                    name-index type-index expr expr)
+                   (collect (fmt "~d, ~d, strlen(~a), ~a"
+                                 name-index type-index expr expr)
                      into blob-args))
 
                   ;; C++ string
                   ((and print-strings
                         (or (string= "string" (type-name type))
                             (string= "std::string" (type-name type))))
-                   (collect (format nil
-                                    "~d, ~d, (~a).length(), (~a).c_str()"
-                                    name-index type-index expr expr)
+                   (collect (fmt "~d, ~d, (~a).length(), (~a).c_str()"
+                                 name-index type-index expr expr)
                      into blob-args))
 
                   ;; Normal variable
                   (t
                    (collect
-                       (format nil "~a, ~a, ~a, ~a, ~a"
-                               name-index type-index size format (ast-name expr))
+                       (fmt "~a, ~a, ~a, ~a, ~a"
+                            name-index type-index size format (ast-name expr))
                      into var-args))))))
           (finally
            (return
@@ -1041,9 +1040,9 @@ Returns a list of strings containing C source code."))
              (cond
                ((eq file-name :stderr) "stderr")
                ((eq file-name :stdout) "stdout")
-               (file-name (format nil "fopen(~s, \"w\")" (namestring file-name)))
-               ((stringp env-name) (format nil "fopen(getenv(~a), \"w\")" env-name))
-               (t (format nil "fopen(buffer, \"w\")"))))
+               (file-name (fmt "fopen(~s, \"w\")" (namestring file-name)))
+               ((stringp env-name) (fmt "fopen(getenv(~a), \"w\")" env-name))
+               (t (fmt "fopen(buffer, \"w\")"))))
            (sort-names-alist (names-alist)
              (sort names-alist #'< :key #'cdr))
            (sort-types-alist (types-alist)
@@ -1051,24 +1050,24 @@ Returns a list of strings containing C source code."))
                    :key [{gethash _ (types instrumenter)} #'car]))
            (names-initialization-str ()
              (if (zerop (hash-table-count (names instrumenter)))
-                 (format nil "const char **~a = NULL"
-                         +names-variable-name+)
-                 (format nil "const char *~a[] = {~{~s, ~}}"
-                         +names-variable-name+
-                         (nest (mapcar [#'ast-name #'car])
-                               (sort-names-alist)
-                               (hash-table-alist)
-                               (names instrumenter)))))
+                 (fmt "const char **~a = NULL"
+                      +names-variable-name+)
+                 (fmt "const char *~a[] = {~{~s, ~}}"
+                      +names-variable-name+
+                      (nest (mapcar [#'ast-name #'car])
+                            (sort-names-alist)
+                            (hash-table-alist)
+                            (names instrumenter)))))
            (types-initialization-str ()
              (if (zerop (hash-table-count (types instrumenter)))
-                 (format nil "const __trace_type_description *~a = NULL"
-                         +types-variable-name+)
-                 (format nil "const __trace_type_description ~a[] = {~{~a, ~}}"
-                         +types-variable-name+
-                         (nest (mapcar [#'source-text #'cdr])
-                               (sort-types-alist)
-                               (hash-table-alist)
-                               (type-descriptions instrumenter))))))
+                 (fmt "const __trace_type_description *~a = NULL"
+                      +types-variable-name+)
+                 (fmt "const __trace_type_description ~a[] = {~{~a, ~}}"
+                      +types-variable-name+
+                      (nest (mapcar [#'source-text #'cdr])
+                            (sort-types-alist)
+                            (hash-table-alist)
+                            (type-descriptions instrumenter))))))
 
     (when contains-entry
       ;; Object contains main() so insert setup code. The goal is to
@@ -1081,12 +1080,12 @@ Returns a list of strings containing C source code."))
       ;; with the trace collector, then opens the trace file and
       ;; writes the header.
       (append-text-to-genome obj
-                             (format nil +write-trace-initialization+
-                                     *trace-instrument-handshake-env-name*
-                                     (file-open-str)
-                                     (names-initialization-str)
-                                     (types-initialization-str)
-                                     (hash-table-count (names instrumenter))
-                                     (hash-table-count (types instrumenter))))))
+                             (fmt +write-trace-initialization+
+                                  *trace-instrument-handshake-env-name*
+                                  (file-open-str)
+                                  (names-initialization-str)
+                                  (types-initialization-str)
+                                  (hash-table-count (names instrumenter))
+                                  (hash-table-count (types instrumenter))))))
 
   obj)

@@ -207,12 +207,10 @@ times.
                        (when (zerop i)
                          (error
                           (make-condition 'trace-error
-                            :text (format nil
-                                          "No traces collected for ~
-                                           test case ~s ~s."
-                                          test-case
-                                          (cons (program-name test-case)
-                                                (program-args test-case)))
+                            :text (fmt "No traces collected for test case ~s ~s."
+                                       test-case
+                                       (cons (program-name test-case)
+                                             (program-args test-case)))
                             :obj test-case
                             :bin bin)))
                      (ignore-empty-trace ()
@@ -250,12 +248,10 @@ times.
                 ;; This usually indicates a problem with the
                 ;; test script or the instrumentation
                 (error (make-condition 'trace-error
-                         :text (format nil
-                                       "No traces collected for ~
-                                        test case ~s ~s."
-                                       test-case
-                                       (cons (program-name test-case)
-                                             (program-args test-case)))
+                         :text (fmt "No traces collected for test case ~s ~s."
+                                    test-case
+                                    (cons (program-name test-case)
+                                          (program-args test-case)))
                          :obj test-case
                          :bin bin)))
             (ignore-empty-trace ()
