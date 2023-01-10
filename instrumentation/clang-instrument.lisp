@@ -18,7 +18,7 @@
 (in-readtable :curry-compose-reader-macros)
 
 
-;;;; Instrumentation
+;;; Instrumentation code
 (defconst +instrument-log-lock-variable-name+ "__sel_trace_file_lock"
   "File lock variable used for instrumentation")
 
@@ -323,6 +323,8 @@ void __attribute__((constructor(101))) __bi_setup() {
 ")
   "C code which initializes the trace file")
 
+
+;;; Data structures
 (defclass clang-instrumenter (instrumenter)
   ((names :accessor names
           :initarg :names
@@ -342,7 +344,6 @@ void __attribute__((constructor(101))) __bi_setup() {
             :documentation "Mapping of ASTs to trace ids."))
   (:documentation "Handles instrumentation for clang software objects."))
 
-
 (defun array-or-pointer-type (type)
   "Is TYPE an array or pointer (but not an array of pointers)?
 * TYPE a type object
@@ -376,46 +377,7 @@ trace statement ID for each AST in OBJ.
           (finally (return ht)))))
 
 
-(defgeneric write-trace-id (instrumenter ast)
-  (:documentation "Generate ASTs which write statement ID to trace.
-* INSTRUMENTER current instrumentation state
-* AST the AST to instrument
-"))
-
-(defmethod write-trace-id ((instrumenter clang-instrumenter) ast)
-  "Generate ASTs which write statement ID to trace.
-* INSTRUMENTER current instrumentation state
-* AST the AST to instrument
-"
-  (make-call-expr "__write_trace_id"
-                  (list (make-var-reference +trace-instrument-log-variable-name+
-                                            nil)
-                        (make-var-reference +instrument-log-lock-variable-name+
-                                            nil)
-                        (make-literal (get-ast-id instrumenter ast) :unsigned))
-                  :fullstmt
-                  :full-stmt t
-                  :annotations '((:instrumentation t))))
-
-(defgeneric write-end-entry (instrumenter)
-  (:documentation "Generate ASTs which write end-entry flag to trace.
-* INSTRUMENTER current instrumentation state
-"))
-
-(defmethod write-end-entry ((instrumenter clang-instrumenter))
-  "Generate ASTs which write end-entry flag to trace.
-* INSTRUMENTER current instrumentation state
-"
-  (declare (ignorable instrumenter))
-  (make-call-expr "__write_end_entry"
-                  (list (make-var-reference +trace-instrument-log-variable-name+
-                                            nil)
-                        (make-var-reference +instrument-log-lock-variable-name+
-                                            nil))
-                  :fullstmt
-                  :full-stmt t
-                  :annotations '((:instrumentation t))))
-
+;;; Instrumentation
 (defmethod instrumented-p ((clang clang))
   "Return true if CLANG is instrumented
 * CLANG a clang software object
@@ -435,55 +397,12 @@ Creates a CLANG-INSTRUMENTER for OBJ and calls its instrument method.
            :ast-ids (get-ast-ids-ht obj))
          args))
 
-(defun instrument-create-value (obj ast before after)
-  (let ((wrap (not (traceable-stmt-p obj ast)))
-        (stmts (append (mapcar {add-semicolon _ :after} before)
-                       (list (@ obj (ast-path obj ast)))
-                       (mapcar {add-semicolon _ :both} after))))
-    ;; Wrap in compound statement if needed
-    (if wrap
-        (make-statement
-         :CompoundStmt
-         :FullStmt
-         `("{" ,@(interleave stmts ";") ";}")
-         :full-stmt t
-         :annotations '((:instrumentation t)))
-        stmts)))
-
-(defgeneric enclosing-traceable-stmt (software ast)
-  (:documentation "Return the first ancestor of AST in SOFTWARE which may
-be a full stmt.  If a statement is reached which is not itself traceable,
-but which could be made traceable by wrapping with curly braces, return that.")
-  (:method ((obj clang) (ast clang-ast))
-    (cond
-      ((traceable-stmt-p obj ast) ast)
-      ;; Wrap AST in a CompoundStmt to make it traceable.
-      ((can-be-made-traceable-p obj ast) ast)
-      (:otherwise
-       (when-let ((parent (get-parent-ast obj ast)))
-         (enclosing-traceable-stmt obj parent))))))
-
-(defmethod can-be-made-traceable-p ((obj clang) (ast clang-ast))
-  (or (traceable-stmt-p obj ast)
-      (unless (or (ast-guard-stmt ast) ; Don't wrap guard statements.
-                  (eq :CompoundStmt ; Don't wrap CompoundStmts.
-                      (ast-class ast)))
-        (when-let ((parent (get-parent-ast obj ast)))
-          ;; Is a child of a statement which might have a hanging body.
-          (member (ast-class parent) +clang-wrapable-parents+)))))
-
-(defmethod traceable-stmt-p ((obj clang) (ast clang-ast))
-  (and (ast-full-stmt ast)
-       (not (function-decl-p ast))
-       (not (ast-in-macro-expansion ast))
-       (not (eq :NullStmt (ast-class ast)))
-       (get-parent-ast obj ast)
-       (eq :CompoundStmt (ast-class (get-parent-ast obj ast)))))
-
 (defmethod instrument
     ((instrumenter clang-instrumenter)
      &key functions functions-after trace-file trace-env
-       (filter (constantly t)) (num-threads 0))
+       (filter (constantly t)) (num-threads 0)
+     &aux (obj (software instrumenter))
+       (entry (get-entry obj)))
   "Use INSTRUMENTER to instrument a clang software object.
 
 * INSTRUMENTER current instrumentation state
@@ -496,60 +415,70 @@ but which could be made traceable by wrapping with curly braces, return that.")
          returning nil if the AST should be filtered from instrumentation
 * NUM-THREADS number of threads to use for instrumentation"
   (declare (ignorable num-threads))
-  (let* ((obj (software instrumenter))
-         (entry (get-entry obj)))
-    (labels
-        ((sort-asts (obj asts)
-           (sort asts {path-later-p obj}))
-         (instrument-asts (obj)
-           "Generate instrumentation for all ASTs in OBJ."
-           (nest (mapcar
-                   (lambda (ast)
-                     (instrument-ast ast
-                                     (mappend {funcall _ instrumenter ast}
-                                              functions)
-                                     (mappend {funcall _ instrumenter ast}
-                                              functions-after))))
-                 (sort-asts obj)
-                 (remove-if-not {funcall filter obj})
-                 (remove-if-not {can-be-made-traceable-p obj})
-                 (asts obj)))
-         (instrument-ast (ast extra-stmts extra-stmts-after)
-           "Generate instrumentation for AST.
-Returns a list of (AST INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER).
-"
-           `(,ast
-             ;; Instrumentation before
-             (;; Instrument before
-              ,(write-trace-id instrumenter ast)
-              ,@extra-stmts
-              ,(write-end-entry instrumenter))
-             (;; Instrumentation after
-              ,@(when functions-after
-                      `(,(write-trace-id instrumenter ast)
-                        ,@extra-stmts-after
-                        ,(write-end-entry instrumenter)))))))
+  (labels
+      ((sort-asts (obj asts)
+         (sort asts {path-later-p obj}))
+       (instrument-ast (ast extra-stmts extra-stmts-after)
+         "Generate instrumentation for AST. Returns a list of
+          (AST INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)."
+         `(,ast
+           ;; Instrumentation before
+           (;; Instrument before
+            ,(write-trace-id instrumenter ast)
+            ,@extra-stmts
+            ,(write-end-entry instrumenter))
+           (;; Instrumentation after
+            ,@(when functions-after
+                `(,(write-trace-id instrumenter ast)
+                  ,@extra-stmts-after
+                  ,(write-end-entry instrumenter))))))
+       (instrument-asts (obj)
+         "Generate instrumentation for all ASTs in OBJ."
+         (nest (mapcar
+                 (lambda (ast)
+                   (instrument-ast ast
+                                   (mappend {funcall _ instrumenter ast}
+                                            functions)
+                                   (mappend {funcall _ instrumenter ast}
+                                            functions-after))))
+               (sort-asts obj)
+               (remove-if-not {funcall filter obj})
+               (remove-if-not {can-be-made-traceable-p obj})
+               (asts obj)))
+       (instrument-create-value (obj ast before after)
+         (let ((wrap (not (traceable-stmt-p obj ast)))
+               (stmts (append (mapcar {add-semicolon _ :after} before)
+                              (list (@ obj (ast-path obj ast)))
+                              (mapcar {add-semicolon _ :both} after))))
+           ;; Wrap in compound statement if needed
+           (if wrap
+               (make-statement
+                :CompoundStmt
+                :FullStmt
+                `("{" ,@(interleave stmts ";") ";}")
+                :full-stmt t
+                :annotations '((:instrumentation t)))
+               stmts))))
 
     ;; Apply mutations to instrument OBJ.
     ;; Note: These mutations are sent as a list to `apply-mutation-ops`
     ;; and are performed sequently.  This offers a performance improvement
     ;; over calling `apply-mutation-ops` multiple times.
-    (apply-mutation-ops
-      obj
-      (iter (for (ast before after) in (instrument-asts obj))
-            (collect (if (not (traceable-stmt-p obj ast))
-                         `(:set (:stmt1 . ,ast)
-                                (:value1 . ,{instrument-create-value
-                                             obj
-                                             ast
-                                             before
-                                             after}))
-                         `(:splice (:stmt1 . ,ast)
-                                   (:value1 . ,{instrument-create-value
-                                                obj
-                                                ast
-                                                before
-                                                after})))))))
+    (nest (apply-mutation-ops obj)
+          (iter (for (ast before after) in (instrument-asts obj))
+                (collect (if (not (traceable-stmt-p obj ast))
+                             `(:set (:stmt1 . ,ast)
+                                    (:value1 . ,{instrument-create-value
+                                                 obj
+                                                 ast
+                                                 before
+                                                 after}))
+                             `(:splice (:stmt1 . ,ast)
+                                       (:value1 . ,{instrument-create-value
+                                                    obj
+                                                    ast
+                                                    before
+                                                    after}))))))
 
     ;; Add support code for tracing to obj
     (prepend-text-to-genome obj +write-trace-forward-declarations+)
@@ -693,6 +622,59 @@ Returns a list of (AST INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER).
 
   clang-project)
 
+
+;;; Tracing functions
+(defgeneric enclosing-traceable-stmt (software ast)
+  (:documentation "Return the first ancestor of AST in SOFTWARE which may
+be a full stmt.  If a statement is reached which is not itself traceable,
+but which could be made traceable by wrapping with curly braces, return that.")
+  (:method ((obj clang) (ast clang-ast))
+    (cond
+      ((traceable-stmt-p obj ast) ast)
+      ;; Wrap AST in a CompoundStmt to make it traceable.
+      ((can-be-made-traceable-p obj ast) ast)
+      (:otherwise
+       (when-let ((parent (get-parent-ast obj ast)))
+         (enclosing-traceable-stmt obj parent))))))
+
+(defmethod can-be-made-traceable-p ((obj clang) (ast clang-ast))
+  (or (traceable-stmt-p obj ast)
+      (unless (or (ast-guard-stmt ast) ; Don't wrap guard statements.
+                  (eq :CompoundStmt ; Don't wrap CompoundStmts.
+                      (ast-class ast)))
+        (when-let ((parent (get-parent-ast obj ast)))
+          ;; Is a child of a statement which might have a hanging body.
+          (member (ast-class parent) +clang-wrapable-parents+)))))
+
+(defmethod traceable-stmt-p ((obj clang) (ast clang-ast))
+  (and (ast-full-stmt ast)
+       (not (function-decl-p ast))
+       (not (ast-in-macro-expansion ast))
+       (not (eq :NullStmt (ast-class ast)))
+       (get-parent-ast obj ast)
+       (eq :CompoundStmt (ast-class (get-parent-ast obj ast)))))
+
+
+;;; Variable instrumentation
+(defmethod var-instrument
+    (key (instrumenter clang-instrumenter) (ast clang-ast) &key print-strings)
+  "Generate ASTs for variable instrumentation.
+* KEY a function used to pull the variable list out of AST
+* INSTRUMENTER current instrumentation state
+* AST the AST to instrument
+"
+  (iter (for var in (funcall key ast))
+        (when-let* ((software (software instrumenter))
+                    (type (when-let ((var-type (find-var-type software var)))
+                            (typedef-type software var-type)))
+                    (name (aget :name var))
+                    ;; Don't instrument nameless variables
+                    (has-name (not (emptyp (source-text name)))))
+          (collect (cons (ast-name name) type) into names-and-types))
+        (finally
+         (return (instrument-c-exprs instrumenter names-and-types
+                                     print-strings)))))
+
 (defgeneric instrument-c-exprs (instrumenter exprs-and-types print-strings)
   (:documentation "Generate C code to print the values of expressions.
 EXPRS-AND-TYPES is a list of (string . clang-type) pairs.
@@ -814,24 +796,47 @@ Returns a list of strings containing C source code."))
                                   "__write_trace_blobs"
                                   blob-args)))))))))
 
-(defmethod var-instrument
-    (key (instrumenter clang-instrumenter) (ast clang-ast) &key print-strings)
-  "Generate ASTs for variable instrumentation.
-* KEY a function used to pull the variable list out of AST
+
+;;; Helper functions
+(defgeneric write-trace-id (instrumenter ast)
+  (:documentation "Generate ASTs which write statement ID to trace.
+* INSTRUMENTER current instrumentation state
+* AST the AST to instrument
+"))
+
+(defmethod write-trace-id ((instrumenter clang-instrumenter) ast)
+  "Generate ASTs which write statement ID to trace.
 * INSTRUMENTER current instrumentation state
 * AST the AST to instrument
 "
-  (iter (for var in (funcall key ast))
-        (when-let* ((software (software instrumenter))
-                    (type (when-let ((var-type (find-var-type software var)))
-                            (typedef-type software var-type)))
-                    (name (aget :name var))
-                    ;; Don't instrument nameless variables
-                    (has-name (not (emptyp (source-text name)))))
-          (collect (cons (ast-name name) type) into names-and-types))
-        (finally
-         (return (instrument-c-exprs instrumenter names-and-types
-                                     print-strings)))))
+  (make-call-expr "__write_trace_id"
+                  (list (make-var-reference +trace-instrument-log-variable-name+
+                                            nil)
+                        (make-var-reference +instrument-log-lock-variable-name+
+                                            nil)
+                        (make-literal (get-ast-id instrumenter ast) :unsigned))
+                  :fullstmt
+                  :full-stmt t
+                  :annotations '((:instrumentation t))))
+
+(defgeneric write-end-entry (instrumenter)
+  (:documentation "Generate ASTs which write end-entry flag to trace.
+* INSTRUMENTER current instrumentation state
+"))
+
+(defmethod write-end-entry ((instrumenter clang-instrumenter))
+  "Generate ASTs which write end-entry flag to trace.
+* INSTRUMENTER current instrumentation state
+"
+  (declare (ignorable instrumenter))
+  (make-call-expr "__write_end_entry"
+                  (list (make-var-reference +trace-instrument-log-variable-name+
+                                            nil)
+                        (make-var-reference +instrument-log-lock-variable-name+
+                                            nil))
+                  :fullstmt
+                  :full-stmt t
+                  :annotations '((:instrumentation t))))
 
 (defun initialize-tracing (instrumenter file-name env-name contains-entry
                            &aux (obj (software instrumenter)))
