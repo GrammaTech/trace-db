@@ -532,7 +532,7 @@ Creates a CLANG-INSTRUMENTER for OBJ and calls its instrument method.
 * ARGS additional arguments are passed through to the instrumenter method.
 "
   (apply #'instrument
-         (make-instance 'clang-instrumenter
+         (make 'clang-instrumenter
            :software obj
            :ast-ids (get-ast-ids-ht obj))
          args))
@@ -835,7 +835,7 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
               (apply #'instrument instrumenter args))
             (iter (for obj in (remove-if #'get-entry (mapcar #'cdr files)))
                   (for file-id upfrom 0)
-                  (collect (make-instance 'clang-instrumenter
+                  (collect (make 'clang-instrumenter
                              :software obj
                              :names names
                              :types types
@@ -851,7 +851,7 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
         (declare (ignorable path))
         (when (get-entry obj)
           (apply #'instrument
-                 (make-instance 'clang-instrumenter
+                 (make 'clang-instrumenter
                    :software obj
                    :names names
                    :types types
@@ -864,7 +864,7 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
         (when-let ((entry (get-entry obj)))
           (prepend-text-to-genome obj +write-trace-forward-declarations+)
           (append-text-to-genome obj +write-trace-implementation+)
-          (initialize-tracing (make-instance 'clang-instrumenter
+          (initialize-tracing (make 'clang-instrumenter
                                 :software obj
                                 :names names
                                 :types types

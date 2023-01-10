@@ -189,7 +189,7 @@ KWARGS are passed on to the OPEN call."
             (nth index (trace-metadata db))))))
 
 (defmethod restrict-to-file ((db sexp-trace-db) file-id)
-  (make-instance 'single-file-sexp-trace-db :parent-db db :file-id file-id))
+  (make 'single-file-sexp-trace-db :parent-db db :file-id file-id))
 
 (defmethod trace-metadata ((db single-file-sexp-trace-db))
   (trace-metadata (parent-db db)))

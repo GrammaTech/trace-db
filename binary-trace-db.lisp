@@ -267,8 +267,8 @@ the results."
          (db-pointer (when (not (emptyp (cdr (assoc :db restore))))
                        (c-deserialize-trace-db (cdr (assoc :db restore)))))
          (trace-metadata (cdr (assoc :trace-metadata restore))))
-    (make-instance 'binary-trace-db :db-pointer db-pointer
-                                    :trace-metadata trace-metadata)))
+    (make 'binary-trace-db :db-pointer db-pointer
+                           :trace-metadata trace-metadata)))
 
 (defmethod n-traces ((db binary-trace-db))
   "Return the number of traces stored in DB."
@@ -638,7 +638,7 @@ software objects.")
 
 (defmethod restrict-to-file ((db binary-trace-db) file-id)
   "Return a wrapper around DB which restricts results by FILE-ID."
-  (make-instance 'single-file-binary-trace-db
+  (make 'single-file-binary-trace-db
     :parent-db db
     :db-pointer (db-pointer db)
     :file-id file-id))

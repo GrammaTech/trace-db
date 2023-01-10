@@ -39,29 +39,29 @@
   "Example test inputs for GCD.")
 
 (defvar *gcd-test-suite*
-  (make-instance 'test-suite
+  (make 'test-suite
     :test-cases (iter (for input in +gcd-inputs+)
-                      (collecting (make-instance 'test-case
+                      (collecting (make 'test-case
                                     :program-name (car input)
                                     :program-args (cdr input))))))
 
 (defixture gcd-clang
   (:setup (setf *soft*
-                (from-file (make-instance 'clang)
+                (from-file (make 'clang)
                            (clang-dir #P"gcd/gcd.c"))))
   (:teardown
    (setf *soft* nil)))
 
 (defixture gcd-wo-curlies-clang
   (:setup (setf *soft*
-                (from-file (make-instance 'clang)
+                (from-file (make 'clang)
                            (clang-dir #P"gcd/gcd-wo-curlies.c"))))
   (:teardown
    (setf *soft* nil)))
 
 (defixture traceable-gcd
   (:setup (setf *soft*
-                (from-file (make-instance 'clang-traceable)
+                (from-file (make 'clang-traceable)
                            (clang-dir #P"gcd/gcd.c"))))
   (:teardown
    (setf *soft* nil)))
@@ -69,7 +69,7 @@
 (defixture c-strings
   (:setup
    (setf *soft*
-         (from-file (make-instance 'clang)
+         (from-file (make 'clang)
                     (clang-dir #P"strings/c-strings.c"))))
   (:teardown
    (setf *soft* nil)))
@@ -77,7 +77,7 @@
 (defixture cpp-strings
   (:setup
    (setf *soft*
-         (from-file (make-instance 'clang :compiler "clang++")
+         (from-file (make 'clang :compiler "clang++")
                     (clang-dir #P"strings/cpp-strings.cpp"))))
   (:teardown
    (setf *soft* nil)))
@@ -85,7 +85,7 @@
 (defixture shadow-clang
   (:setup
    (setf *soft*
-         (from-file (make-instance 'clang)
+         (from-file (make 'clang)
                     (clang-dir #P"shadow/shadow.c"))))
   (:teardown
    (setf *soft* nil)))
@@ -93,7 +93,7 @@
 (defixture binary-search-clang
   (:setup
    (setf *soft*
-         (from-file (make-instance 'clang)
+         (from-file (make 'clang)
                     (clang-dir #P"binary-search/binary-search.c"))))
   (:teardown
    (setf *soft* nil)))
@@ -101,7 +101,7 @@
 (defixture clang-project
   (:setup
    (setf *soft*
-         (from-file (make-instance 'clang-project
+         (from-file (make 'clang-project
                      :build-command "make foo"
                      :artifacts '("foo"))
                     (clang-dir #P"multi-file/"))))
@@ -111,7 +111,7 @@
 (defixture grep-project
   (:setup
    (setf *soft*
-         (from-file (make-instance 'clang-project
+         (from-file (make 'clang-project
                      :build-command "make grep"
                      :artifacts '("grep"))
                     (clang-dir #P"grep/"))))
@@ -120,14 +120,14 @@
 
 (defixture print-env-clang
   (:setup (setf *soft*
-                (from-file (make-instance 'clang :compiler "clang")
+                (from-file (make 'clang :compiler "clang")
                            (clang-dir #P"print-env/print-env.c"))))
   (:teardown (setf *soft* nil)))
 
 (defixture long-running-program-clang
   (:setup
    (setf *soft*
-         (from-file (make-instance 'clang)
+         (from-file (make 'clang)
                     (clang-dir #P"long-running/long-running-program.c"))))
   (:teardown
    (setf *soft* nil)))
@@ -551,7 +551,7 @@ prints unique counters in the trace"
                     (if (find-restart 'keep-partial-asts)
                         (invoke-restart 'keep-partial-asts)
                         (error e)))))
-    (let ((soft (make-instance 'clang
+    (let ((soft (make 'clang
                  :genome "int test(int) { return 1; }")))
       (instrument soft :functions
                   (list (lambda (instrumenter ast)
@@ -713,7 +713,7 @@ prints unique counters in the trace"
     (with-temporary-file (:pathname bin)
       (phenome *soft* :bin bin)
       (let ((proc (start-test bin
-                              (make-instance 'test-case :program-name bin)
+                              (make 'test-case :program-name bin)
                               :wait nil))
             (*process-kill-timeout* 4))
         (finish-test proc)
@@ -729,7 +729,7 @@ prints unique counters in the trace"
            (read-stream-content-into-string
             (process-info-output
              (start-test bin
-                         (make-instance 'test-case
+                         (make 'test-case
                            :program-name bin
                            :program-args '("__sel_foo"))
                          :wait t
@@ -748,10 +748,10 @@ prints unique counters in the trace"
     (ensure-directories-exist dir)))
 
 (deftest collect-traces-handles-directory-phenomes ()
-  (let ((obj (make-instance 'collect-traces-handles-directory-phenomes-mock)))
+  (let ((obj (make 'collect-traces-handles-directory-phenomes-mock)))
     (handler-bind ((trace-error (lambda (c)
                                   (declare (ignorable c))
                                   (invoke-restart 'ignore-empty-trace))))
-      (collect-traces obj (make-instance 'test-suite)))
+      (collect-traces obj (make 'test-suite)))
     (is (not (probe-file (phenome-dir obj)))
         "collect-traces did not remove a phenome directory")))

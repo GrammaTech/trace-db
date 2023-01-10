@@ -87,9 +87,9 @@ was already in place then leave it alone."
 (defgeneric reset-traces (software)
   (:documentation "Reset the SOFTWARE's traces.")
   (:method ((obj binary-traceable))
-    (setf (traces obj) (make-instance 'binary-trace-db)))
+    (setf (traces obj) (make 'binary-trace-db)))
   (:method ((obj sexp-traceable))
-    (setf (traces obj) (make-instance 'sexp-trace-db))))
+    (setf (traces obj) (make 'sexp-trace-db))))
 
 (defgeneric collect-traces (software test-suite
                             &key max-trace-points bin num-traces)
