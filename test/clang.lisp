@@ -25,7 +25,7 @@
 
 (define-software clang-traceable (clang binary-traceable) ())
 
-(define-constant +gcd-inputs+
+(defconst +gcd-inputs+
     '((:bin "1071" "1029")
       (:bin "555" "666")
       (:bin "678" "987")
@@ -36,8 +36,7 @@
       (:bin "513332" "91583315")
       (:bin "112" "135")
       (:bin "310" "55"))
-  :test #'equalp
-  :documentation "Example test inputs for GCD.")
+  "Example test inputs for GCD.")
 
 (defvar *gcd-test-suite*
   (make-instance 'test-suite

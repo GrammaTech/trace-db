@@ -41,9 +41,8 @@
 (defvar *trace-instrument-handshake-env-name* "__SEL_HANDSHAKE_FILE"
   "Default environment variable in which to store log file.")
 
-(define-constant +trace-instrument-log-variable-name+ "__sel_trace_file"
-  :test #'string=
-  :documentation "Variable used for instrumentation.")
+(defconst +trace-instrument-log-variable-name+ "__sel_trace_file"
+  "Variable used for instrumentation.")
 
 (define-software binary-traceable (traceable) ()
   (:documentation "Instrumentable software with support for collecting dynamic

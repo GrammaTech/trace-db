@@ -15,10 +15,9 @@
 (in-package :trace-db/binary-trace-db)
 (in-readtable :curry-compose-reader-macros)
 
-(define-constant +lib-dir+
+(defconst +lib-dir+
     (make-pathname :directory (append +trace-db-dir+ (list "cffi-interface")))
-  :test #'equalp
-  :documentation "Path to directory holding shared library.")
+  "Path to directory holding shared library.")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (unless (probe-file (merge-pathnames-as-file +lib-dir+ "libtrace-db.so"))

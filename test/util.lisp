@@ -19,10 +19,9 @@
 ;;; Variables and constants
 (defvar *soft* nil "Software used in tests.")
 
-(define-constant +clang-dir+
+(defconst +clang-dir+
     (append +trace-db-dir+ (list "test" "etc" "clang"))
-  :test #'equalp
-  :documentation "Path to the directory holding clang test artifacts.")
+  "Path to the directory holding clang test artifacts.")
 
 
 ;;; Functions

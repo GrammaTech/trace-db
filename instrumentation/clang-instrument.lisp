@@ -20,11 +20,10 @@
 
 
 ;;;; Instrumentation
-(define-constant +instrument-log-lock-variable-name+ "__sel_trace_file_lock"
-  :test #'string=
-  :documentation "File lock variable used for instrumentation")
+(defconst +instrument-log-lock-variable-name+ "__sel_trace_file_lock"
+  "File lock variable used for instrumentation")
 
-(define-constant +write-trace-forward-declarations+
+(defconst +write-trace-forward-declarations+
     (concatenate 'string "
 #ifndef __GT_TRACEDB_FORWARD_DECLARATIONS
 #define __GT_TRACEDB_FORWARD_DECLARATIONS
@@ -93,11 +92,10 @@ static void __write_buffer_size(void *out,
 #endif
 
 ")
-  :test #'string=
-  :documentation "C code to include in all instrumented files.")
+  "C code to include in all instrumented files.")
 
 
-(define-constant +write-trace-implementation+
+(defconst +write-trace-implementation+
     "
 #ifndef __GT_TRACEDB_IMPLEMENTATION
 #define __GT_TRACEDB_IMPLEMENTATION
@@ -286,18 +284,15 @@ static void __write_buffer_size(void *out,
 
 #endif
 "
-  :test #'string=
-  :documentation "C code which implements trace writing.")
+  "C code which implements trace writing.")
 
-(define-constant +names-variable-name+ "names"
-  :test #'string=
-  :documentation "Name of the variable containing instrumentation var names.")
+(defconst +names-variable-name+ "names"
+  "Name of the variable containing instrumentation var names.")
 
-(define-constant +types-variable-name+ "types"
-  :test #'string=
-  :documentation "Name of the variable containing instrumentation types.")
+(defconst +types-variable-name+ "types"
+  "Name of the variable containing instrumentation types.")
 
-(define-constant +write-trace-initialization+
+(defconst +write-trace-initialization+
     (concatenate 'string "
 #include <pthread.h>
 #include <stdio.h>
@@ -336,8 +331,7 @@ void __attribute__((constructor(101))) __bi_setup() {
                        " +types-variable-name+ ", ~d);
 }
 ")
-  :test #'string=
-  :documentation "C code which initializes the trace file")
+  "C code which initializes the trace file")
 
 (defclass clang-instrumenter (instrumenter)
   ((names :accessor names
