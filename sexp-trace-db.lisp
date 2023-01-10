@@ -52,6 +52,9 @@ software objects.")
                   (remove-if-not [{eq (file-id db)} #'cdr {assoc :f}] trace))
                 (traces (parent-db db)))))
 
+(-> read-sexp-trace ((or pathname string) &key (:timeout number)
+                                               (:max-trace-points number))
+                    (values list &optional))
 (defun read-sexp-trace (file &key timeout max-trace-points)
   "Read a trace from FILE-NAME with `read-trace-stream'."
   (when-let ((in (open-file-timeout file timeout)))
@@ -59,6 +62,9 @@ software objects.")
         (read-trace-stream in :max-trace-points max-trace-points)
       (close in))))
 
+(-> read-trace-stream (stream &key (:predicate function)
+                                   (:max-trace-points (or null number)))
+                      (values list))
 (defun read-trace-stream
     (in &key (predicate #'identity) max-trace-points &aux (collected 0))
   "Read a trace from the IN.
@@ -76,6 +82,7 @@ limits number of trace points to collect."
         (incf collected)
         (collect trace-point)))
 
+(-> open-file-timeout ((or pathname string) number &rest list) t)
 (defun open-file-timeout (filename seconds &rest kwargs)
   "Try to open file, but give up after waiting SECONDS.
 KWARGS are passed on to the OPEN call."

@@ -26,6 +26,8 @@
                        "libtrace-db.so"))))
 
 (defvar *trace-db-loaded* nil)
+
+(-> load-libtrace-db () t)
 (defun load-libtrace-db ()
   (unless *trace-db-loaded*
     (pushnew +lib-dir+ *foreign-library-directories*

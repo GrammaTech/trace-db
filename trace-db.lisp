@@ -71,6 +71,7 @@ FILTER ----------- A function taking (FILE LOCATION VARS...) as arguments.
   (:documentation "Return a wrapper around DB which restricts results by
 FILE-ID."))
 
+(-> get-statement-and-bindings (list) (values list &optional))
 (defun get-statement-and-bindings (pt)
   "Return the file/statement counters and variable bindings for the given PT."
   (list (cdr (assoc :f pt))
