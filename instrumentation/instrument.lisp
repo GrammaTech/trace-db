@@ -19,7 +19,7 @@
 (defgeneric instrumented-p (obj)
   (:documentation "Return true if OBJ is instrumented"))
 
-(defgeneric instrument (obj &key points functions functions-after
+(defgeneric instrument (obj &key functions functions-after
                                  trace-file trace-env filter
                                  num-threads &allow-other-keys)
   (:documentation
@@ -28,7 +28,6 @@
 The indices printed here are the position of the ast in (asts obj).
 
 Keyword arguments are as follows:
-  POINTS --------------- alist of additional values to print at specific points
   FUNCTIONS ------------ functions to calculate instrumentation at each point
   FUNCTIONS-AFTER ------ functions to calculate instrumentation after each point
   TRACE-FILE ----------- file for trace output

@@ -72,9 +72,6 @@ static void __write_trace_id(void *out,
                              const unsigned long long statement_id);
 
 __attribute__((unused))
-static void __write_trace_aux(void *out, const unsigned long long value);
-
-__attribute__((unused))
 static void __write_end_entry(void *out, void *lock);
 
 __attribute__((unused))
@@ -159,12 +156,6 @@ static void __write_trace_id(void *out,
 
     fputc(__GT_TRACEDB_STATEMENT_ID, (FILE *) out);
     fwrite(&statement_id, sizeof(uint64_t), 1, (FILE *) out);
-}
-
-static void __write_trace_aux(void *out, const unsigned long long value)
-{
-    fputc(__GT_TRACEDB_AUXILIARY, (FILE *) out);
-    fwrite(&value, sizeof(uint64_t), 1, (FILE *) out);
 }
 
 static void __write_end_entry(void *out, void *lock)
@@ -406,25 +397,6 @@ trace statement ID for each AST in OBJ.
                   :full-stmt t
                   :annotations '((:instrumentation t))))
 
-(defgeneric write-trace-aux (instrumenter value)
-  (:documentation "Generate ASTs which write aux entries to trace.
-* INSTRUMENTER current instrumentation state
-* VALUE the auxiliary value to write
-"))
-
-(defmethod write-trace-aux ((instrumenter clang-instrumenter) value)
-  "Generate ASTs which write aux entries to trace.
-* INSTRUMENTER current instrumentation state
-* VALUE the auxiliary value to write
-"
-  (declare (ignorable instrumenter))
-  (make-call-expr "__write_trace_aux"
-                  (list (make-var-reference +trace-instrument-log-variable-name+ nil)
-                        (make-literal value))
-                  :fullstmt
-                  :full-stmt t
-                  :annotations '((:instrumentation t))))
-
 (defgeneric write-end-entry (instrumenter)
   (:documentation "Generate ASTs which write end-entry flag to trace.
 * INSTRUMENTER current instrumentation state
@@ -510,12 +482,11 @@ but which could be made traceable by wrapping with curly braces, return that.")
 
 (defmethod instrument
     ((instrumenter clang-instrumenter)
-     &key points functions functions-after trace-file trace-env
+     &key functions functions-after trace-file trace-env
        (filter (constantly t)) (num-threads 0))
   "Use INSTRUMENTER to instrument a clang software object.
 
 * INSTRUMENTER current instrumentation state
-* POINTS alist of additional values to print at specific points
 * FUNCTIONS  functions to calculate instrumentation at each point
 * FUNCTIONS-AFTER functions to calculate instrumentation after each point
 * TRACE-FILE file or stream (stdout/stderr) for trace output
@@ -526,42 +497,24 @@ but which could be made traceable by wrapping with curly braces, return that.")
 * NUM-THREADS number of threads to use for instrumentation"
   (declare (ignorable num-threads))
   (let* ((obj (software instrumenter))
-         (entry (get-entry obj))
-         ;; Promote every counter key in POINTS to the enclosing full
-         ;; statement with a CompoundStmt as a parent.  Otherwise they
-         ;; will not appear in the output.
-         (points
-          (remove nil
-            (mapcar (lambda (pair)
-                      (destructuring-bind (ast . value) pair
-                        (let ((parent (enclosing-traceable-stmt obj ast)))
-                          (if parent (cons parent value)
-                              (warn "Point ~s doesn't match traceable AST."
-                                    ast)))))
-                    points))))
+         (entry (get-entry obj)))
     (labels
         ((sort-asts (obj asts)
            (sort asts {path-later-p obj}))
          (instrument-asts (obj)
-           "Generate instrumentation for all ASTs in OBJ.  As a side-effect,
-update POINTS after instrumenting ASTs."
+           "Generate instrumentation for all ASTs in OBJ."
            (nest (mapcar
                    (lambda (ast)
-                     (prog1
-                         (instrument-ast ast
-                                         (mappend {funcall _ instrumenter ast}
-                                                  functions)
-                                         (mappend {funcall _ instrumenter ast}
-                                                  functions-after)
-                                         (when points
-                                           (aget ast points :test #'equalp)))
-                       (when points
-                         (setf (aget ast points :test #'equalp) nil)))))
+                     (instrument-ast ast
+                                     (mappend {funcall _ instrumenter ast}
+                                              functions)
+                                     (mappend {funcall _ instrumenter ast}
+                                              functions-after))))
                  (sort-asts obj)
                  (remove-if-not {funcall filter obj})
                  (remove-if-not {can-be-made-traceable-p obj})
                  (asts obj)))
-         (instrument-ast (ast extra-stmts extra-stmts-after aux-values)
+         (instrument-ast (ast extra-stmts extra-stmts-after)
            "Generate instrumentation for AST.
 Returns a list of (AST INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER).
 "
@@ -569,7 +522,6 @@ Returns a list of (AST INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER).
              ;; Instrumentation before
              (;; Instrument before
               ,(write-trace-id instrumenter ast)
-              ,@(mapcar {write-trace-aux instrumenter} aux-values)
               ,@extra-stmts
               ,(write-end-entry instrumenter))
              (;; Instrumentation after
@@ -598,11 +550,6 @@ Returns a list of (AST INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER).
                                                 ast
                                                 before
                                                 after})))))))
-
-    ;; Warn about any leftover un-inserted points.
-    (mapc (lambda (point)
-            (warn "No insertion point found for point ~a." point))
-          (remove-if-not #'cdr points))
 
     ;; Add support code for tracing to obj
     (prepend-text-to-genome obj +write-trace-forward-declarations+)

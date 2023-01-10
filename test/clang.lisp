@@ -217,29 +217,6 @@
           (is (every {aget :c} trace))
           (is (= 1 (length trace))))))))
 
-(deftest (instrumentation-insertion-w-points-test :long-running) ()
-  (with-fixture gcd-clang
-    (let ((instrumented
-           (handler-bind ((warning #'muffle-warning))
-             (instrument (copy *soft*)
-                         :points
-                         (iter (for ast in (stmt-asts *soft*))
-                               (for i upfrom 0)
-                               (collect (cons ast (if (evenp i) '(1 2) '(3 4) ))))
-                         :trace-file :stderr))))
-      (is (scan (quote-meta-chars "__write_trace_aux(__sel_trace_file")
-                (genome-string instrumented))
-          "We find code to print auxiliary values in the instrumented source.")
-      ;; Instrumented compiles and runs.
-      (with-temporary-file (:pathname bin)
-        (is (zerop (nth-value 1 (ignore-phenome-errors
-                                 (phenome instrumented :bin bin)))))
-        (is (probe-file bin))
-        (let ((trace (get-gcd-trace bin)))
-          (is (every [«or {equalp #(1 2)} {equalp #(3 4)}»
-                      {aget :aux}]
-                     trace)))))))
-
 (deftest (instrumentation-insertion-w-trace-file-test :long-running) ()
   (with-fixture gcd-clang
     (with-temporary-file (:pathname trace)
@@ -274,30 +251,6 @@
                                  (phenome instrumented :bin bin)))))
         (is (probe-file bin))
         (is (not (emptyp (get-gcd-trace bin))))))))
-
-(deftest
-    (instrumentation-insertion-w-points-and-added-blocks-test :long-running) ()
-  (with-fixture gcd-wo-curlies-clang
-    (let* ((cookie 1234)
-           (instrumented
-            (instrument (copy *soft*)
-                        :points
-                        `((,(stmt-with-text *soft* "b - a") ,cookie))
-                        :trace-file :stderr)))
-      ;; Instrumented program holds the value 1234.
-      (is (scan (quote-meta-chars (format nil "~d" cookie))
-                (genome-string instrumented))
-          "The point trace value ~S appears in the instrumented program text."
-          cookie)
-      ;; Instrumented compiles and runs.
-      (with-temporary-file (:pathname bin)
-        (is (zerop (nth-value 1 (ignore-phenome-errors
-                                 (phenome instrumented :bin bin)))))
-        (is (probe-file bin))
-        (let ((trace (get-gcd-trace bin)))
-          (is (find-if [{equalp `#(,cookie)} {aget :aux}]
-                       trace)
-              "The point trace value ~S appears in the trace" cookie))))))
 
 (deftest (instrumentation-after-insertion-mutation-test :long-running) ()
   "Ensure after applying an insert mutation, the instrumented software
