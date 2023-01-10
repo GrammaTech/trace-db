@@ -13,8 +13,7 @@
         :trace-db/binary-trace-db
         :trace-db/traceable)
   (:import-from :functional-trees :path-later-p)
-  (:export :clang-instrumenter
-           :instrument-c-exprs))
+  (:export :clang-instrumenter))
 (in-package :trace-db/instrumentation/clang-instrument)
 (in-readtable :curry-compose-reader-macros)
 
