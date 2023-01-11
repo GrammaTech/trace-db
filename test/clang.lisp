@@ -206,7 +206,9 @@
   (with-fixture gcd-clang
     (let ((instrumented (instrument (copy *soft*)
                                     :filter (lambda (obj ast)
-                                              (eq 92 (index-of-ast obj ast)))
+                                              (declare (ignorable obj))
+                                              (string= "return 0;"
+                                                       (source-text ast)))
                                     :trace-file :stderr)))
       ;; Instrumented compiles and runs.
       (with-temporary-file (:pathname bin)
