@@ -774,35 +774,33 @@ Returns a list of (AST RETURN-TYPE INSTRUMENTATION-BEFORE INSTRUMENTATION-AFTER)
     (uninstrument-genome-epilogue clang)
 
     ;; Remove instrumented ASTs - blocks first, then individual statements
-    (let ((*matching-free-var-retains-name-bias* 1.0)
-          (*matching-free-function-retains-name-bias* 1.0))
-      (apply-mutation-ops
-        clang
-        (iter (for ast in (nest (reverse)
-                                (remove-if-not #'block-p)
-                                (remove-if-not [{aget :instrumentation}
-                                                #'ast-annotations])
-                                (asts clang)))
-              (collect `(:set (:stmt1 . ,ast)
-                              (:value1 .
-                               ,{lookup clang
-                                        (nest (ast-path clang)
-                                              (first)
-                                              (remove-if
-                                                [{aget :instrumentation}
-                                                 #'ast-annotations])
-                                              (child-asts)
-                                              (lookup clang)
-                                              (ast-path clang ast))})))))
+    (apply-mutation-ops
+      clang
+      (iter (for ast in (nest (reverse)
+                              (remove-if-not #'block-p)
+                              (remove-if-not [{aget :instrumentation}
+                                              #'ast-annotations])
+                              (asts clang)))
+            (collect `(:set (:stmt1 . ,ast)
+                            (:value1 .
+                             ,{lookup clang
+                                      (nest (ast-path clang)
+                                            (first)
+                                            (remove-if
+                                              [{aget :instrumentation}
+                                               #'ast-annotations])
+                                            (child-asts)
+                                            (lookup clang)
+                                            (ast-path clang ast))})))))
 
-      (apply-mutation-ops
-        clang
-        (iter (for ast in (nest (reverse)
-                                (remove-if #'block-p)
-                                (remove-if-not [{aget :instrumentation}
-                                                #'ast-annotations])
-                                (asts clang)))
-              (collect `(:splice (:stmt1 . ,ast) (:value1 . nil)))))))
+    (apply-mutation-ops
+      clang
+      (iter (for ast in (nest (reverse)
+                              (remove-if #'block-p)
+                              (remove-if-not [{aget :instrumentation}
+                                              #'ast-annotations])
+                              (asts clang)))
+            (collect `(:splice (:stmt1 . ,ast) (:value1 . nil))))))
 
   ;; Return the software object
   clang)
