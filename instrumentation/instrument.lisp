@@ -17,7 +17,9 @@
 ;;;; Instrumentation
 
 (defgeneric instrumented-p (obj)
-  (:documentation "Return true if OBJ is instrumented"))
+  (:documentation "Return true if OBJ is instrumented")
+  (:method ((project project))
+    (some #'instrumented-p (mapcar #'cdr (instrumentation-files project)))))
 
 (defgeneric instrument (obj &key functions functions-after
                                  trace-file trace-env filter
@@ -46,30 +48,21 @@ Keyword arguments are as follows:
   (:documentation "Remove instrumentation from OBJ
 
 Keyword arguments are as follows:
-  NUM-THREADS ---------- number of threads to use for uninstrumenting"))
+  NUM-THREADS ---------- number of threads to use for uninstrumenting")
+  (:method ((project project) &key (num-threads 1))
+    (task-map num-threads
+              #'uninstrument
+              (mapcar #'cdr (instrumentation-files project)))
+    project))
 
 (defgeneric instrumentation-files (project)
   (:documentation
-   "Return files in PROJECT in the order which they would be instrumented"))
+   "Return files in PROJECT in the order which they would be instrumented")
+  (:method ((project project))
+    (evolve-files project)))
 
 (defclass instrumenter ()
   ((software :accessor software :initarg :software :initform nil))
   (:documentation "Base class for objects which handle instrumentation.
 Stores instrumentation state and provides methods for instrumentation
 operations."))
-
-(defmethod instrumented-p ((project project))
-  "Return true if PROJECT is instrumented."
-  (some #'instrumented-p (mapcar #'cdr (evolve-files project))))
-
-(defmethod instrumentation-files ((project project))
-  "Return files in PROJECT in the order which they would be instrumented."
-  (evolve-files project))
-
-(defmethod uninstrument ((project project)
-                         &key (num-threads 1))
-  "Remove instrumentation from PROJECT."
-  (task-map num-threads
-            #'uninstrument
-            (mapcar #'cdr (instrumentation-files project)))
-  project)
