@@ -1049,7 +1049,7 @@ Returns a list of strings containing C source code.")
 annotation."
   (convert ast-class
            `((:class . :text-fragment)
-             (:text . ,(fmt "~a" text))
+             (:text . ,text)
              (:annotations . ((:instrumentation . t))))))
 
 (-> instrumentation-ast-p (ast) (values t &optional))
