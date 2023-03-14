@@ -563,8 +563,8 @@ Creates a C/CPP-INSTRUMENTER for OBJ and calls its instrument method.
   ;; Insert log setup code in other-files with an entry point.
   (iter (for obj in (mapcar #'cdr (other-files c/cpp-project)))
         (when (contains-main-p obj)
-          (prepend-text-to-genome obj +write-trace-forward-declarations+)
-          (append-text-to-genome obj +write-trace-implementation+)
+          (prepend-instrumentation-code obj +write-trace-forward-declarations+)
+          (append-instrumentation-code obj +write-trace-implementation+)
           (initialize-tracing (make 'c/cpp-instrumenter
                                 :software obj
                                 :names names
