@@ -1052,31 +1052,36 @@ annotation."
   "Return non-NIL if AST is part of instrumentation."
   (aget :instrumentation (ast-annotations ast)))
 
+(-> immediate-children (ast) (values list &optional))
+(defun immediate-children (ast)
+  "Return the immediate children (not below the first level) of AST."
+  (remove-if-not [{length= 1} {ast-path ast}] (children ast)))
+
 (-> prepend-instrumentation-code (c/cpp string) (values c/cpp &optional))
-(defun prepend-instrumentation-code (obj text &aux (root (genome obj)))
+(defun prepend-instrumentation-code (obj text)
   "Prepend TEXT with instrumentation declarations to the top-level of OBJ."
-  (nest (prepend-append-genome-helper obj :prepend)
-        (prepend-before-asts (car (direct-children root)))
-        (list)
-        (create-instrumentation-ast (language-ast-class obj) text)))
+  (nest (inject-instrumentation-setup-code obj text #'prepend-before-asts)
+        (car)
+        (immediate-children)
+        (genome obj)))
 
 (-> append-instrumentation-code (c/cpp string) (values c/cpp &optional))
-(defun append-instrumentation-code (obj text &aux (root (genome obj)))
+(defun append-instrumentation-code (obj text)
   "Append TEXT with instrumentation definitions to the top-level of OBJ."
-  (nest (prepend-append-genome-helper obj :append)
-        (append-after-asts (lastcar (direct-children root)))
-        (list)
-        (create-instrumentation-ast (language-ast-class obj) text)))
+  (nest (inject-instrumentation-setup-code obj text #'append-after-asts)
+        (lastcar)
+        (immediate-children)
+        (genome obj)))
 
-(-> prepend-append-genome-helper (c/cpp keyword ast) (values c/cpp &optional))
-(defun prepend-append-genome-helper (obj mode ast &aux (root (genome obj)))
-  "Replace the start of end of OBJ's genome with AST depending on the value
-of MODE passed."
-  (setf (genome obj)
-        (nest (copy root :children)
-              (if (eq mode :prepend)
-                  (append (list ast) (cdr (direct-children root)))
-                  (append (butlast (direct-children root)) (list ast)))))
+(-> inject-instrumentation-setup-code (c/cpp string function ast)
+                                      (values c/cpp &optional))
+(defun inject-instrumentation-setup-code (obj text action target)
+  "Inject TEXT with instrumentation setup code at TARGET in OBJ."
+  (nest (setf (genome obj))
+        (with (genome obj) target)
+        (funcall action target)
+        (list)
+        (create-instrumentation-ast (language-ast-class obj) text))
   obj)
 
 (-> wrap-before-after-asts (ast list list) (values ast &optional))
