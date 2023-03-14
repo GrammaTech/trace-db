@@ -483,7 +483,7 @@ Creates a C/CPP-INSTRUMENTER for OBJ and calls its instrument method.
     ;; Add support code for tracing to obj
     (prepend-instrumentation-setup-code obj +write-trace-forward-declarations+)
     (append-instrumentation-setup-code obj +write-trace-implementation+)
-    (initialize-tracing instrumenter trace-file trace-env (contains-main-p obj))
+    (initialize-tracing instrumenter trace-file trace-env (main-declarator obj))
 
     ;; Add flag to allow building with pthreads
     (appendf (flags obj) (list "-lpthread"))
@@ -563,7 +563,7 @@ Creates a C/CPP-INSTRUMENTER for OBJ and calls its instrument method.
 
   ;; Insert log setup code in other-files with an entry point.
   (iter (for obj in (mapcar #'cdr (other-files c/cpp-project)))
-        (when (contains-main-p obj)
+        (when-let ((main (main-declarator obj)))
           (prepend-instrumentation-setup-code obj +write-trace-forward-declarations+)
           (append-instrumentation-setup-code obj +write-trace-implementation+)
           (initialize-tracing (make 'c/cpp-instrumenter
@@ -573,7 +573,7 @@ Creates a C/CPP-INSTRUMENTER for OBJ and calls its instrument method.
                                 :type-descriptions type-descriptions)
                               (plist-get :trace-file args)
                               (plist-get :trace-env args)
-                              t)))
+                              main)))
 
   c/cpp-project)
 
@@ -962,16 +962,16 @@ Returns a list of strings containing C source code.")
 (-> initialize-tracing (c/cpp-instrumenter
                         (or string pathname keyword null)
                         (or string null)
-                        boolean)
+                        (or ast null))
                        (values c/cpp &optional))
-(defun initialize-tracing (instrumenter file-name env-name contains-main-p
+(defun initialize-tracing (instrumenter file-name env-name main
                            &aux (obj (software instrumenter)))
   "Insert code to initialize tracing and/or define the log variable.
 
 * INSTRUMENTER current instrumentation state with software object to instrument
 * FILE-NAME fixed name for the trace output file or stream (:stdout/:stderr)
 * ENV-NAME environment variable from which to read the trace output file
-* CONTAINS-MAIN-P does this object contain the entry point?"
+* MAIN declarator for the main entry point, if present"
   (assert (typep obj 'c/cpp))
 
   (labels ((file-open-str ()
@@ -1011,7 +1011,7 @@ Returns a list of strings containing C source code.")
                             (hash-table-alist)
                             (type-descriptions instrumenter))))))
 
-    (when contains-main-p
+    (when main
       ;; Object contains main() so insert setup code. The goal is to
       ;; insert this exactly once in each executable while avoiding
       ;; link problems. It doesn't need to be in the same file as
@@ -1034,13 +1034,16 @@ Returns a list of strings containing C source code.")
 
 (defgeneric contains-main-p (obj)
   (:documentation "Return non-NIL if the main function exists in OBJ.")
+  (:method ((obj c/cpp)) (not (null (main-declarator obj))))
+  (:method ((obj t)) nil))
+
+(defgeneric main-declarator (obj)
+  (:documentation "Return the function declarator for main in OBJ, if possible.")
   (:method ((obj c/cpp))
-    (nest (not)
-          (null)
+    (nest (first)
           (remove-if-not [{equal "main"} #'declarator-name])
           (remove-if-not (of-type 'c/cpp-function-declarator))
-          (convert 'list)
-          (genome obj)))
+          (asts obj)))
   (:method ((obj t)) nil))
 
 (-> create-instrumentation-ast (symbol string)
