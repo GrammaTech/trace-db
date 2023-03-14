@@ -619,9 +619,14 @@ but which could be made traceable by wrapping with curly braces, return that.")
 (defun traceable-stmt-parent-ast-type-p (obj ast)
   "Return non-NIL if the parent of AST in OBJ is of a type which may have
 traceable children."
-  (let ((parents (get-parent-asts* obj ast)))
+  (let* ((parents (get-parent-asts* obj ast))
+         (enclosing-function (find-if (of-type 'c/cpp-function-definition)
+                                      parents)))
     (and (member (car parents) +traceable-parent-types+ :test #'typep)
-         (some (of-type 'compound-ast) parents))))
+         (some (of-type 'compound-ast) parents)
+         (not (member (when enclosing-function (function-name enclosing-function))
+                      '("struct" "enum" "class")
+                      :test #'equal)))))
 
 (-> possibly-incomplete-ast-p (c/cpp ast) (values boolean &optional))
 (defun possibly-incomplete-ast-p (obj ast &aux (root (genome obj)))
