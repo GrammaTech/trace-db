@@ -954,7 +954,7 @@ Returns a list of strings containing C source code.")
   (:method ((instrumenter c/cpp-instrumenter)
             &aux (sw (software instrumenter)))
     (nest (create-instrumentation-ast (language-ast-class sw))
-          (fmt "__write_end_entry(~a, ~a);"
+          (fmt "__write_end_entry(~a, ~a);~%"
                +trace-instrument-log-variable-name+
                +instrument-log-lock-variable-name+))))
 

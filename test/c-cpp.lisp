@@ -253,7 +253,7 @@
         (let ((location (position-if {scan matcher}
                         (lines (genome-string instrumented)))))
           (is (scan (quote-meta-chars "b = b - a;")
-                    (nth location (lines (genome-string instrumented)))))))
+                    (nth (1+ location) (lines (genome-string instrumented)))))))
       ;; Finally, lets be sure we still compile.
       (with-temporary-file (:pathname bin)
         (is (zerop (nth-value 1 (ignore-phenome-errors
