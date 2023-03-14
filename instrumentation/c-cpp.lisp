@@ -481,8 +481,8 @@ Creates a C/CPP-INSTRUMENTER for OBJ and calls its instrument method.
           (finally (setf (genome obj) root)))
 
     ;; Add support code for tracing to obj
-    (prepend-instrumentation-code obj +write-trace-forward-declarations+)
-    (append-instrumentation-code obj +write-trace-implementation+)
+    (prepend-instrumentation-setup-code obj +write-trace-forward-declarations+)
+    (append-instrumentation-setup-code obj +write-trace-implementation+)
     (initialize-tracing instrumenter trace-file trace-env (contains-main-p obj))
 
     ;; Add flag to allow building with pthreads
@@ -563,8 +563,8 @@ Creates a C/CPP-INSTRUMENTER for OBJ and calls its instrument method.
   ;; Insert log setup code in other-files with an entry point.
   (iter (for obj in (mapcar #'cdr (other-files c/cpp-project)))
         (when (contains-main-p obj)
-          (prepend-instrumentation-code obj +write-trace-forward-declarations+)
-          (append-instrumentation-code obj +write-trace-implementation+)
+          (prepend-instrumentation-setup-code obj +write-trace-forward-declarations+)
+          (append-instrumentation-setup-code obj +write-trace-implementation+)
           (initialize-tracing (make 'c/cpp-instrumenter
                                 :software obj
                                 :names names
@@ -1020,7 +1020,7 @@ Returns a list of strings containing C source code.")
       ;; before any other code. It optionally performs a handshake
       ;; with the trace collector, then opens the trace file and
       ;; writes the header.
-      (nest (append-instrumentation-code obj)
+      (nest (append-instrumentation-setup-code obj)
             (fmt +write-trace-initialization+
                  *trace-instrument-handshake-env-name*
                  (file-open-str)
@@ -1062,16 +1062,16 @@ annotation."
   "Return the immediate children (not below the first level) of AST."
   (remove-if-not [{length= 1} {ast-path ast}] (children ast)))
 
-(-> prepend-instrumentation-code (c/cpp string) (values c/cpp &optional))
-(defun prepend-instrumentation-code (obj text)
+(-> prepend-instrumentation-setup-code (c/cpp string) (values c/cpp &optional))
+(defun prepend-instrumentation-setup-code (obj text)
   "Prepend TEXT with instrumentation declarations to the top-level of OBJ."
   (nest (inject-instrumentation-setup-code obj text #'prepend-before-asts)
         (car)
         (immediate-children)
         (genome obj)))
 
-(-> append-instrumentation-code (c/cpp string) (values c/cpp &optional))
-(defun append-instrumentation-code (obj text)
+(-> append-instrumentation-setup-code (c/cpp string) (values c/cpp &optional))
+(defun append-instrumentation-setup-code (obj text)
   "Append TEXT with instrumentation definitions to the top-level of OBJ."
   (nest (inject-instrumentation-setup-code obj text #'append-after-asts)
         (lastcar)
