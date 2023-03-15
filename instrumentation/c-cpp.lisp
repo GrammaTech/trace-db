@@ -359,6 +359,12 @@ void __attribute__((constructor(101))) __bi_setup() {
     c/cpp-labeled-statement)
   "Parent types of ASTs which may be instrumented/traced.")
 
+(defconst +error-ast-types+
+  '(variation-point
+    parse-error-ast
+    source-text-fragment)
+  "Types of error AST types.")
+
 
 ;;; Data structures
 (defclass c/cpp-instrumenter (instrumenter)
@@ -1089,13 +1095,27 @@ annotation."
   "Return the immediate children (not below the first level) of AST."
   (remove-if-not [{length= 1} {ast-path ast}] (children ast)))
 
+(-> concretize-error-ast (function ast) (values ast &optional))
+(defun concretize-error-ast (getter ast)
+  "If AST is an error node, replace it with a non-error child if possible."
+  (if (member ast +error-ast-types+ :test #'typep)
+      (or (nest (concretize-error-ast getter)
+                (funcall getter)
+                (immediate-children ast))
+          ast)
+      ast))
+
 (-> prepend-instrumentation-setup-code (c/cpp string &optional ast)
                                        (values c/cpp &optional))
 (defun prepend-instrumentation-setup-code (obj text &optional target)
   "Prepend TEXT with instrumentation setup to TARGET or
 the top-level of OBJ."
   (nest (inject-instrumentation-setup-code obj text #'prepend-before-asts)
-        (or target (car (immediate-children (genome obj))))))
+        (or target
+            (nest (concretize-error-ast #'first)
+                  (first)
+                  (immediate-children)
+                  (genome obj)))))
 
 (-> append-instrumentation-setup-code (c/cpp string &optional ast)
                                       (values c/cpp &optional))
@@ -1103,7 +1123,11 @@ the top-level of OBJ."
   "Append TEXT with instrumentation setup to TARGET or
 the top-level of OBJ."
   (nest (inject-instrumentation-setup-code obj text #'append-after-asts)
-        (or target (lastcar (immediate-children (genome obj))))))
+        (or target
+            (nest (concretize-error-ast #'lastcar)
+                  (lastcar)
+                  (immediate-children)
+                  (genome obj)))))
 
 (-> inject-instrumentation-setup-code (c/cpp string function ast)
                                       (values c/cpp &optional))
