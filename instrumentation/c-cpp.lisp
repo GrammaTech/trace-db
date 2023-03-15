@@ -25,6 +25,9 @@
 (defconst +instrument-log-lock-variable-name+ "__sel_trace_file_lock"
   "File lock variable used for instrumentation")
 
+(defconst +trace-entry-macro-name+ "__GT_TRACEDB_ENTRY_POINT"
+  "Name of the macro to be defined for entry points")
+
 (defconst +write-trace-forward-declarations+
     (concatenate 'string "
 #ifndef __GT_TRACEDB_FORWARD_DECLARATIONS
@@ -285,8 +288,18 @@ static void __write_buffer_size(void *out,
 (defconst +types-variable-name+ "types"
   "Name of the variable containing instrumentation types.")
 
+(defconst +write-trace-entry-macro+
+    (concatenate 'string "
+#ifndef " +trace-entry-macro-name+ "
+#define " +trace-entry-macro-name+ "
+#endif
+")
+  "C code which defines a macro for trace database entry points.")
+
 (defconst +write-trace-initialization+
     (concatenate 'string "
+#ifdef " +trace-entry-macro-name+ "
+
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
@@ -323,6 +336,8 @@ void __attribute__((constructor(101))) __bi_setup() {
                        " +names-variable-name+ ", ~d,
                        " +types-variable-name+ ", ~d);
 }
+
+#endif
 ")
   "C code which initializes the trace file")
 
@@ -1020,6 +1035,7 @@ Returns a list of strings containing C source code.")
       ;; before any other code. It optionally performs a handshake
       ;; with the trace collector, then opens the trace file and
       ;; writes the header.
+      (prepend-instrumentation-setup-code obj +write-trace-entry-macro+ main)
       (nest (append-instrumentation-setup-code obj)
             (fmt +write-trace-initialization+
                  *trace-instrument-handshake-env-name*
