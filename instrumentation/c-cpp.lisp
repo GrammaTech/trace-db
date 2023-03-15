@@ -1065,21 +1065,21 @@ annotation."
   "Return the immediate children (not below the first level) of AST."
   (remove-if-not [{length= 1} {ast-path ast}] (children ast)))
 
-(-> prepend-instrumentation-setup-code (c/cpp string) (values c/cpp &optional))
-(defun prepend-instrumentation-setup-code (obj text)
-  "Prepend TEXT with instrumentation declarations to the top-level of OBJ."
+(-> prepend-instrumentation-setup-code (c/cpp string &optional ast)
+                                       (values c/cpp &optional))
+(defun prepend-instrumentation-setup-code (obj text &optional target)
+  "Prepend TEXT with instrumentation setup to TARGET or
+the top-level of OBJ."
   (nest (inject-instrumentation-setup-code obj text #'prepend-before-asts)
-        (car)
-        (immediate-children)
-        (genome obj)))
+        (or target (car (immediate-children (genome obj))))))
 
-(-> append-instrumentation-setup-code (c/cpp string) (values c/cpp &optional))
-(defun append-instrumentation-setup-code (obj text)
-  "Append TEXT with instrumentation definitions to the top-level of OBJ."
+(-> append-instrumentation-setup-code (c/cpp string &optional ast)
+                                      (values c/cpp &optional))
+(defun append-instrumentation-setup-code (obj text &optional target)
+  "Append TEXT with instrumentation setup to TARGET or
+the top-level of OBJ."
   (nest (inject-instrumentation-setup-code obj text #'append-after-asts)
-        (lastcar)
-        (immediate-children)
-        (genome obj)))
+        (or target (lastcar (immediate-children (genome obj))))))
 
 (-> inject-instrumentation-setup-code (c/cpp string function ast)
                                       (values c/cpp &optional))
