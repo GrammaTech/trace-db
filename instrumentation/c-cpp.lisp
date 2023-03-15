@@ -517,7 +517,8 @@ Creates a C/CPP-INSTRUMENTER for OBJ and calls its instrument method.
                      (evolve-files c/cpp-project)
                      :key #'cdr)
           (remove-if [#'not #'contains-main-p]
-                     (evolve-files c/cpp-project)
+                     (append (evolve-files c/cpp-project)
+                             (other-files c/cpp-project))
                      :key #'cdr)))
 
 (defmethod instrument ((c/cpp-project c/cpp-project) &rest args
