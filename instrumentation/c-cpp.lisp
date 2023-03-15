@@ -505,25 +505,32 @@ Creates a C/CPP-INSTRUMENTER for OBJ and calls its instrument method.
 
     obj))
 
-(defmethod uninstrument ((obj c/cpp) &key (num-threads 0)
-                         &aux (root (genome obj)))
+(defmethod uninstrument ((obj c/cpp) &key (num-threads 0))
   "Remove instrumentation from OBJ."
   (declare (ignorable num-threads))
 
-  ;; Remove instrumentation ASTs - top-level first, then blocks,
-  ;; and finally individual statements.
-  (setf (genome obj)
-        (nest (remove-if #'instrumentation-ast-p)
-              (mapcar (lambda (ast)
-                        (when (and (instrumentation-ast-p ast)
-                                   (typep ast 'compound-ast))
-                          (nest (first)
-                                (remove-if #'instrumentation-ast-p)
-                                (children)
-                                (lookup root)
-                                (ast-path root ast))))
-                      root)))
-  obj)
+  ;; Remove instrumentation ASTs - blocks first, then individual statements.
+  (nest (apply-mutation-ops obj)
+        (mapcar (lambda (ast)
+                  `(:set (:stmt1 . ,ast)
+                         (:value1 .
+                          ,{lookup obj
+                                   (nest (ast-path obj)
+                                         (first)
+                                         (direct-children)
+                                         (lookup obj)
+                                         (ast-path obj ast))}))))
+        (reverse)
+        (remove-if-not (of-type 'compound-ast))
+        (remove-if-not #'instrumentation-ast-p)
+        (asts obj))
+
+  (nest (apply-mutation-ops obj)
+        (mapcar (lambda (ast)
+                  `(:cut (:stmt1 . ,ast))))
+        (reverse)
+        (remove-if-not #'instrumentation-ast-p)
+        (asts obj)))
 
 (defmethod instrumentation-files ((c/cpp-project c/cpp-project))
   "Return files in C/CPP-PROJECT in the order which they would be instrumented
