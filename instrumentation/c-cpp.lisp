@@ -813,6 +813,9 @@ if __STDC__ is defined."
 
 
 ;;; Variable instrumentation
+(defparameter +identifier-regex+
+  (create-scanner "^[A-Za-z_][A-Za-z0-9_]*$"))
+
 (defmethod var-instrument ((key function)
                            (instrumenter c/cpp-instrumenter)
                            (ast c/cpp-ast)
@@ -823,17 +826,43 @@ if __STDC__ is defined."
 * AST the AST to instrument"
   (iter (for var in (funcall key ast))
         (and-let* ((software (software instrumenter))
+                   (root (genome software))
                    (name (aget :name var))
-                   ((not (emptyp name)))
                    (decl (aget :decl var))
-                   ((and (typep decl 'variable-declaration-ast)
-                         (not (typep decl 'c/cpp-enumerator))))
+                   (scope (aget :scope var))
+                   ((var-instrument-p name decl scope root))
                    (type (canonicalize-type decl :software software)))
           (collect (cons name type) into names-and-types))
         (finally
          (return (instrument-c-exprs instrumenter
                                      names-and-types
                                      print-strings)))))
+
+(-> var-instrument-p (string ast ast ast) (values boolean &optional))
+(defun var-instrument-p (name decl scope root)
+  "Return non-NIL if we should instrument this variable entry."
+  (labels ((has-name-p (name)
+             (not (emptyp name)))
+           (attribute-p (name)
+             (starts-with-subseq "__attribute" name))
+           (valid-identifier-p (name)
+             (scan +identifier-regex+ name))
+           (variable-declaration-p (ast)
+             (typep ast 'variable-declaration-ast))
+           (enumerator-p (ast)
+             (typep ast 'c/cpp-enumerator))
+           (function-pointer-parameter-p (root scope decl)
+             (let ((parents (nest (butlast)
+                                  (take-until {eq scope})
+                                  (get-parent-asts root decl))))
+               (and (some (of-type 'c/cpp-function-declarator) parents)
+                    (some (of-type 'c/cpp-parameter-list) parents)))))
+    (and (has-name-p name)
+         (valid-identifier-p name)
+         (variable-declaration-p decl)
+         (not (enumerator-p decl))
+         (not (attribute-p name))
+         (not (function-pointer-parameter-p root scope decl)))))
 
 (defgeneric instrument-c-exprs (instrumenter names-and-types print-strings)
   (:documentation "Generate C code to print the values of expressions.
