@@ -711,7 +711,7 @@ if __STDC__ is defined."
   (create-scanner "^(\\*|\\[[^\\[\\]]*\\])+"))
 
 (defparameter +integer-regex+
-  (Create-scanner "[0-9]+"))
+  (create-scanner "^[0-9]+$"))
 
 (defparameter *type-from-trace-string-cache*
   (make-thread-safe-hash-table :test #'equal))
@@ -725,7 +725,9 @@ if __STDC__ is defined."
            (array-str ()
              (nest (apply #'concatenate 'string)
                    (mapcar (lambda (array-spec)
-                             (if (second array-spec)
+                             (if (nest (scan +integer-regex+)
+                                       (source-text)
+                                       (second array-spec))
                                  (fmt "[~d]" (source-text (second array-spec)))
                                  "[]")))
                    (remove-if-not [{eq :array} #'car])
