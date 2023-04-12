@@ -653,7 +653,7 @@ traceable children."
     (and (member (car parents) +traceable-parent-types+ :test #'typep)
          (some (of-type 'compound-ast) parents)
          (not (member (when enclosing-function (function-name enclosing-function))
-                      '("struct" "enum" "class")
+                      '("struct" "enum" "class" "namespace")
                       :test #'equal)))))
 
 (-> possibly-incomplete-ast-p (c/cpp ast) (values boolean &optional))
