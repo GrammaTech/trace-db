@@ -647,14 +647,26 @@ but which could be made traceable by wrapping with curly braces, return that.")
 (defun traceable-stmt-parent-ast-type-p (obj ast)
   "Return non-NIL if the parent of AST in OBJ is of a type which may have
 traceable children."
-  (let* ((parents (get-parent-asts* obj ast))
-         (enclosing-function (find-if (of-type 'c/cpp-function-definition)
-                                      parents)))
+  (let ((parents (get-parent-asts* obj ast)))
     (and (member (car parents) +traceable-parent-types+ :test #'typep)
          (some (of-type 'compound-ast) parents)
-         (not (member (when enclosing-function (function-name enclosing-function))
-                      '("struct" "enum" "class" "namespace")
-                      :test #'equal)))))
+         (not (misidentified-ast-p ast parents)))))
+
+(-> misidentified-ast-p (ast list) (values boolean &optional))
+(defun misidentified-ast-p (ast parents)
+  "Return non-NIL if AST is misidentified by tree-sitter and not traceable."
+  (labels ((misidentified-function-p (parents)
+             (when-let ((enclosing-function
+                         (find-if (of-type 'c/cpp-function-definition)
+                                  parents)))
+               (not (null (member (function-name enclosing-function)
+                                  '("struct" "enum" "class" "namespace")
+                                  :test #'equal)))))
+           (misidentified-if-clause-p (ast)
+             (or (starts-with-subseq "else if" (source-text ast))
+                 (starts-with-subseq "else" (source-text ast)))))
+    (or (misidentified-function-p parents)
+        (misidentified-if-clause-p ast))))
 
 (-> possibly-incomplete-ast-p (c/cpp ast) (values boolean &optional))
 (defun possibly-incomplete-ast-p (obj ast &aux (root (genome obj)))
