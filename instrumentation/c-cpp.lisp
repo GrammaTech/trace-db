@@ -641,6 +641,7 @@ but which could be made traceable by wrapping with curly braces, return that.")
   "Return non-NIL if AST is of a type which may be traced."
   (and (null (member ast +traceable-parent-types+ :test #'typep))
        (member ast +traceable-stmt-types+ :test #'typep)
+       (not (empty-statement-ast-p ast))
        (not (possibly-incomplete-ast-p obj ast))))
 
 (-> traceable-stmt-parent-ast-type-p (c/cpp ast) (values boolean &optional))
@@ -683,14 +684,18 @@ int foo;
 
 `int foo` is incomplete as the previous macro adds an additional qualifier
 if __STDC__ is defined."
-  (labels ((variation-point-ast-p (ast)
-             (typep ast 'variation-point))
+  (labels ((error-ast-p (ast)
+             (not (null (member ast +error-ast-types+ :test #'typep))))
            (possibly-incomplete-macro-p (ast)
              (and (or (typep ast 'c/cpp-preproc-if)
                       (typep ast 'c/cpp-preproc-ifdef))
-                  (variation-point-ast-p (lastcar (butlast (children ast))))))
+                  (let ((prev (previous-sibling root ast))
+                        (next (next-sibling root ast)))
+                    (or (error-ast-p prev)
+                        (error-ast-p next)
+                        (empty-statement-ast-p next)))))
            (possibly-incomplete-ast-helper (ast)
-             (or (variation-point-ast-p ast)
+             (or (error-ast-p ast)
                  (possibly-incomplete-macro-p ast))))
     (or (possibly-incomplete-ast-helper (previous-sibling root ast))
         (possibly-incomplete-ast-helper (next-sibling root ast)))))
@@ -702,6 +707,11 @@ if __STDC__ is defined."
 (defun next-sibling (root ast)
   "Return the next sibling of AST in ROOT."
   (car (find-following (constantly t) root ast)))
+
+(defun empty-statement-ast-p (ast)
+  "Return non-NIL if AST is an empty statement."
+  (and (typep ast 'expression-statement-ast)
+       (equalp (trim-whitespace (source-text ast)) ";")))
 
 
 ;;; Types tracing functions
