@@ -633,15 +633,15 @@ but which could be made traceable by wrapping with curly braces, return that.")
            (not (possibly-incomplete-ast-p obj ast)))))
 
 (defmethod traceable-stmt-p ((obj c/cpp) (ast ast))
-  (and (traceable-stmt-ast-type-p ast)
-       (traceable-stmt-parent-ast-type-p obj ast)
-       (not (possibly-incomplete-ast-p obj ast))))
+  (and (traceable-stmt-ast-type-p obj ast)
+       (traceable-stmt-parent-ast-type-p obj ast)))
 
-(-> traceable-stmt-ast-type-p (ast) (values list &optional))
-(defun traceable-stmt-ast-type-p (ast)
+(-> traceable-stmt-ast-type-p (c/cpp ast) (values boolean &optional))
+(defun traceable-stmt-ast-type-p (obj ast)
   "Return non-NIL if AST is of a type which may be traced."
   (and (null (member ast +traceable-parent-types+ :test #'typep))
-       (member ast +traceable-stmt-types+ :test #'typep)))
+       (member ast +traceable-stmt-types+ :test #'typep)
+       (not (possibly-incomplete-ast-p obj ast))))
 
 (-> traceable-stmt-parent-ast-type-p (c/cpp ast) (values boolean &optional))
 (defun traceable-stmt-parent-ast-type-p (obj ast)
