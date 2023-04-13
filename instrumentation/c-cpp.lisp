@@ -650,7 +650,8 @@ traceable children."
   (let ((parents (get-parent-asts* obj ast)))
     (and (member (car parents) +traceable-parent-types+ :test #'typep)
          (some (of-type 'compound-ast) parents)
-         (not (misidentified-ast-p ast parents)))))
+         (not (misidentified-ast-p ast parents))
+         (not (possibly-incomplete-ast-p obj (car parents))))))
 
 (-> misidentified-ast-p (ast list) (values boolean &optional))
 (defun misidentified-ast-p (ast parents)
