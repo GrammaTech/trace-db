@@ -759,9 +759,16 @@ if __STDC__ is defined."
              (fmt "~a~a~a"
                   (pointer-str)
                   (array-str)
-                  (source-text (car (specifier canonical-type))))))
+                  (source-text (car (specifier canonical-type)))))
+           (trim-to-single-line (str)
+             (nest (trim-whitespace)
+                   (drop-suffix "{")
+                   (trim-whitespace)
+                   (car)
+                   (split-sequence #\Newline str))))
 
-    (nest (fmt "~{~a~^ ~}")
+    (nest (trim-to-single-line)
+          (fmt "~{~a~^ ~}")
           (cons (add-declators-to-first-specifier))
           (mapcar #'source-text)
           (cdr)
