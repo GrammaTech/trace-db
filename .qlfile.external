@@ -1,4 +1,3 @@
-git cffi https://github.com/death/cffi
 git cl-tree-sitter https://github.com/death/cl-tree-sitter
 git serapeum https://github.com/ruricolist/serapeum
 git gt https://github.com/GrammaTech/cl-utils.git
