@@ -689,12 +689,12 @@ if __STDC__ is defined."
            (possibly-incomplete-macro-p (ast)
              (and (or (typep ast 'c/cpp-preproc-if)
                       (typep ast 'c/cpp-preproc-ifdef))
-                  (not (typep (lastcar (direct-children ast)) 'statement-ast))))
-           (possibly-incomplete-ast-helper (ast)
-             (or (error-ast-p ast)
-                 (possibly-incomplete-macro-p ast))))
-    (or (possibly-incomplete-ast-helper (previous-sibling root ast))
-        (possibly-incomplete-ast-helper (next-sibling root ast)))))
+                  (not (typep (lastcar (direct-children ast)) 'statement-ast)))))
+    (let ((prev (previous-sibling root ast))
+          (next (next-sibling root ast)))
+      (or (possibly-incomplete-macro-p prev)
+          (error-ast-p prev)
+          (error-ast-p next)))))
 
 (defun previous-sibling (root ast)
   "Return the previous sibling of AST in ROOT."
