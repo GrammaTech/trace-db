@@ -857,12 +857,26 @@ if __STDC__ is defined."
                    (decl (aget :decl var))
                    (scope (aget :scope var))
                    ((var-instrument-p name decl scope root))
-                   (type (canonicalize-type decl :software software)))
+                   (type (get-canonicalized-type software decl name)))
           (collect (cons name type) into names-and-types))
         (finally
          (return (instrument-c-exprs instrumenter
                                      names-and-types
                                      print-strings)))))
+
+(defgeneric get-canonicalized-type (software decl name)
+  (:documentation "Get a canonicalized form of the TYPE for the variable
+with NAME in DECL.")
+  (:method ((software c/cpp)
+            (decl c/cpp-ast)
+            (name string))
+    (canonicalize-type decl :software software))
+  (:method ((software c/cpp)
+            (decl c/cpp-declaration)
+            (name string))
+    (when-let ((declarator (find name (c/cpp-declarator decl)
+                                 :key #'declarator-name :test #'equal)))
+      (canonicalize-type decl :declarator declarator :software software))))
 
 (-> var-instrument-p (string ast ast ast) (values boolean &optional))
 (defun var-instrument-p (name decl scope root)
